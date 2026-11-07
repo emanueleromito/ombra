@@ -63,6 +63,24 @@ These are not style preferences. Breaking one is a bug.
 - **Tests:** small sizes by default so tests are fast; large sizes only in `make bench`.
 - **Commits:** small and focused, imperative subject line ("Add query expansion kernel").
 
+## Agents and models
+
+The main session runs on **Opus 5.5** and acts as planner and reviewer. Hands-on work goes to cheaper subagents in `.claude/agents/`:
+
+| Agent | Model | Does | Can edit? |
+| --- | --- | --- | --- |
+| main session | Opus 5.5 | plans, delegates, reviews every diff, commits, opens PRs | yes |
+| `implementer` | Sonnet | writes code and tests for one scoped task | yes, no git |
+| `test-runner` | Haiku | runs `make` commands, summarizes results | no |
+| `Explore` | Haiku | read-only search of code and docs | no |
+
+Rules for the main session:
+1. **Delegate implementation** to `implementer`, one task at a time, passing the task ID and its "Done when" line.
+2. **Delegate test and benchmark runs** to `test-runner`.
+3. **Review before committing.** Read the full diff yourself and check it against the Hard rules: parameters, key handling, oracle tests for kernels, no plaintext logging, format versions. Anything in `core/` crypto code, key handling or parameter selection gets your line-by-line review, never only the subagent's summary.
+4. **Only the main session commits and opens PRs.** Subagents never run git write commands.
+5. If a subagent reports "blocked", decide yourself; do not send the same task back unchanged.
+
 ## How to work on a task
 
 1. Pick the task in `docs/plan/`. Its "Done when" line is the acceptance test.
