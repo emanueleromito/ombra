@@ -1,0 +1,105 @@
+# ---------------------------------------------------------------
+# Secrets and keys: never commit these
+# ---------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+*.keyfile
+*.ombrakey
+keys/
+secrets/
+**/test-keys/
+.modal.toml
+
+# ---------------------------------------------------------------
+# Data, models and benchmark output
+# ---------------------------------------------------------------
+data/
+datasets/
+*.fvecs
+*.bvecs
+*.ivecs
+*.npy
+*.npz
+*.parquet
+*.hdf5
+*.h5
+docs/plan/results/raw/
+# Serialized ciphertexts and keys produced by tests or spikes
+*.ctxt
+*.ombra
+*.bin
+
+# ---------------------------------------------------------------
+# C++ / CUDA / CMake
+# ---------------------------------------------------------------
+build/
+build-*/
+cmake-build-*/
+out/
+CMakeCache.txt
+CMakeFiles/
+CMakeUserPresets.json
+cmake_install.cmake
+CTestTestfile.cmake
+Testing/
+_deps/
+compile_commands.json
+*.o
+*.obj
+*.a
+*.so
+*.so.*
+*.dylib
+*.dll
+*.lib
+*.exe
+*.out
+*.ptx
+*.cubin
+*.fatbin
+*.ncu-rep
+*.nsys-rep
+*.qdrep
+*.sqlite
+.cache/
+.clangd/
+
+# ---------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+dist/
+wheels/
+.venv/
+venv/
+env/
+.python-version
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+.ipynb_checkpoints/
+
+# ---------------------------------------------------------------
+# Editors, OS and local agent state
+# ---------------------------------------------------------------
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+.claude/settings.local.json
+CLAUDE.local.md
