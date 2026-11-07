@@ -97,4 +97,5 @@ Rules for the main session:
 - Commit secrets, keys, key files, Modal tokens or datasets (see `.gitignore`).
 - Push to `main` directly; open a pull request.
 - Add dependencies without saying why in the PR description.
+- Add `Co-Authored-By` or session lines (e.g. `Claude-Session:` links) to commit messages or PR descriptions.
 - Silence a failing test to make CI green.
