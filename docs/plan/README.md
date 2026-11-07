@@ -18,6 +18,7 @@ Benchmark results go in [results/](results/), one file per run, so numbers are n
 ### T<milestone>.<n> Title
 
 **Why:** one line on what this proves or unlocks.
+**Depends on:** task IDs that must be done first (or "none").
 **Steps:** short list.
 **Done when:** a concrete, checkable condition.
 **Status:** todo | in progress | done
