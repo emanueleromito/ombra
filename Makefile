@@ -1,15 +1,19 @@
 # Ombra development commands. Run `make help` for the list.
 
-PYTHON      ?= python3
+PYTHON      ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 BUILD_DIR   ?= build
 CUDA_ARCHS  ?= 80;86
 TASK        ?= all
 
 .DEFAULT_GOAL := help
-.PHONY: help build build-cpu test test-gpu bench gpu-info results-pull fmt lint clean
+.PHONY: help venv build build-cpu test test-gpu test-openfhe bench gpu-info results-pull fmt lint clean
 
 help: ## List commands
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-14s %s\n", $$1, $$2}'
+
+venv: ## Create .venv with pytest and ruff
+	python3 -m venv .venv
+	.venv/bin/python -m pip install --quiet pytest ruff numpy
 
 build: ## Build C++/CUDA locally (needs CUDA)
 	cmake -S . -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=Debug -DOMBRA_ENABLE_CUDA=ON "-DCMAKE_CUDA_ARCHITECTURES=$(CUDA_ARCHS)"
@@ -21,10 +25,13 @@ build-cpu: ## Build C++ code without CUDA (for CPU-only tests)
 
 test: build-cpu ## Run CPU tests locally (C++ and Python)
 	ctest --test-dir $(BUILD_DIR)-cpu --output-on-failure --no-tests=ignore
-	$(PYTHON) -m pytest -m "not gpu"; code=$$?; [ $$code -eq 0 ] || [ $$code -eq 5 ]
+	$(PYTHON) -m pytest -m "not gpu and not openfhe"; code=$$?; [ $$code -eq 0 ] || [ $$code -eq 5 ]
 
 test-gpu: ## Run GPU tests on Modal (A10)
 	modal run modal_app.py::test_gpu
+
+test-openfhe: ## Run tests marked openfhe on Modal (CPU only, pinned image)
+	modal run modal_app.py::test_openfhe
 
 bench: ## Run benchmarks on Modal (A100); TASK=t0.4 to pick one
 	modal run modal_app.py::bench --task $(TASK)
