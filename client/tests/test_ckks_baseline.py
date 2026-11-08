@@ -149,7 +149,7 @@ def test_cpu_timings(ofhe):
         holder["keys"] = cc.KeyGen()
         cc.EvalMultKeyGen(holder["keys"].secretKey)
 
-    timings["keygen_with_evalmultkey"] = _median_ms(keygen, 3)
+    timings["keygen_with_evalmultkey"] = _median_ms(keygen)
     keys = holder["keys"]
     pt_a = cc.MakeCKKSPackedPlaintext(a)
     pt_b = cc.MakeCKKSPackedPlaintext(b)

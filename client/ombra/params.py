@@ -68,7 +68,7 @@ def get_preset(name: str, path: Path | None = None) -> dict[str, Any]:
     return presets[name]
 
 
-def make_ckks_params(preset: dict[str, Any]):
+def make_ckks_params(preset: dict[str, Any]) -> Any:
     """Validate a preset dict and return a configured openfhe CCParamsCKKSRNS."""
     validate_preset(preset)
     import openfhe as ofhe
@@ -85,7 +85,7 @@ def make_ckks_params(preset: dict[str, Any]):
     return params
 
 
-def make_context(name: str, path: Path | None = None):
+def make_context(name: str, path: Path | None = None) -> tuple[Any, Any]:
     """Return (params, crypto_context) for the named preset, with PKE, KEYSWITCH and LEVELEDSHE."""
     import openfhe as ofhe
 

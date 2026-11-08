@@ -13,7 +13,7 @@ help: ## List commands
 
 venv: ## Create .venv with pytest and ruff
 	python3 -m venv .venv
-	.venv/bin/python -m pip install --quiet pytest ruff numpy
+	.venv/bin/python -m pip install --quiet pytest ruff
 
 build: ## Build C++/CUDA locally (needs CUDA)
 	cmake -S . -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=Debug -DOMBRA_ENABLE_CUDA=ON "-DCMAKE_CUDA_ARCHITECTURES=$(CUDA_ARCHS)"
