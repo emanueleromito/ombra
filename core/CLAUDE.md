@@ -27,4 +27,4 @@ core/
 
 ## Testing
 
-`make test-gpu` runs these tests on a Modal A10G. Keep default test sizes small (one or a few ciphertexts) so a run takes seconds, not minutes.
+`make test-gpu` runs these tests on a Modal A10. Keep default test sizes small (one or a few ciphertexts) so a run takes seconds, not minutes.

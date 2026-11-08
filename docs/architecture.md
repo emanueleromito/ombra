@@ -16,7 +16,7 @@ Client (your environment)              Server (Docker, one or more machines)
   key file (secret key never leaves)
 ```
 
-**First version targets NVIDIA Ampere only** (`sm_80` A100, `sm_86` A10G). Other generations come later.
+**First version targets NVIDIA Ampere only** (`sm_80` A100, `sm_86` A10). Other generations come later.
 
 ## FHE library and scheme
 
@@ -111,4 +111,4 @@ The server ships as two Docker images on a public registry (GitHub Container Reg
 
 ## Development environment
 
-GPU development and benchmarks run on Modal (`modal_app.py`): A10G for day-to-day tests, A100 for benchmarks. The image is built from an NVIDIA CUDA devel base with OpenFHE and openfhe-python compiled from pinned release tags.
+GPU development and benchmarks run on Modal (`modal_app.py`): A10 for day-to-day tests, A100 for benchmarks. The image is built from an NVIDIA CUDA devel base with OpenFHE and openfhe-python compiled from pinned release tags.

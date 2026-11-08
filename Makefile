@@ -23,13 +23,13 @@ test: build-cpu ## Run CPU tests locally (C++ and Python)
 	ctest --test-dir $(BUILD_DIR)-cpu --output-on-failure --no-tests=ignore
 	$(PYTHON) -m pytest -m "not gpu"; code=$$?; [ $$code -eq 0 ] || [ $$code -eq 5 ]
 
-test-gpu: ## Run GPU tests on Modal (A10G)
+test-gpu: ## Run GPU tests on Modal (A10)
 	modal run modal_app.py::test_gpu
 
 bench: ## Run benchmarks on Modal (A100); TASK=t0.4 to pick one
 	modal run modal_app.py::bench --task $(TASK)
 
-gpu-info: ## Check GPU, CUDA and OpenFHE in the Modal image (A10G)
+gpu-info: ## Check GPU, CUDA and OpenFHE in the Modal image (A10)
 	modal run modal_app.py::gpu_info
 
 results-pull: ## Copy benchmark results from the Modal volume into docs/plan/results/raw/

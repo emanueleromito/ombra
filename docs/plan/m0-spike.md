@@ -2,7 +2,7 @@
 
 **Goal:** prove the hybrid OpenFHE + CUDA design works on Ampere, and get real numbers for query expansion, search throughput, batching, accuracy and sizes. Spike code may be rough, but every number must come from a reproducible command.
 
-**GPUs:** A10G for development (`make test-gpu`), A100 for benchmarks (`make bench`).
+**GPUs:** A10 for development (`make test-gpu`), A100 for benchmarks (`make bench`).
 **Vector dimensions:** 384, 768, 1536.
 **Collection sizes:** 100k, 1M (10M only if 1M looks good).
 **Datasets:** synthetic normalized random vectors first; then a real embedding set (e.g. a public text-embedding benchmark set) for recall.
@@ -22,8 +22,8 @@ T0.1 -> T0.2 -> T0.3 -> T0.4 + T0.5 (in parallel)
 
 **Why:** everything else runs on it.
 **Depends on:** none
-**Steps:** build the Modal image from `modal_app.py` (CUDA devel base, OpenFHE and openfhe-python from pinned tags); run `nvidia-smi`, `nvcc --version` and an openfhe-python import on A10G.
-**Done when:** `make gpu-info` prints the A10G, the CUDA version and the OpenFHE version, and the image builds from scratch without manual steps.
+**Steps:** build the Modal image from `modal_app.py` (CUDA devel base, OpenFHE and openfhe-python from pinned tags); run `nvidia-smi`, `nvcc --version` and an openfhe-python import on A10.
+**Done when:** `make gpu-info` prints the A10, the CUDA version and the OpenFHE version, and the image builds from scratch without manual steps.
 **Status:** todo
 
 ### T0.2 CKKS parameters and CPU baseline

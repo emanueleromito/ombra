@@ -1,10 +1,10 @@
 """GPU environment for Ombra on Modal.
 
-Development runs on an A10G (Ampere, sm_86); benchmarks on an A100 (Ampere, sm_80).
+Development runs on an A10 (Ampere, sm_86); benchmarks on an A100 (Ampere, sm_80).
 Use the Makefile instead of calling these directly:
 
     make gpu-info      # check GPU, CUDA and OpenFHE in the image
-    make test-gpu      # build and run GPU tests on an A10G
+    make test-gpu      # build and run GPU tests on an A10
     make bench         # build and run benchmarks on an A100
     make results-pull  # copy benchmark results from the Modal volume to docs/plan/results/raw/
 
@@ -91,7 +91,7 @@ def _build(build_type: str) -> None:
     _run(["cmake", "--build", BUILD_DIR, "-j"])
 
 
-@app.function(gpu="A10G", timeout=600)
+@app.function(gpu="A10", timeout=600)
 def gpu_info() -> None:
     """Print GPU, CUDA and OpenFHE versions, to check the image."""
     _run(["nvidia-smi"])
@@ -122,9 +122,9 @@ def gpu_info() -> None:
         raise SystemExit("installed openfhe-python does not match the pinned tag")
 
 
-@app.function(gpu="A10G", timeout=1800, volumes={DATA_DIR: volume})
+@app.function(gpu="A10", timeout=1800, volumes={DATA_DIR: volume})
 def test_gpu(pytest_args: str = "") -> None:
-    """Build in Debug and run C++ (ctest) and Python GPU tests on an A10G."""
+    """Build in Debug and run C++ (ctest) and Python GPU tests on an A10."""
     _build("Debug")
     _run(["ctest", "--test-dir", BUILD_DIR, "--output-on-failure", "--no-tests=ignore"])
     # Exit code 5 means "no tests collected", which is fine while the repo is empty.

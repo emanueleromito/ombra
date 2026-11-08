@@ -9,7 +9,7 @@ Supporting every GPU generation from day one slows builds and testing. We develo
 
 ## Decision
 
-Compile only for `sm_80` (A100) and `sm_86` (A10G). Develop on A10G, benchmark on A100. Ada, Hopper and Blackwell come later.
+Compile only for `sm_80` (A100) and `sm_86` (A10). Develop on A10, benchmark on A100. Ada, Hopper and Blackwell come later.
 
 ## Consequences
 
