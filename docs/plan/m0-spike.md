@@ -54,7 +54,7 @@ T0.1 -> T0.2 -> T0.3 -> T0.4 + T0.5 (in parallel)
 
 **Why:** the main open risk of decision 0003.
 **Depends on:** T0.3
-**Steps:** implement expanding one query ciphertext into d per-dimension ciphertexts with rotations (GPU), plus the rotation keys it needs; time it.
+**Steps:** per decision 0010: encode the query as coefficients on the client through OpenFHE; on the GPU, expand one query ciphertext into d per-dimension ciphertexts with a tree of substitutions X -> X^(N/2^k + 1) and key switching, pruned at d outputs, using keys from `EvalAutomorphismKeyGen`; adjust the ciphertext scale for the 2^l factor; time it and measure the automorphism-key size.
 **Done when:** expansion matches OpenFHE CPU, and expansion time and rotation-key size are recorded for d = 384, 768, 1536 on A100.
 **Status:** todo
 

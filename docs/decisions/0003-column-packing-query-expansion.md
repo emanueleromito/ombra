@@ -1,6 +1,6 @@
 # 0003. Column packing with server-side query expansion
 
-- **Status:** accepted
+- **Status:** accepted; expansion method amended by 0010
 - **Date:** 2026-10-31
 
 ## Context
