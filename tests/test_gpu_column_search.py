@@ -76,8 +76,14 @@ def test_gpu_column_search_matches_openfhe(tmp_path: Path, dims: int, blocks: in
             assert ofhe.SerializeToFile(str(tmp_path / f"stored_{b}_{j}.bin"), ct, ofhe.BINARY)
 
     proc = subprocess.run(  # noqa: S603
-        [str(_driver()), str(tmp_path / "context.bin"), str(tmp_path), str(tmp_path), str(dims),
-         str(blocks)],
+        [
+            str(_driver()),
+            str(tmp_path / "context.bin"),
+            str(tmp_path),
+            str(tmp_path),
+            str(dims),
+            str(blocks),
+        ],
         capture_output=True,
         text=True,
         timeout=600,
