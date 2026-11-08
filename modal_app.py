@@ -143,7 +143,9 @@ def test_openfhe(pytest_args: str = "") -> None:
     volume.commit()
 
 
-@app.function(gpu="A100", timeout=3600, volumes={DATA_DIR: volume})
+# memory: the T0.4 benchmark holds one block (about 1.2 GB at d = 1536) as OpenFHE ciphertexts plus
+# its flattened copy on the host at a time, so about 3 to 4 GB peak; 16 GiB leaves headroom.
+@app.function(gpu="A100", memory=16384, timeout=3600, volumes={DATA_DIR: volume})
 def bench(task: str = "all") -> None:
     """Build in Release and run benchmarks on an A100; results go to the volume."""
     _build("Release")

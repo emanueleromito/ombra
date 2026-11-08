@@ -1,0 +1,145 @@
+"""Benchmark runner for core/ kernels (run via `make bench`, on an A100 in Modal).
+
+    python core/bench/run.py --task t0.4 --out <dir>      # or --task all
+
+T0.4: column-packed search throughput for d = 384, 768, 1536. This script creates the CKKS context
+from the `m0_depth2` preset and a key pair, writes ONLY the context and the public key to a
+temporary directory (the secret key is never serialized or used), and runs the C++ benchmark binary
+`ombra_bench_column_search` once per dimension. It merges the binary's per-run JSON into
+`<out>/t0.4-a100.json`. Nothing written contains plaintext or keys.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT / "client"))
+
+PRESET = "m0_depth2"
+T04_DIMS = (384, 768, 1536)
+# Stored data per benchmark is kept near constant: blocks = BLOCK_DIM_BUDGET // d. At the preset
+# (3 towers, ring 16384, 8192 slots) one ciphertext is 786,432 bytes, so the stored data is about
+# 16 * 1536 * 786,432 B = 19.3 GB for every d, plus 1.2 GB (d = 1536) of query: under 40 GB.
+BLOCK_DIM_BUDGET = 16 * 1536
+DEFAULT_WARMUP = 2
+DEFAULT_ITERS = 10
+DEFAULT_OUT_NAME = "t0.4-a100.json"
+
+
+def find_binary(name: str) -> Path:
+    env = os.environ.get("OMBRA_BENCH_BIN_DIR")
+    candidates = [
+        Path(env) / name if env else None,
+        Path("/root/ombra-build/core") / name,
+        REPO_ROOT / "build" / "core" / name,
+    ]
+    for c in candidates:
+        if c is not None and c.is_file():
+            return c
+    raise SystemExit(f"{name} not found; build with `make build` (or via modal_app.py)")
+
+
+def openfhe_version() -> str:
+    """Installed OpenFHE C++ version, read from the config file `cmake --install` wrote."""
+    for path in sorted(Path("/usr/local").glob("lib*/OpenFHE/OpenFHEConfigVersion.cmake")):
+        match = re.search(r'set\(PACKAGE_VERSION\s+"([^"]+)"\)', path.read_text())
+        if match:
+            return match.group(1)
+    return "unknown"
+
+
+def run_t04(
+    out_dir: Path,
+    dims: tuple[int, ...],
+    blocks: int | None,
+    warmup: int,
+    iters: int,
+    out_name: str,
+) -> Path:
+    import openfhe as ofhe
+    from ombra import params as ombra_params
+
+    binary = find_binary("ombra_bench_column_search")
+    _, cc = ombra_params.make_context(PRESET)
+    keys = cc.KeyGen()
+
+    results = []
+    gpu_name = "unknown"
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        # Public material only. The secret key stays in this process and is never written.
+        if not ofhe.SerializeToFile(str(tmp_dir / "context.bin"), cc, ofhe.BINARY):
+            raise SystemExit("cannot serialize context")
+        if not ofhe.SerializeToFile(str(tmp_dir / "public_key.bin"), keys.publicKey, ofhe.BINARY):
+            raise SystemExit("cannot serialize public key")
+        for d in dims:
+            n_blocks = blocks if blocks is not None else max(1, BLOCK_DIM_BUDGET // d)
+            part = tmp_dir / f"part_{d}.json"
+            cmd = [
+                str(binary),
+                str(tmp_dir / "context.bin"),
+                str(tmp_dir / "public_key.bin"),
+                str(d),
+                str(n_blocks),
+                str(warmup),
+                str(iters),
+                str(part),
+            ]
+            print("$", " ".join(cmd), flush=True)
+            subprocess.run(cmd, check=True)  # noqa: S603
+            entry = json.loads(part.read_text())
+            gpu_name = entry.pop("gpu_name")
+            results.append(entry)
+            print(
+                f"d={d} blocks={n_blocks} vectors/s={entry['vectors_per_second']:.3e}",
+                flush=True,
+            )
+
+    record = {
+        "task": "t0.4",
+        "format_version": 1,
+        "preset": PRESET,
+        "openfhe_version": openfhe_version(),
+        "gpu_name": gpu_name,
+        "note": (
+            "Column-packed search: sum over d of stored_j * query_j (ciphertext x ciphertext, "
+            "evaluation form, 3 components). Relinearization and rescale are excluded. Kernel "
+            "time only (CUDA events); copies are reported separately."
+        ),
+        "results": results,
+    }
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / out_name
+    out_path.write_text(json.dumps(record, indent=2) + "\n")
+    print(f"wrote {out_path}")
+    return out_path
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--task", default="all", help="t0.4 or all")
+    parser.add_argument("--out", required=True, type=Path)
+    parser.add_argument("--dims", default=",".join(map(str, T04_DIMS)))
+    parser.add_argument("--blocks", type=int, default=None, help="override the block count")
+    parser.add_argument("--warmup", type=int, default=DEFAULT_WARMUP)
+    parser.add_argument("--iters", type=int, default=DEFAULT_ITERS)
+    parser.add_argument("--name", default=DEFAULT_OUT_NAME, help="output file name for t0.4")
+    args = parser.parse_args()
+
+    task = args.task.lower()
+    if task not in ("all", "t0.4"):
+        raise SystemExit(f"unknown task {args.task!r}")
+    dims = tuple(int(x) for x in args.dims.split(","))
+    run_t04(args.out, dims, args.blocks, args.warmup, args.iters, args.name)
+
+
+if __name__ == "__main__":
+    main()

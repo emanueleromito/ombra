@@ -17,7 +17,8 @@ string(REPLACE "-Werror" "" OMBRA_OPENFHE_CXX_FLAGS "${OpenFHE_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OMBRA_OPENFHE_CXX_FLAGS}")
 
 # Pure CUDA library: no OpenFHE headers are seen by nvcc.
-add_library(ombra_rns_cuda STATIC kernels/rns_basic.cu src/rns_basic_host.cu)
+add_library(ombra_rns_cuda STATIC kernels/rns_basic.cu kernels/column_search.cu src/rns_basic_host.cu
+            src/column_search_host.cu)
 target_include_directories(ombra_rns_cuda PUBLIC include PRIVATE kernels src)
 # CMake 3.22 (the pinned image's apt cmake) does not know the CUDA20 dialect (added in 3.25), and
 # this file needs nothing beyond C++17 device code.
@@ -32,3 +33,9 @@ target_link_libraries(ombra_core PUBLIC ombra_rns_cuda ${OpenFHE_SHARED_LIBRARIE
 
 add_executable(ombra_roundtrip src/ombra_roundtrip.cpp)
 target_link_libraries(ombra_roundtrip PRIVATE ombra_core)
+
+add_executable(ombra_column_search src/ombra_column_search.cpp)
+target_link_libraries(ombra_column_search PRIVATE ombra_core)
+
+add_executable(ombra_bench_column_search src/ombra_bench_column_search.cpp)
+target_link_libraries(ombra_bench_column_search PRIVATE ombra_core)

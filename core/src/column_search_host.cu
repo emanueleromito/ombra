@@ -1,0 +1,173 @@
+// Host wrapper for the column-packed search kernel (kernel: core/kernels/column_search.cu).
+// Internal code returns Status; the public functions convert to exceptions at the boundary.
+
+#include "ombra/core/column_search.hpp"
+
+#include <stdexcept>
+
+#include "device_buffer.cuh"
+#include "kernel_launch.hpp"
+#include "ombra/core/cuda_check.hpp"
+
+namespace ombra::core {
+namespace {
+
+void validate_shape(const ColumnSearchShape& s, const std::vector<u64>& moduli) {
+    if (s.dims == 0 || s.blocks == 0 || s.num_towers == 0 || s.ring_dim == 0) {
+        throw std::invalid_argument("column_search: empty shape");
+    }
+    if (moduli.size() != s.num_towers) {
+        throw std::invalid_argument("column_search: one modulus per tower is required");
+    }
+    if ((s.blocks + 3) / 4 > 65535) {
+        throw std::invalid_argument("column_search: too many blocks for one launch");
+    }
+}
+
+// Words are laid out [poly][tower][coeff]: chunk number i / ring_dim has tower (chunk % towers).
+void check_reduced(const u64* words, std::size_t count, const ColumnSearchShape& s,
+                   const std::vector<u64>& moduli) {
+    for (std::size_t chunk = 0; chunk * s.ring_dim < count; ++chunk) {
+        const u64 q = moduli[chunk % s.num_towers];
+        const u64* p = words + chunk * s.ring_dim;
+        for (std::size_t i = 0; i < s.ring_dim; ++i) {
+            if (p[i] >= q) throw std::invalid_argument("column_search: unreduced input word");
+        }
+    }
+}
+
+}  // namespace
+
+struct ColumnSearchDevice::Impl {
+    ColumnSearchShape shape;
+    std::vector<u64> moduli;
+    DeviceBuffer<u64> stored, query, out;
+    DeviceBuffer<TowerConst> tc;
+    cudaEvent_t start = nullptr, stop = nullptr;
+
+    ~Impl() {
+        // Destructors cannot return a Status; failures are ignored on purpose (nothing to recover).
+        if (start != nullptr) (void)cudaEventDestroy(start);
+        if (stop != nullptr) (void)cudaEventDestroy(stop);
+    }
+
+    Status init(const std::vector<TowerConst>& consts) {
+        OMBRA_TRY(stored.allocate(shape.stored_words()));
+        OMBRA_TRY(query.allocate(shape.query_words()));
+        OMBRA_TRY(out.allocate(shape.out_words()));
+        OMBRA_TRY(tc.allocate(consts.size()));
+        OMBRA_CUDA_CHECK(cudaMemcpy(tc.get(), consts.data(), consts.size() * sizeof(TowerConst),
+                                    cudaMemcpyHostToDevice));
+        OMBRA_CUDA_CHECK(cudaEventCreate(&start));
+        OMBRA_CUDA_CHECK(cudaEventCreate(&stop));
+        return {};
+    }
+
+    Status copy_in(u64* dst, const u64* src, std::size_t count) {
+        OMBRA_CUDA_CHECK(cudaMemcpy(dst, src, count * sizeof(u64), cudaMemcpyHostToDevice));
+        return {};
+    }
+
+    Status copy_block_dev(std::size_t src, std::size_t dst) {
+        const std::size_t bw = shape.block_words();
+        OMBRA_CUDA_CHECK(cudaMemcpy(stored.get() + dst * bw, stored.get() + src * bw,
+                                    bw * sizeof(u64), cudaMemcpyDeviceToDevice));
+        return {};
+    }
+
+    Status run_kernel(double& seconds) {
+        const ColumnSearchDims d{shape.dims, shape.blocks, shape.num_towers, shape.ring_dim};
+        OMBRA_CUDA_CHECK(cudaEventRecord(start, nullptr));
+        OMBRA_CUDA_CHECK(
+            launch_column_search(stored.get(), query.get(), out.get(), tc.get(), d, nullptr));
+        OMBRA_CUDA_CHECK(cudaEventRecord(stop, nullptr));
+        OMBRA_CUDA_CHECK(cudaEventSynchronize(stop));  // wait for completion before timing is read
+        OMBRA_CUDA_CHECK_LAUNCH();
+        float ms = 0;
+        OMBRA_CUDA_CHECK(cudaEventElapsedTime(&ms, start, stop));
+        seconds = ms / 1000.0;
+        return {};
+    }
+
+    Status copy_out(std::vector<u64>& host) {
+        host.assign(shape.out_words(), 0);
+        OMBRA_CUDA_CHECK(cudaMemcpy(host.data(), out.get(), host.size() * sizeof(u64),
+                                    cudaMemcpyDeviceToHost));
+        return {};
+    }
+};
+
+ColumnSearchDevice::ColumnSearchDevice(const ColumnSearchShape& shape,
+                                       const std::vector<std::uint64_t>& moduli)
+    : impl_(std::make_unique<Impl>()) {
+    validate_shape(shape, moduli);
+    const std::vector<TowerConst> consts = make_tower_consts(moduli);
+    impl_->shape = shape;
+    impl_->moduli = moduli;
+    impl_->init(consts).throw_if_error();
+}
+
+ColumnSearchDevice::~ColumnSearchDevice() = default;
+
+void ColumnSearchDevice::upload_block(std::size_t block, const std::uint64_t* words,
+                                      std::size_t count) {
+    const ColumnSearchShape& s = impl_->shape;
+    if (block >= s.blocks || count != s.block_words()) {
+        throw std::invalid_argument("column_search: bad block index or size");
+    }
+    check_reduced(words, count, s, impl_->moduli);
+    impl_->copy_in(impl_->stored.get() + block * s.block_words(), words, count).throw_if_error();
+}
+
+void ColumnSearchDevice::copy_block(std::size_t src, std::size_t dst) {
+    if (src >= impl_->shape.blocks || dst >= impl_->shape.blocks) {
+        throw std::invalid_argument("column_search: bad block index");
+    }
+    impl_->copy_block_dev(src, dst).throw_if_error();
+}
+
+void ColumnSearchDevice::upload_query(const std::uint64_t* words, std::size_t count) {
+    const ColumnSearchShape& s = impl_->shape;
+    if (count != s.query_words()) throw std::invalid_argument("column_search: bad query size");
+    check_reduced(words, count, s, impl_->moduli);
+    impl_->copy_in(impl_->query.get(), words, count).throw_if_error();
+}
+
+double ColumnSearchDevice::run() {
+    double seconds = 0;
+    impl_->run_kernel(seconds).throw_if_error();
+    return seconds;
+}
+
+void ColumnSearchDevice::download_result(std::vector<std::uint64_t>& out) {
+    impl_->copy_out(out).throw_if_error();
+}
+
+std::string cuda_device_name() {
+    int dev = 0;
+    cudaDeviceProp prop{};
+    const auto query = [&]() -> Status {
+        OMBRA_CUDA_CHECK(cudaGetDevice(&dev));
+        OMBRA_CUDA_CHECK(cudaGetDeviceProperties(&prop, dev));
+        return {};
+    };
+    query().throw_if_error();
+    return prop.name;
+}
+
+void column_search(const std::vector<std::uint64_t>& stored, const std::vector<std::uint64_t>& query,
+                   std::vector<std::uint64_t>& out, const ColumnSearchShape& shape,
+                   const std::vector<std::uint64_t>& moduli) {
+    if (stored.size() != shape.stored_words() || query.size() != shape.query_words()) {
+        throw std::invalid_argument("column_search: operand size does not match shape");
+    }
+    ColumnSearchDevice dev(shape, moduli);
+    for (std::size_t b = 0; b < shape.blocks; ++b) {
+        dev.upload_block(b, stored.data() + b * shape.block_words(), shape.block_words());
+    }
+    dev.upload_query(query.data(), query.size());
+    dev.run();
+    dev.download_result(out);
+}
+
+}  // namespace ombra::core
