@@ -40,7 +40,7 @@ T0.1 -> T0.2 -> T0.3 -> T0.4 + T0.5 (in parallel)
 **Depends on:** T0.2
 **Steps:** serialize an OpenFHE ciphertext in Python; load it in C++; copy its polynomials to the GPU; run a trivial kernel (ciphertext + ciphertext, then ciphertext × plaintext); copy back; decrypt in Python.
 **Done when:** decrypted GPU results match OpenFHE CPU results on the same inputs within tolerance, in an automated test run by `make test-gpu`.
-**Status:** todo
+**Status:** done
 
 ### T0.4 Column-packed search kernel
 
