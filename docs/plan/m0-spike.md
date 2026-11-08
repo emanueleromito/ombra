@@ -48,7 +48,7 @@ T0.1 -> T0.2 -> T0.3 -> T0.4 + T0.5 (in parallel)
 **Depends on:** T0.3
 **Steps:** pack N vectors column-wise (one ciphertext per dimension, many vectors per ciphertext); implement multiply-and-add over d dimensions on the GPU with a pre-expanded query; compare with OpenFHE CPU.
 **Done when:** scores match OpenFHE CPU within tolerance, and throughput (vectors scored per second) on A100 is recorded for d = 384, 768, 1536.
-**Status:** todo
+**Status:** done
 
 ### T0.5 Query expansion
 
