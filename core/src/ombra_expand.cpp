@@ -3,13 +3,16 @@
 // Usage: ombra_expand <context.bin> <query.bin> <autokeys.bin> <out_dir> <d>
 //
 // Inputs are OpenFHE BINARY serializations of public material only: the CryptoContext, one query
-// ciphertext (coefficient-packed, see client/ombra/query.py) and the automorphism keys from
+// ciphertext (symmetric coefficient-packed, see client/ombra/query.py) and the automorphism keys from
 // EvalAutomorphismKeyGen. Runs the SealPIR-style tree of expansion_tree.hpp with
 //   - EvalAutomorphism (base-leveledshe.cpp:382, key switch then permute, :411-436) for tau_t,
 //   - EvalAdd / EvalSub,
 //   - an exact multiplication by X^(-k) done on the coefficients of every RNS tower (no level,
 //     no scale change),
-// then multiplies each output's scaling factor by 2^L (the tree scaled every value by 2^L).
+// then removes the factor 2^L the tree put on every value by multiplying each output by the exact
+// constant 2^-L on the server (EvalMult by a double: scale degree +1, no rescale). Adjusting the
+// ciphertext scaling factor instead does nothing under FIXEDMANUAL, whose decode ignores it
+// (ckkspackedencoding.cpp:315-363), so the leaves would decrypt to 2^L * q_j.
 // Writes expanded_<j>.bin for j in [0, d) to <out_dir>. Never takes a secret key and prints no
 // data values: only depth, node counts and timing.
 // Exit code: 0 ok, 2 error.
@@ -120,18 +123,15 @@ int main(int argc, char** argv) {
 
         const double factor = std::ldexp(1.0, static_cast<int>(stats.depth));
         for (std::size_t j = 0; j < out.size(); ++j) {
-            out[j]->SetScalingFactor(out[j]->GetScalingFactor() * factor);
+            out[j] = cc->EvalMult(out[j], 1.0 / factor);
             const std::string path = out_dir + "/expanded_" + std::to_string(j) + ".bin";
             if (!Serial::SerializeToFile(path, out[j], SerType::BINARY)) {
                 throw std::runtime_error("cannot write " + path);
             }
         }
-        std::printf("expansion: d=%zu depth=%zu outputs=%zu nodes=%zu automorphisms=%zu seconds=%.3f\n",
+        std::printf("d=%zu depth=%zu outputs=%zu nodes=%zu automorphisms=%zu seconds=%.3f\n",
                     d, stats.depth, out.size(), stats.nodes, stats.automorphisms,
                     std::chrono::duration<double>(t1 - t0).count());
-        for (std::size_t l = 0; l < stats.nodes_per_level.size(); ++l) {
-            std::printf("expansion: level %zu nodes=%zu\n", l, stats.nodes_per_level[l]);
-        }
         return 0;
     } catch (const std::exception& e) {
         std::fprintf(stderr, "error: %s\n", e.what());

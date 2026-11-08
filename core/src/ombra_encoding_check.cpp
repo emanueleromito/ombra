@@ -1,18 +1,17 @@
 // ombra_encoding_check: reads the polynomial coefficients OpenFHE produces when it encodes given
-// complex slot values (T0.5 encoding test).
+// real slot values (T0.5 encoding test).
 //
 // Usage: ombra_encoding_check <context.bin> <slots.bin> <q.bin> <d>
 //
-// <slots.bin> holds N/2 complex slot values as interleaved little-endian doubles (re, im); <q.bin>
-// holds d doubles. The plaintext is encoded with MakeCKKSPackedPlaintext (complex overload), its
-// DCRTPoly is interpolated over the CRT basis to centered big integers, and the maximum of
-// |coefficient / scale - target| over all N coefficients is printed, where target is q_j for
-// j < d and 0 otherwise. Needs no keys. Prints only that maximum.
+// <slots.bin> holds N/2 real slot values as little-endian doubles; <q.bin> holds d doubles. The
+// plaintext is encoded with the real MakeCKKSPackedPlaintext, its DCRTPoly is interpolated over the
+// CRT basis to centered big integers, and the maximum of |coefficient / scale - target| over all N
+// coefficients is printed, where target is q_j at index j, -q_j at index N - j (j >= 1) and 0
+// elsewhere. Needs no keys and makes no CUDA calls. Prints only that maximum.
 // Exit code: 0 ok, 2 error.
 
 #include <algorithm>
 #include <cmath>
-#include <complex>
 #include <cstdio>
 #include <exception>
 #include <fstream>
@@ -51,13 +50,11 @@ int main(int argc, char** argv) {
         }
         const std::size_t d = std::stoul(argv[4]);
         const std::size_t ring = cc->GetRingDimension();
-        const std::size_t slots = ring / 2;
-        const std::vector<double> raw = read_doubles(argv[2], 2 * slots);
-        const std::vector<double> q = read_doubles(argv[3], d);
-        std::vector<std::complex<double>> values(slots);
-        for (std::size_t k = 0; k < slots; ++k) {
-            values[k] = {raw[2 * k], raw[2 * k + 1]};
+        if (d == 0 || d > ring / 2) {
+            throw std::runtime_error("d must be in [1, N/2]");
         }
+        const std::vector<double> values = read_doubles(argv[2], ring / 2);
+        const std::vector<double> q = read_doubles(argv[3], d);
 
         Plaintext pt = cc->MakeCKKSPackedPlaintext(values);
         DCRTPoly poly = pt->GetElement<DCRTPoly>();
@@ -71,7 +68,12 @@ int main(int argc, char** argv) {
         for (std::size_t j = 0; j < ring; ++j) {
             const BigInteger& v = big.GetValues()[j];
             const double c = (v > half) ? -(modulus - v).ConvertToDouble() : v.ConvertToDouble();
-            const double want = (j < d) ? q[j] : 0.0;
+            double want = 0.0;
+            if (j < d) {
+                want = q[j];
+            } else if (j > ring - d) {  // index N - i holds -q_i for 1 <= i < d
+                want = -q[ring - j];
+            }
             worst = std::max(worst, std::abs(c / scale - want));
         }
         std::printf("encoding check: d=%zu max_coeff_error_in_scale_units=%.3e\n", d, worst);

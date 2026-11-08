@@ -1,12 +1,14 @@
 // Query expansion tree (decision 0010, T0.5). Independent of OpenFHE and CUDA types so the same
 // tree can run with the CPU reference operations (ombra_expand.cpp) and, later, GPU operations.
 //
-// The input is one ciphertext whose plaintext polynomial is q(X) = sum_j q_j X^j, j < d. At level l
-// (l = 0 .. L-1, L = ceil(log2 d)) every node c with residue r (its coefficients sit at indices
-// congruent to r mod 2^l) is split with t = N/2^l + 1:
+// The input is one ciphertext whose plaintext polynomial is the symmetric
+// p(X) = q_0 + sum_{j>=1} q_j (X^j + X^-j), i.e. coefficient j is q_j and coefficient N-j is -q_j.
+// With L = ceil(log2(2d)) (2^L >= 2d, so j and N-j fall in different residues mod 2^L), at level l
+// (l = 0 .. L-1) every node c with residue r (its coefficients sit at indices congruent to r mod
+// 2^l) is split with t = N/2^l + 1:
 //     child r            = c + tau_t(c)
 //     child r + 2^l      = (c - tau_t(c)) * X^(-2^l)
-// After L levels the node with residue r is the constant polynomial 2^L * q_r. Branches whose
+// After L levels the node with residue r < d is the constant polynomial 2^L * q_r. Branches whose
 // smallest leaf index is >= d are never created, so exactly d outputs come out, all at depth L.
 // The factor 2^L is NOT removed here; the caller adjusts the scaling factor.
 #pragma once
@@ -29,7 +31,7 @@ struct ExpansionStats {
 
 inline std::size_t expansion_depth(std::size_t d) {
     std::size_t depth = 0;
-    while ((std::size_t{1} << depth) < d) {
+    while ((std::size_t{1} << depth) < 2 * d) {
         ++depth;
     }
     return depth;
@@ -44,7 +46,7 @@ inline std::size_t expansion_depth(std::size_t d) {
 template <class Ct, class Ops>
 std::vector<Ct> expand_tree(const Ct& root, std::size_t d, std::size_t ring_dim, Ops& ops,
                             ExpansionStats* stats = nullptr) {
-    if (d == 0 || d > ring_dim / 2) {
+    if (d == 0 || d > ring_dim / 2) {  // also guarantees 2^L <= N
         throw std::invalid_argument("expansion: d must be in [1, N/2]");
     }
     const std::size_t depth = expansion_depth(d);
