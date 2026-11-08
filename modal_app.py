@@ -128,8 +128,12 @@ def test_gpu(pytest_args: str = "") -> None:
     """Build in Debug and run C++ (ctest) and Python GPU tests on an A10."""
     _build("Debug")
     _run(["ctest", "--test-dir", BUILD_DIR, "--output-on-failure", "--no-tests=ignore"])
-    # Exit code 5 means "no tests collected", which is fine while the repo is empty.
-    _run(["python", "-m", "pytest", "-m", "gpu", *pytest_args.split()], ok_codes=(0, 5))
+    # Zero collected tests (pytest exit code 5) is a failure: GPU tests exist now (T0.3). The
+    # driver for tests/test_gpu_ciphertext_roundtrip.py is built into BUILD_DIR above.
+    _run(
+        ["python", "-m", "pytest", "-m", "gpu", "-v", "-s", *pytest_args.split()],
+        ok_codes=(0,),
+    )
 
 
 @app.function(cpu=4.0, memory=8192, timeout=1800, volumes={DATA_DIR: volume})
