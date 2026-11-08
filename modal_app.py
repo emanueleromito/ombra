@@ -13,6 +13,7 @@ Needs MODAL_TOKEN_ID and MODAL_TOKEN_SECRET in the environment (or `modal token 
 
 from __future__ import annotations
 
+import re
 import subprocess
 from pathlib import Path
 
@@ -96,7 +97,29 @@ def gpu_info() -> None:
     _run(["nvidia-smi"])
     _run(["nvcc", "--version"])
     _run(["python", "-c", "import openfhe; print('openfhe-python imported OK')"])
-    print(f"OpenFHE {OPENFHE_TAG}, openfhe-python {OPENFHE_PYTHON_TAG}")
+
+    # Installed versions, read from the image (not from the pins above). openfhe-python has no
+    # binding for the C++ GetOPENFHEVersion(), so read PACKAGE_VERSION from the OpenFHEConfigVersion
+    # file that `cmake --install` wrote (lib/ or lib64/ under /usr/local).
+    version_files = sorted(Path("/usr/local").glob("lib*/OpenFHE/OpenFHEConfigVersion.cmake"))
+    if not version_files:
+        raise SystemExit("OpenFHEConfigVersion.cmake not found under /usr/local/lib*/OpenFHE")
+    match = re.search(r'set\(PACKAGE_VERSION\s+"([^"]+)"\)', version_files[0].read_text())
+    if match is None:
+        raise SystemExit(f"no PACKAGE_VERSION in {version_files[0]}")
+    installed_openfhe = match.group(1)
+    installed_python = subprocess.run(
+        ["python", "-c", "import openfhe; print(openfhe.__version__)"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    print(f"OpenFHE installed: {installed_openfhe} (pinned: {OPENFHE_TAG})")
+    print(f"openfhe-python installed: {installed_python} (pinned: {OPENFHE_PYTHON_TAG})")
+    if installed_openfhe != OPENFHE_TAG.lstrip("v"):
+        raise SystemExit("installed OpenFHE does not match the pinned tag")
+    if installed_python != OPENFHE_PYTHON_TAG.lstrip("v"):
+        raise SystemExit("installed openfhe-python does not match the pinned tag")
 
 
 @app.function(gpu="A10G", timeout=1800, volumes={DATA_DIR: volume})
