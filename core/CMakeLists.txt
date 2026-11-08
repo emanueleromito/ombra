@@ -39,3 +39,9 @@ target_link_libraries(ombra_column_search PRIVATE ombra_core)
 
 add_executable(ombra_bench_column_search src/ombra_bench_column_search.cpp)
 target_link_libraries(ombra_bench_column_search PRIVATE ombra_core)
+
+add_executable(ombra_expand src/ombra_expand.cpp)
+target_link_libraries(ombra_expand PRIVATE ombra_core)
+
+add_executable(ombra_encoding_check src/ombra_encoding_check.cpp)
+target_link_libraries(ombra_encoding_check PRIVATE ombra_core)
