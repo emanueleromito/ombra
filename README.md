@@ -26,7 +26,7 @@ See [docs/](docs/) for the product requirements, architecture and decisions.
 
 ## Development
 
-GPU work runs on [Modal](https://modal.com). Targets for now: NVIDIA Ampere (A10G for development, A100 for benchmarks).
+GPU work runs on [Modal](https://modal.com). Targets for now: NVIDIA Ampere (A10 for development, A100 for benchmarks).
 
 ```bash
 make help        # list all commands

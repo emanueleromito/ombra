@@ -1,6 +1,6 @@
 ---
 name: run-on-gpu
-description: Run GPU tests or benchmarks for Ombra on Modal (A10G for tests, A100 for benchmarks) and bring the results back. Use whenever code in core/ must be run or measured on a GPU.
+description: Run GPU tests or benchmarks for Ombra on Modal (A10 for tests, A100 for benchmarks) and bring the results back. Use whenever code in core/ must be run or measured on a GPU.
 ---
 
 # Run on GPU (Modal)
@@ -11,9 +11,9 @@ There is no local GPU. All CUDA execution goes through Modal via the Makefile.
 
 | Goal | Command | GPU |
 | --- | --- | --- |
-| Check the environment | `make gpu-info` | A10G |
-| Build and run GPU tests | `make test-gpu` | A10G |
-| Run one test file or filter | `modal run modal_app.py::test_gpu --pytest-args "-k expansion"` | A10G |
+| Check the environment | `make gpu-info` | A10 |
+| Build and run GPU tests | `make test-gpu` | A10 |
+| Run one test file or filter | `modal run modal_app.py::test_gpu --pytest-args "-k expansion"` | A10 |
 | Run benchmarks | `make bench TASK=t0.4` | A100 |
 | Copy results locally | `make results-pull` | none |
 

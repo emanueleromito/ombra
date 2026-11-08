@@ -35,7 +35,7 @@ Always use the Makefile; run `make help` for the full list.
 | --- | --- |
 | `make build` | Configure and build C++/CUDA locally (needs CUDA) |
 | `make test` | CPU tests (Python + C++), runs locally |
-| `make test-gpu` | GPU tests on Modal (A10G) |
+| `make test-gpu` | GPU tests on Modal (A10) |
 | `make bench` | Benchmarks on Modal (A100) |
 | `make fmt` | Format all code (clang-format, ruff) |
 | `make lint` | Lint all code |
