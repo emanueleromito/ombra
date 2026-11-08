@@ -34,8 +34,10 @@ Always use the Makefile; run `make help` for the full list.
 | Command | What it does |
 | --- | --- |
 | `make build` | Configure and build C++/CUDA locally (needs CUDA) |
-| `make test` | CPU tests (Python + C++), runs locally |
-| `make test-gpu` | GPU tests on Modal (A10) |
+| `make venv` | Create the gitignored `.venv` with pytest and ruff, which `make` then uses |
+| `make test` | CPU tests (Python + C++) that need neither OpenFHE nor a GPU, runs locally |
+| `make test-openfhe` | Tests marked `openfhe`, on Modal in the pinned image, CPU only (no GPU) |
+| `make test-gpu` | Tests marked `gpu` and C++ tests, on Modal (A10) |
 | `make bench` | Benchmarks on Modal (A100) |
 | `make fmt` | Format all code (clang-format, ruff) |
 | `make lint` | Lint all code |

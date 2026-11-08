@@ -5,6 +5,7 @@ Use the Makefile instead of calling these directly:
 
     make gpu-info      # check GPU, CUDA and OpenFHE in the image
     make test-gpu      # build and run GPU tests on an A10
+    make test-openfhe  # run tests marked `openfhe` on CPU in the pinned image
     make bench         # build and run benchmarks on an A100
     make results-pull  # copy benchmark results from the Modal volume to docs/plan/results/raw/
 
@@ -127,8 +128,19 @@ def test_gpu(pytest_args: str = "") -> None:
     """Build in Debug and run C++ (ctest) and Python GPU tests on an A10."""
     _build("Debug")
     _run(["ctest", "--test-dir", BUILD_DIR, "--output-on-failure", "--no-tests=ignore"])
-    # Exit code 5 means "no tests collected", which is fine while the repo is empty.
-    _run(["python", "-m", "pytest", "-m", "gpu", *pytest_args.split()], ok_codes=(0, 5))
+    # Zero collected tests (pytest exit code 5) is a failure: GPU tests exist now (T0.3). The
+    # driver for tests/test_gpu_ciphertext_roundtrip.py is built into BUILD_DIR above.
+    _run(
+        ["python", "-m", "pytest", "-m", "gpu", "-v", "-s", *pytest_args.split()],
+        ok_codes=(0,),
+    )
+
+
+@app.function(cpu=4.0, memory=8192, timeout=1800, volumes={DATA_DIR: volume})
+def test_openfhe(pytest_args: str = "") -> None:
+    """Run tests marked `openfhe` on CPU. Zero collected tests (exit code 5) is a failure."""
+    _run(["python", "-m", "pytest", "-m", "openfhe", *pytest_args.split()], ok_codes=(0,))
+    volume.commit()
 
 
 @app.function(gpu="A100", timeout=3600, volumes={DATA_DIR: volume})

@@ -32,7 +32,7 @@ T0.1 -> T0.2 -> T0.3 -> T0.4 + T0.5 (in parallel)
 **Depends on:** T0.1
 **Steps:** pick a CKKS parameter set (ring dimension, scaling, depth 2) that gives at least 128-bit security under OpenFHE's security tables; in Python, encrypt, multiply-add, decrypt; time each step on CPU.
 **Done when:** a test asserts the security level is at least 128 bits, a CPU round trip matches plaintext within a stated tolerance, and CPU timings are written to `results/`.
-**Status:** todo
+**Status:** done
 
 ### T0.3 Ciphertext round trip through CUDA
 
@@ -40,7 +40,7 @@ T0.1 -> T0.2 -> T0.3 -> T0.4 + T0.5 (in parallel)
 **Depends on:** T0.2
 **Steps:** serialize an OpenFHE ciphertext in Python; load it in C++; copy its polynomials to the GPU; run a trivial kernel (ciphertext + ciphertext, then ciphertext × plaintext); copy back; decrypt in Python.
 **Done when:** decrypted GPU results match OpenFHE CPU results on the same inputs within tolerance, in an automated test run by `make test-gpu`.
-**Status:** todo
+**Status:** done
 
 ### T0.4 Column-packed search kernel
 
