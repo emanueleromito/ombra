@@ -24,7 +24,7 @@ T0.1 -> T0.2 -> T0.3 -> T0.4 + T0.5 (in parallel)
 **Depends on:** none
 **Steps:** build the Modal image from `modal_app.py` (CUDA devel base, OpenFHE and openfhe-python from pinned tags); run `nvidia-smi`, `nvcc --version` and an openfhe-python import on A10.
 **Done when:** `make gpu-info` prints the A10, the CUDA version and the OpenFHE version, and the image builds from scratch without manual steps.
-**Status:** todo
+**Status:** done
 
 ### T0.2 CKKS parameters and CPU baseline
 
