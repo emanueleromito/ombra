@@ -36,6 +36,28 @@ struct FlatCiphertexts {
 // std::invalid_argument if they differ in level, noise degree, scale, shape or moduli.
 FlatCiphertexts flatten_ciphertexts(const std::vector<lbcrypto::Ciphertext<lbcrypto::DCRTPoly>>& cts);
 
+// One ciphertext of any number of components (T1.2: 3-component products, rescaled ciphertexts),
+// words [component][tower][coeff] and its metadata.
+struct FlatOne {
+    std::size_t components = 0;
+    std::size_t num_towers = 0;
+    std::size_t ring_dim = 0;
+    std::vector<std::uint64_t> words;
+    std::vector<std::uint64_t> moduli;
+    std::size_t level = 0;
+    std::size_t noise_scale_deg = 0;
+    double scaling_factor = 0;
+};
+FlatOne flatten_one(const lbcrypto::Ciphertext<lbcrypto::DCRTPoly>& ct);
+
+// A ciphertext with `components` polynomials of `towers` towers (a prefix of the towers of `like`),
+// RNS words `words` ([component][tower][coeff], evaluation form) and the given metadata; context,
+// key tag and encoding are copied from `like`. Throws std::invalid_argument on a size mismatch.
+lbcrypto::Ciphertext<lbcrypto::DCRTPoly> make_ciphertext_like(
+    const lbcrypto::Ciphertext<lbcrypto::DCRTPoly>& like, std::size_t components,
+    std::size_t towers, const std::vector<std::uint64_t>& words, std::size_t level,
+    std::size_t noise_scale_deg, double scaling_factor);
+
 // Inverse of flatten_ciphertexts for one ciphertext: a copy of `like` (context, key tag, level,
 // noise degree, scaling factor) whose RNS words are replaced by `words` ([component][tower][coeff],
 // evaluation form, same shape and moduli as `like`).
