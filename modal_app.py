@@ -234,7 +234,8 @@ def recall(dry_run: bool = False, queries: int = 100) -> None:
         volume.commit()
 
 
-@app.function(gpu="A100", memory=16384, timeout=3600)
+# "A100-40GB" pins the SXM4 40 GB part that T0.4 ran on; plain "A100" can also give an 80 GB PCIe card.
+@app.function(gpu="A100-40GB", memory=16384, timeout=3600)
 def profile_search(ncu: bool = True, micro: bool = True) -> None:
     """T1.4 profiling: micro kernels, instruction mix and an Nsight Compute attempt on an A100."""
     import json
