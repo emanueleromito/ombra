@@ -16,6 +16,9 @@ directory. Output: `<out>/t0.5-a100.json` with d, L, nodes, automorphisms, keys,
 gpu_seconds and iterations per d.
 
     python core/bench/run.py --task t0.5 --out <dir>
+
+T0.11: compact configurations (ring dimension 8192 preset, fp16/int8 plaintext storage), see
+core/bench/t011.py. Only runs when asked for: `--task t0.11` (not part of `all`).
 """
 
 from __future__ import annotations
@@ -227,16 +230,33 @@ def main() -> None:
     parser.add_argument(
         "--profile", action="store_true", help="t0.5: also time the stages of one split"
     )
+    parser.add_argument("--presets-t011", default="m0_depth2,m0_compact_n8192", help="t0.11")
+    parser.add_argument(
+        "--error-presets-t011", default="m0_compact_n8192", help="t0.11: presets with the e2e error"
+    )
     args = parser.parse_args()
 
     task = args.task.lower()
-    if task not in ("all", "t0.4", "t0.5"):
+    if task not in ("all", "t0.4", "t0.5", "t0.11"):
         raise SystemExit(f"unknown task {args.task!r}")
     dims = tuple(int(x) for x in args.dims.split(","))
     if task in ("all", "t0.4"):
         run_t04(args.out, dims, args.blocks, args.warmup, args.iters, args.name)
     if task in ("all", "t0.5"):
         run_t05(args.out, dims, args.warmup, args.iters, args.name_t05, args.profile)
+    if task == "t0.11":
+        from t011 import run_t011
+
+        run_t011(
+            args.out,
+            dims,
+            tuple(args.presets_t011.split(",")),
+            tuple(x for x in args.error_presets_t011.split(",") if x),
+            args.warmup,
+            args.iters,
+            find_binary,
+            openfhe_version(),
+        )
 
 
 if __name__ == "__main__":

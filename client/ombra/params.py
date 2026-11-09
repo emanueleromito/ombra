@@ -82,6 +82,10 @@ def make_ckks_params(preset: dict[str, Any]) -> Any:
     params.SetBatchSize(preset["batch_size"])
     params.SetScalingTechnique(getattr(ofhe.ScalingTechnique, preset["scaling_technique"]))
     params.SetKeySwitchTechnique(getattr(ofhe.KeySwitchTechnique, preset["key_switch_technique"]))
+    # Optional: number of key-switching digits (HYBRID). Without it OpenFHE picks its default.
+    # The digit count sets the size of the special modulus P, hence log2(QP).
+    if "num_large_digits" in preset:
+        params.SetNumLargeDigits(preset["num_large_digits"])
     return params
 
 

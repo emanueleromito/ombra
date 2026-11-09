@@ -23,8 +23,11 @@ add_library(
   kernels/column_search.cu
   kernels/ntt.cu
   kernels/keyswitch.cu
+  kernels/encode.cu
+  kernels/plain_search.cu
   src/rns_basic_host.cu
   src/column_search_host.cu
+  src/plain_search_host.cu
   src/expansion_device.cu)
 target_include_directories(ombra_rns_cuda PUBLIC include PRIVATE kernels src)
 # CMake 3.22 (the pinned image's apt cmake) does not know the CUDA20 dialect (added in 3.25), and
@@ -58,3 +61,9 @@ target_link_libraries(ombra_bench_expand PRIVATE ombra_core)
 
 add_executable(ombra_encoding_check src/ombra_encoding_check.cpp)
 target_link_libraries(ombra_encoding_check PRIVATE ombra_core)
+
+add_executable(ombra_plain_search src/ombra_plain_search.cpp)
+target_link_libraries(ombra_plain_search PRIVATE ombra_core)
+
+add_executable(ombra_bench_plain_search src/ombra_bench_plain_search.cpp)
+target_link_libraries(ombra_bench_plain_search PRIVATE ombra_core)

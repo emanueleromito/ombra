@@ -25,7 +25,7 @@ np = pytest.importorskip("numpy")
 
 pytestmark = pytest.mark.gpu
 
-PRESET = "m0_depth2"
+PRESETS = ["m0_depth2", "m0_compact_n8192"]  # T0.11: every test runs on both
 SEED = 20260109
 
 # Max |decrypted slot - q_j| for GPU leaves, and between GPU and CPU leaves. Same agreed bound as
@@ -38,6 +38,8 @@ LARGE_DIMS = [384, 768, 1536]  # `--expansion-large`: every tree depth the bench
 
 
 def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
+    if "preset" in metafunc.fixturenames:
+        metafunc.parametrize("preset", PRESETS)
     if "d" in metafunc.fixturenames:
         large = metafunc.config.getoption("--expansion-large")
         metafunc.parametrize("d", DEFAULT_DIMS + (LARGE_DIMS if large else []))
@@ -55,10 +57,10 @@ def _driver() -> Path:
     pytest.fail("ombra_expand_gpu not found; build with `make build` or run `make test-gpu`")
 
 
-def test_gpu_expansion_matches_openfhe(tmp_path: Path, d: int) -> None:
+def test_gpu_expansion_matches_openfhe(tmp_path: Path, d: int, preset: str) -> None:
     import openfhe as ofhe
 
-    _, cc = ombra_params.make_context(PRESET)
+    _, cc = ombra_params.make_context(preset)
     keys = cc.KeyGen()
     ring = cc.GetRingDimension()
     depth = oq.expansion_depth(d)

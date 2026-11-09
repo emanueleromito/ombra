@@ -138,6 +138,27 @@ cudaError_t launch_ks_inner_product(const u64* digits, const u64* key, const u64
                                     const u32* digit_of_tower, u64* ext, const TowerConst* tc,
                                     const KsDims& dims, u32 batch, cudaStream_t stream);
 
+// encode.cu (T0.11): GPU CKKS encoding of plaintext columns, see the comment above the kernels.
+enum class CodeFormat : int { kDouble = 0, kFp16 = 1, kInt8 = 2 };
+// buf[col][k] = (decode(codes[col][k]), 0) for k < slots; int8 decodes as code / code_scale.
+cudaError_t launch_encode_decode(CodeFormat fmt, const void* codes, u64 cols, u64 slots,
+                                 double code_scale, double2* buf, cudaStream_t stream);
+// One stage (butterfly span `len`, len = slots .. 2) of the inverse special FFT on every column.
+// tw = the inverse twiddle table [slots - 1] (OpenFHE's m_invTw layout).
+cudaError_t launch_encode_fft_stage(double2* buf, const double2* tw, u64 cols, u64 slots, u64 len,
+                                    cudaStream_t stream);
+// Bit reversal, scaling by inv_len then scaling_factor, rounding, reduction into every tower:
+// out[col][tower][k] = round(re), out[col][tower][k + slots] = round(im), coefficient form.
+// *err is set to 1 if a scaled value does not fit in 62 bits.
+cudaError_t launch_encode_finish(const double2* buf, u64 cols, u64 slots, double inv_len,
+                                 double scaling_factor, const TowerConst* tc, u64 num_towers,
+                                 u64 ring_dim, u64* out, int* err, cudaStream_t stream);
+
+// plain_search.cu (T0.11): ciphertext x plaintext column search, see the comment above the kernel.
+cudaError_t launch_plain_search(const u64* plain, const u64* query, u64* out, const TowerConst* tc,
+                                u64 dims, u64 blocks, u64 num_towers, u64 ring_dim,
+                                cudaStream_t stream);
+
 // An empty kernel, only to measure launch overhead when profiling.
 cudaError_t launch_noop(cudaStream_t stream);
 
