@@ -91,7 +91,9 @@ ENTRY_POINTS = [
     "GpuSearch",
     "gpu_eval_add (require_fixedmanual)",
 ]
-EXPECTED_LOG2QP = {"m0_depth2": 280, "m0_compact_n8192": 195}
+# Sum of each tower's bit length, an upper bound on log2(QP): the nominal sizes are 280 and 195, and
+# one prime of each preset sits just above its power of two, so it counts one bit more.
+EXPECTED_LOG2QP = {"m0_depth2": 281, "m0_compact_n8192": 196}
 
 
 @pytest.mark.parametrize("preset", PRESETS)
