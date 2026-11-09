@@ -141,6 +141,31 @@ Ciphertext<DCRTPoly> unflatten_ciphertext(const Ciphertext<DCRTPoly>& like,
     return result;
 }
 
+Ciphertext<DCRTPoly> gpu_eval_plain_search(const std::vector<Ciphertext<DCRTPoly>>& query,
+                                           const std::vector<Plaintext>& plaintexts,
+                                           const std::vector<std::uint64_t>& words) {
+    if (query.empty() || query.size() != plaintexts.size()) {
+        throw std::invalid_argument("plain search: query and plaintexts differ in count or empty");
+    }
+    const auto& q0 = query[0];
+    require_fixedmanual(*q0);
+    for (std::size_t j = 0; j < query.size(); ++j) {
+        if (query[j]->GetLevel() != q0->GetLevel() ||
+            query[j]->GetNoiseScaleDeg() != q0->GetNoiseScaleDeg() ||
+            query[j]->GetScalingFactor() != q0->GetScalingFactor() ||
+            plaintexts[j]->GetLevel() != q0->GetLevel() ||
+            plaintexts[j]->GetNoiseScaleDeg() != plaintexts[0]->GetNoiseScaleDeg() ||
+            plaintexts[j]->GetScalingFactor() != plaintexts[0]->GetScalingFactor()) {
+            throw std::invalid_argument("plain search: operands differ in level, degree or scale");
+        }
+    }
+    Ciphertext<DCRTPoly> result = unflatten_ciphertext(q0, words);  // context and shape only
+    result->SetLevel(q0->GetLevel());
+    result->SetNoiseScaleDeg(q0->GetNoiseScaleDeg() + plaintexts[0]->GetNoiseScaleDeg());
+    result->SetScalingFactor(q0->GetScalingFactor() * plaintexts[0]->GetScalingFactor());
+    return result;
+}
+
 FlatOne flatten_one(const Ciphertext<DCRTPoly>& ct) {
     require_fixedmanual(*ct);
     Flat f = flatten(ct->GetElements());

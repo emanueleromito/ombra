@@ -111,7 +111,7 @@ One task per high or medium finding in `results/m1-crypto-review.md`. T1.10 shou
 **Depends on:** none
 **Steps:** add a `ciphertext_ops` wrapper that derives level, degree and scale from the query and plaintext; compare its output with OpenFHE without using an OpenFHE result as the template.
 **Done when:** the oracle fails if the wrapper's metadata rule is wrong (shown by a negative test) and passes on both presets.
-**Status:** todo
+**Status:** done
 
 ### T1.12 Validate metadata on expansion upload (F4, medium)
 

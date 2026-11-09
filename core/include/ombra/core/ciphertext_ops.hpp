@@ -71,6 +71,16 @@ lbcrypto::Ciphertext<lbcrypto::DCRTPoly> gpu_eval_add(
 lbcrypto::Ciphertext<lbcrypto::DCRTPoly> gpu_eval_mult_plain(
     lbcrypto::ConstCiphertext<lbcrypto::DCRTPoly>& ct, lbcrypto::ConstPlaintext& pt);
 
+// Result of the plaintext search (kernel: core/kernels/plain_search.cu): query[j] is multiplied by
+// plaintexts[j] and the products summed; `words` are the device's raw output ([component][tower]
+// [coeff], evaluation form, 2 components). The result is built on a copy of query[0] and its
+// metadata is derived from the query and the plaintexts only, as in gpu_eval_mult_plain: level
+// unchanged (query and plaintexts must agree), noise-scale degree = ciphertext + plaintext degree,
+// scaling factor = product. Throws if the query or plaintexts disagree among themselves.
+lbcrypto::Ciphertext<lbcrypto::DCRTPoly> gpu_eval_plain_search(
+    const std::vector<lbcrypto::Ciphertext<lbcrypto::DCRTPoly>>& query,
+    const std::vector<lbcrypto::Plaintext>& plaintexts, const std::vector<std::uint64_t>& words);
+
 // Column-packed search (kernel: core/kernels/column_search.cu). stored_blocks[b][j] is dimension j
 // of block b; query[j] holds query value j in every slot. Returns one 3-component ciphertext per
 // block holding sum_j stored[b][j] * query[j] (no relinearization, no rescale). Metadata, derived
