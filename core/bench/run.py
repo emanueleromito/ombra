@@ -26,6 +26,10 @@ achieved memory bandwidth, and the per-(d, Q) memory plan (queries per pass, pas
 memory). Output `<out>/t0.7-a100.json`; speedups are relative to the Q = 1 row of the same run.
 Runs only when asked for (`--task t0.7`), not as part of `--task all`.
 
+T1.3: end-to-end query latency per step (client encrypt, expansion, stage 1, stage 2, client
+decrypt and top-k), see core/bench/e2e.py. Output `<out>/t1.3-a100.json`. Runs only when asked for
+(`--task t1.3`), not as part of `--task all`.
+
     python core/bench/run.py --task t0.7 --out <dir>
 """
 
@@ -403,6 +407,9 @@ def main() -> None:
     parser.add_argument(
         "--profile", action="store_true", help="t0.5: also time the stages of one split"
     )
+    parser.add_argument("--name-t13", default="t1.3-a100.json", help="output file name for t1.3")
+    parser.add_argument("--e2e-queries", type=int, default=20, help="t1.3: timed queries per case")
+    parser.add_argument("--e2e-warmup", type=int, default=3, help="t1.3: untimed queries per case")
     parser.add_argument("--presets-t011", default="m0_depth2,m0_compact_n8192", help="t0.11")
     parser.add_argument(
         "--error-presets-t011", default="m0_compact_n8192", help="t0.11: presets with the e2e error"
@@ -410,7 +417,7 @@ def main() -> None:
     args = parser.parse_args()
 
     task = args.task.lower()
-    if task not in ("all", "t0.4", "t0.5", "t0.7", "t0.11"):
+    if task not in ("all", "t0.4", "t0.5", "t0.7", "t0.11", "t1.3"):
         raise SystemExit(f"unknown task {args.task!r}")
     dims = tuple(int(x) for x in args.dims.split(","))
     if task in ("all", "t0.4"):
@@ -428,6 +435,18 @@ def main() -> None:
             args.warmup,
             args.iters,
             args.name_t07,
+        )
+    if task == "t1.3":
+        from e2e import run_t13
+
+        run_t13(
+            args.out,
+            dims,
+            args.e2e_queries,
+            args.e2e_warmup,
+            find_binary,
+            openfhe_version(),
+            name=args.name_t13,
         )
     if task == "t0.11":
         from t011 import run_t011

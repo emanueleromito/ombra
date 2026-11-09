@@ -94,6 +94,9 @@ class ExpansionDevice {
 
   CtHandle upload(const std::vector<std::uint64_t>& words);  // [comp][Q tower][N]
   std::vector<std::uint64_t> download(const CtHandle& ct);
+  // T1.3: device pointer to the words of a ciphertext ([component][Q tower][N], 2 * num_q * N
+  // words), valid while a handle to it is alive. For device-to-device handoff of expansion leaves.
+  const std::uint64_t* device_ptr(const CtHandle& ct) const;
   void synchronize();
 
   // (c + tau_g(c), (c - tau_g(c)) * X^-shift); the second is null unless want_odd. Asynchronous.

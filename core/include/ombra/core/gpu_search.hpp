@@ -18,6 +18,7 @@
 #include <memory>
 #include <vector>
 
+#include "ombra/core/ciphertext_ops.hpp"
 #include "ombra/core/column_search.hpp"
 #include "ombra/core/expansion_device.hpp"
 #include "openfhe.h"
@@ -98,6 +99,22 @@ class GpuSearch {
 
   void upload_block(std::size_t block, const std::vector<Ct>& columns);  // dims ciphertexts
   void upload_query(const std::vector<Ct>& columns);                     // dims ciphertexts
+  // T1.3: the same as upload_block for columns already flattened (flatten_ciphertexts), so the
+  // host-to-device copy can be timed apart from the flattening.
+  void upload_block_flat(std::size_t block, const FlatCiphertexts& columns);
+  // T1.3: device-to-device copy of stored block `src` into `dst` (synthetic benchmark data only).
+  void copy_block(std::size_t src, std::size_t dst);
+  // T1.3: seconds of the host-to-device copy in the last upload_block / upload_block_flat.
+  double last_upload_seconds() const;
+  // Device bytes this object holds (stored blocks, query, search output, stage buffers).
+  std::size_t device_bytes() const;
+  // T1.3: device-to-device handoff of the query. column_ptrs[j] is a device pointer to dimension j
+  // (2 * num_q * N words, [component][tower][coeff], e.g. an expansion leaf from
+  // ExpansionDevice::device_ptr). `meta` is the level, noise-scale degree and scaling factor of the
+  // columns; the caller has checked them (and the moduli) against the stored columns, as the
+  // expansion's output is not an OpenFHE object. run() rejects a mismatch with the stored blocks.
+  void set_query_from_device(const std::vector<const std::uint64_t*>& column_ptrs,
+                             const CtMeta& meta);
   void upload_mask(std::size_t block, const Ct& mask);  // level L + 1, same metadata for all
 
   // Runs all five steps on the GPU for every block; waits between steps to time them.
@@ -106,6 +123,9 @@ class GpuSearch {
   // Copies the result of `stage` for one block to the host as an OpenFHE ciphertext with the
   // metadata the GPU path derived (the only place OpenFHE objects are built).
   Ct download(SearchStage stage, std::size_t block);
+  // The raw words ([component][tower][coeff]) of the same result, a device-to-host copy only (no
+  // OpenFHE object is built). Not for kSum.
+  std::vector<std::uint64_t> download_words(SearchStage stage, std::size_t block);
   CtMeta meta(SearchStage stage) const;
 
   GpuCtOps& level0();  // stored/query level L
