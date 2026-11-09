@@ -43,6 +43,12 @@ inline std::size_t expansion_depth(std::size_t d) {
 //                           std::size_t shift, bool want_odd);
 // returning (c + tau_galois(c), (c - tau_galois(c)) * X^(-shift)); the second is only needed when
 // want_odd is true (otherwise it may be left default-constructed).
+// Ops may additionally provide a level-at-once operation (T0.5b):
+//   std::vector<std::pair<Ct, Ct>> split_level(const std::vector<Ct>& nodes, std::size_t level,
+//                                              std::uint32_t galois, std::size_t shift,
+//                                              const std::vector<char>& want_odd);
+// which must return exactly what calling split on every node would. All nodes of a level share the
+// Galois element and the shift, so a GPU can batch them. If it is absent, split is called per node.
 // Returns the d leaves in index order.
 template <class Ct, class Ops>
 std::vector<Ct> expand_tree(const Ct& root, std::size_t d, std::size_t ring_dim, Ops& ops,
@@ -63,14 +69,37 @@ std::vector<Ct> expand_tree(const Ct& root, std::size_t d, std::size_t ring_dim,
         const auto galois = static_cast<std::uint32_t>(ring_dim / step + 1);
         std::vector<std::pair<std::size_t, Ct>> next;
         next.reserve(level_nodes.size() * 2);
-        for (auto& [r, c] : level_nodes) {
-            const bool want_odd = (r + step) < d;
-            auto children = ops.split(c, l, galois, step, want_odd);
-            ++local.splits;
-            ++local.automorphisms;
-            next.emplace_back(r, std::move(children.first));
-            if (want_odd) {
-                next.emplace_back(r + step, std::move(children.second));
+        if constexpr (requires(Ops& o, const std::vector<Ct>& v, const std::vector<char>& w) {
+                          o.split_level(v, l, galois, step, w);
+                      }) {
+            std::vector<Ct> nodes;
+            std::vector<char> odd;
+            nodes.reserve(level_nodes.size());
+            for (auto& [r, c] : level_nodes) {
+                nodes.push_back(std::move(c));
+                odd.push_back((r + step) < d ? 1 : 0);
+            }
+            auto children = ops.split_level(nodes, l, galois, step, odd);
+            nodes.clear();  // release the parents' handles before the next level
+            for (std::size_t k = 0; k < level_nodes.size(); ++k) {
+                const std::size_t r = level_nodes[k].first;
+                ++local.splits;
+                ++local.automorphisms;
+                next.emplace_back(r, std::move(children[k].first));
+                if (odd[k]) {
+                    next.emplace_back(r + step, std::move(children[k].second));
+                }
+            }
+        } else {
+            for (auto& [r, c] : level_nodes) {
+                const bool want_odd = (r + step) < d;
+                auto children = ops.split(c, l, galois, step, want_odd);
+                ++local.splits;
+                ++local.automorphisms;
+                next.emplace_back(r, std::move(children.first));
+                if (want_odd) {
+                    next.emplace_back(r + step, std::move(children.second));
+                }
             }
         }
         local.nodes += next.size();

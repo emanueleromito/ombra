@@ -171,3 +171,32 @@ def bench(task: str = "all") -> None:
         return
     _run(["python", str(bench_script), "--task", task, "--out", str(out_dir)])
     volume.commit()
+
+
+@app.function(gpu="A10", memory=16384, timeout=3600, volumes={DATA_DIR: volume})
+def profile_expand(dims: str = "1536") -> None:
+    """Release build; time the stages of one expansion split on an A10 (T0.5b profiling)."""
+    _build("Release")
+    out_dir = Path(DATA_DIR) / "results-profile"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    bench_script = Path(REPO_DIR) / "core" / "bench" / "run.py"
+    _run(
+        [
+            "python",
+            str(bench_script),
+            "--task",
+            "t0.5",
+            "--profile",
+            "--dims",
+            dims,
+            "--warmup",
+            "2",
+            "--iters",
+            "5",
+            "--name-t05",
+            "t0.5-profile-a10.json",
+            "--out",
+            str(out_dir),
+        ]
+    )
+    volume.commit()

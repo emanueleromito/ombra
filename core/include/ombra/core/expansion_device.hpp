@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -39,6 +40,17 @@ struct ExpansionTables {
   std::vector<std::uint64_t> p_hat_mod_q;      // [num_p][num_q] (P/p_j) mod q_i
 };
 
+// Timing of the pieces of one split (profiling only, see ExpansionDevice::profile_split).
+struct SplitProfile {
+  std::size_t nodes = 0;  // splits per batch
+  std::vector<std::string> stage;
+  std::vector<double> stage_us;  // per stage, GPU time between events (includes launch gaps)
+  double host_enqueue_us = 0;    // host time to enqueue one batch of `nodes` splits
+  double pipelined_us = 0;       // wall time per batch, batches enqueued back to back
+  double synced_us = 0;          // wall time per batch, synchronized after each
+  double noop_launch_us = 0;     // time per empty kernel launch, back to back
+};
+
 class DeviceCt;  // one ciphertext on the device: 2 * num_q * N words
 using CtHandle = std::shared_ptr<DeviceCt>;
 
@@ -64,11 +76,29 @@ class ExpansionDevice {
   std::pair<CtHandle, CtHandle> split(const CtHandle& c, std::uint32_t galois, std::size_t level,
                                       bool want_odd);
 
+  // All splits of one tree level at once: node k gives (c + tau_g(c), (c - tau_g(c)) * X^-shift)
+  // with the second null unless want_odd[k]. The level has one Galois element and one monomial, so
+  // the tables are shared and every kernel launch covers a whole chunk of nodes (chunks bound the
+  // scratch memory, see max_batch). Asynchronous. Results equal `split` node by node.
+  std::vector<std::pair<CtHandle, CtHandle>> split_level(const std::vector<CtHandle>& nodes,
+                                                         std::uint32_t galois, std::size_t level,
+                                                         const std::vector<char>& want_odd);
+  // Largest chunk of nodes per batch (default from a ~1 GiB scratch budget); tests lower it to
+  // exercise chunking. The scratch grows to the largest chunk used and is never shrunk.
+  void set_max_batch(std::size_t nodes);
+  std::size_t max_batch() const;
+
+  // Profiling only (bench option, never on the hot path): times the stages of one batch of `nodes`
+  // identical splits of `c` (nodes <= max_batch), `reps` times.
+  SplitProfile profile_level(const CtHandle& c, std::uint32_t galois, std::size_t level,
+                             std::size_t nodes, int reps);
+
   // Synchronous stage entry points for the oracle tests (copy results to the host).
   // NTT of rows [rows][N]; tower[r] is the QP tower (modulus) of row r.
   std::vector<std::uint64_t> test_ntt(bool forward, const std::vector<std::uint64_t>& rows,
                                       const std::vector<std::uint32_t>& tower);
-  // Digits of the second component of `ct`: [digit][QP tower][N] (OpenFHE EvalKeySwitchPrecomputeCore).
+  // Digits of the second component of `ct`: [digit][QP tower][N] (OpenFHE
+  // EvalKeySwitchPrecomputeCore).
   std::vector<std::uint64_t> test_digits(const std::vector<std::uint64_t>& ct);
   // Extended-basis result before ModDown: [2][QP tower][N] (inner product, + c0 * P, automorphism).
   std::vector<std::uint64_t> test_ext(const std::vector<std::uint64_t>& ct, std::uint32_t galois);

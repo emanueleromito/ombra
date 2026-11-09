@@ -19,32 +19,46 @@ using u128 = unsigned __int128;
 // Per-tower constants for Barrett reduction. For q with bit length n (2 <= q < 2^n, n <= 60):
 // mu = floor(2^(2n) / q) < 2^(n+1) <= 2^61, so it fits a 64-bit word.
 struct TowerConst {
-    u64 q;
-    u64 mu;
-    u64 n;  // bit length of q
+  u64 q;
+  u64 mu;
+  u64 n;  // bit length of q
 };
 
 // x mod q for x < q^2, by Barrett reduction (HAC 14.42, b=2, k=n):
 //   q1 = x >> (n-1); q3 = (q1 * mu) >> (n+1); r = x - q3*q  (0 <= r < 3q), then up to 2 subtracts.
 // Correct for any q < 2^60; r < 3q < 2^62 so the low 64 bits of x - q3*q are exact.
 __host__ __device__ inline u64 barrett_reduce(u128 x, const TowerConst& c) {
-    const u64 q1 = (u64)(x >> (c.n - 1));
-    const u64 q3 = (u64)(((u128)q1 * c.mu) >> (c.n + 1));
-    u64 r = (u64)x - q3 * c.q;
-    if (r >= c.q) r -= c.q;
-    if (r >= c.q) r -= c.q;
-    return r;
+  const u64 q1 = (u64)(x >> (c.n - 1));
+  const u64 q3 = (u64)(((u128)q1 * c.mu) >> (c.n + 1));
+  u64 r = (u64)x - q3 * c.q;
+  if (r >= c.q) r -= c.q;
+  if (r >= c.q) r -= c.q;
+  return r;
 }
 
 // (a * b) mod q for reduced a, b < q.
 __host__ __device__ inline u64 mul_mod(u64 a, u64 b, const TowerConst& c) {
-    return barrett_reduce((u128)a * b, c);
+  return barrett_reduce((u128)a * b, c);
 }
+
+// Shoup multiplication by a fixed multiplier w < q < 2^63 with wq = floor(w * 2^64 / q)
+// (shoup_quotient). For ANY x < 2^64: hi = floor(x * wq / 2^64) satisfies
+// x*w/q - 1 - x/2^64 < hi <= x*w/q, so r = x*w - hi*q (computed mod 2^64, exact because
+// r < 2q < 2^64) lies in [0, 2q), and after one conditional subtraction r = x*w mod q. The result
+// is the unique residue, identical to Barrett's; x does not need to be reduced.
+__host__ __device__ inline u64 mul_mod_shoup(u64 x, u64 w, u64 wq, u64 q) {
+  const u64 hi = (u64)(((u128)x * wq) >> 64);
+  const u64 r = x * w - hi * q;
+  return r >= q ? r - q : r;
+}
+
+// Host: floor(w * 2^64 / q) for w < q.
+inline u64 shoup_quotient(u64 w, u64 q) { return (u64)(((u128)w << 64) / q); }
 
 // (a + b) mod q for reduced a, b < q < 2^60 (a + b < 2^61, one conditional subtraction).
 __host__ __device__ inline u64 add_mod(u64 a, u64 b, u64 q) {
-    const u64 r = a + b;
-    return r >= q ? r - q : r;
+  const u64 r = a + b;
+  return r >= q ? r - q : r;
 }
 
 // (a - b) mod q for reduced a, b < q.
@@ -52,17 +66,17 @@ __host__ __device__ inline u64 sub_mod(u64 a, u64 b, u64 q) { return a >= b ? a 
 
 // Host: builds the constants; throws std::invalid_argument for a modulus outside [2, 2^60).
 inline std::vector<TowerConst> make_tower_consts(const std::vector<u64>& moduli) {
-    std::vector<TowerConst> out;
-    for (u64 q : moduli) {
-        if (q < 2 || q >= (u64(1) << 60)) {
-            throw std::invalid_argument("rns: modulus must satisfy 2 <= q < 2^60");
-        }
-        u64 n = 0;
-        while ((u64(1) << n) <= q) ++n;  // q < 2^n
-        const u64 mu = (u64)((u128(1) << (2 * n)) / q);
-        out.push_back({q, mu, n});
+  std::vector<TowerConst> out;
+  for (u64 q : moduli) {
+    if (q < 2 || q >= (u64(1) << 60)) {
+      throw std::invalid_argument("rns: modulus must satisfy 2 <= q < 2^60");
     }
-    return out;
+    u64 n = 0;
+    while ((u64(1) << n) <= q) ++n;  // q < 2^n
+    const u64 mu = (u64)((u128(1) << (2 * n)) / q);
+    out.push_back({q, mu, n});
+  }
+  return out;
 }
 
 }  // namespace ombra::core

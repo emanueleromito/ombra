@@ -27,7 +27,9 @@ std::uint32_t bit_reverse(std::uint32_t x, std::uint32_t bits) {
   return r;
 }
 
-u64 mulmod(u64 a, u64 b, u64 q) { return static_cast<u64>((static_cast<unsigned __int128>(a) * b) % q); }
+u64 mulmod(u64 a, u64 b, u64 q) {
+  return static_cast<u64>((static_cast<unsigned __int128>(a) * b) % q);
+}
 
 u64 to_u64(const NativeInteger& v) { return v.ConvertToInt<u64>(); }
 
@@ -205,8 +207,7 @@ GpuExpansion::GpuExpansion(const CryptoContext<DCRTPoly>& cc, const Ct& sample, 
     std::vector<std::uint32_t> map(n);
     PrecomputeAutoMap(static_cast<std::uint32_t>(n), galois, &map);
     device_.add_key(galois, map, extract_key_words(it->second, tables_, full_q));
-    device_.add_monomial(l, extract_monomial_words(sample->GetElements()[0],
-                                                   std::size_t{1} << l));
+    device_.add_monomial(l, extract_monomial_words(sample->GetElements()[0], std::size_t{1} << l));
     ++key_count_;
   }
   setup_seconds_ = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
@@ -214,7 +215,8 @@ GpuExpansion::GpuExpansion(const CryptoContext<DCRTPoly>& cc, const Ct& sample, 
 
 GpuCt GpuExpansion::upload(const Ct& ct) {
   const FlatCiphertexts f = flatten_ciphertexts({ct});
-  if (f.moduli != std::vector<u64>(tables_.moduli.begin(), tables_.moduli.begin() + tables_.num_q)) {
+  if (f.moduli !=
+      std::vector<u64>(tables_.moduli.begin(), tables_.moduli.begin() + tables_.num_q)) {
     throw std::invalid_argument("expansion: ciphertext moduli differ from the tables");
   }
   return {device_.upload(f.words)};
@@ -224,11 +226,25 @@ GpuExpansion::Ct GpuExpansion::download(const GpuCt& ct) {
   return unflatten_ciphertext(sample_, device_.download(ct.dev));
 }
 
-std::pair<GpuCt, GpuCt> GpuExpansion::split(const GpuCt& c, std::size_t level,
-                                            std::uint32_t galois, std::size_t /*shift*/,
-                                            bool want_odd) {
+std::pair<GpuCt, GpuCt> GpuExpansion::split(const GpuCt& c, std::size_t level, std::uint32_t galois,
+                                            std::size_t /*shift*/, bool want_odd) {
   auto r = device_.split(c.dev, galois, level, want_odd);
   return {GpuCt{std::move(r.first)}, GpuCt{std::move(r.second)}};
+}
+
+std::vector<std::pair<GpuCt, GpuCt>> GpuExpansion::split_level(const std::vector<GpuCt>& nodes,
+                                                               std::size_t level,
+                                                               std::uint32_t galois,
+                                                               std::size_t /*shift*/,
+                                                               const std::vector<char>& want_odd) {
+  std::vector<CtHandle> in;
+  in.reserve(nodes.size());
+  for (const GpuCt& c : nodes) in.push_back(c.dev);
+  auto r = device_.split_level(in, galois, level, want_odd);
+  std::vector<std::pair<GpuCt, GpuCt>> out;
+  out.reserve(r.size());
+  for (auto& p : r) out.push_back({GpuCt{std::move(p.first)}, GpuCt{std::move(p.second)}});
+  return out;
 }
 
 }  // namespace ombra::core
