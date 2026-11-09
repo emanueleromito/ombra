@@ -134,7 +134,16 @@ struct ExpansionDevice::Impl {
   std::size_t cap = 0;
   std::size_t max_batch = 1;
   std::map<std::uint32_t, KeyDev> keys;
+  KeyDev relin_key;  // words only (no automorphism map)
+  bool has_relin_key = false;
   std::map<std::size_t, DeviceBuffer<u64>> monos;
+  // Rescale (T1.2): constants, plus scratch for `rs_cap` nodes: last [2][N], tmp [2][nq-1][N] per
+  // node and the pointer array of the dropped towers (2 per node).
+  DeviceBuffer<u64> ql_inv;
+  DeviceBuffer<NttRow> rows_inv_last, rows_fwd_rs;
+  DeviceBuffer<u64> rs_last, rs_tmp;
+  DeviceBuffer<u64*> rs_ptrs;
+  std::size_t rs_cap = 0;
   Marks marks;
 
   NttTables ntt() const {
@@ -227,6 +236,14 @@ struct ExpansionDevice::Impl {
     OMBRA_TRY(to_device(rows_inv_p, inv_p));
     OMBRA_TRY(to_device(rows_fwd_pq, fwd_pq));
 
+    if (nq >= 2) {
+      OMBRA_TRY(to_device(ql_inv, t.ql_inv_mod_q));
+      std::vector<NttRow> last_row{row(0, t.n_inv[nq - 1], nq - 1)};
+      std::vector<NttRow> fwd_rs;
+      for (u64 i = 0; i + 1 < nq; ++i) fwd_rs.push_back(row(i * n, 0, i));
+      OMBRA_TRY(to_device(rows_inv_last, last_row));
+      OMBRA_TRY(to_device(rows_fwd_rs, fwd_rs));
+    }
     max_batch = std::clamp<std::size_t>(kScratchBudgetBytes / (scratch_words_per_node() * 8), 1,
                                         kMaxBatchCeiling);
     return ensure_scratch(1);
@@ -295,9 +312,9 @@ struct ExpansionDevice::Impl {
   // Step 1 for `b` nodes (in_ptrs set): the converted towers of the digits of the second
   // components into dbuf. A digit's own towers are not copied: the inner product reads them from
   // the ciphertext. The inverse NTT reads component 1 straight from the ciphertexts.
-  Status digits(u32 b) {
+  Status digits(u32 b, u64 src_comp = 1) {
     OMBRA_CUDA_CHECK(launch_ntt_inverse(ybuf.get(), rows_inv_q.get(), n_rows_inv_q, ntt(), nullptr,
-                                        {b, nq * n}, NttSource{in_ptrs(), nq * n}));
+                                        {b, nq * n}, NttSource{in_ptrs(), src_comp * nq * n}));
     OMBRA_TRY(marks.mark());
     const ConvLoad up{ybuf.get(), nq * n, mat.get(), mat_shoup.get(), jobs_up.get()};
     OMBRA_CUDA_CHECK(launch_ntt_forward(dbuf.get(), rows_fwd_dig.get(), n_rows_fwd_dig, ntt(),
@@ -335,6 +352,89 @@ struct ExpansionDevice::Impl {
     OMBRA_CUDA_CHECK(launch_ntt_forward_combine(pq.get(), rows_fwd_pq.get(), n_rows_fwd_pq, ntt(),
                                                 ca, nullptr, {b, 2 * nq * n}, &down));
     OMBRA_TRY(marks.mark());
+    return {};
+  }
+
+  // Step 2 of a relinearization: ext = digits . key (no c0 * P term, no permutation).
+  Status inner_relin(u32 b) {
+    KsDims d = dims();
+    d.src_comp = 2;
+    d.add_c0_p = 0;
+    OMBRA_CUDA_CHECK(launch_ks_inner_product(dbuf.get(), relin_key.words.get(), in_ptrs(), nullptr,
+                                             nullptr, digit_of_tower.get(), ext.get(), tc.get(), d,
+                                             b, nullptr));
+    return {};
+  }
+
+  // One chunk of relinearizations: nodes [first, first + b). The ModDown result is added to
+  // components 0 and 1 by the same combine epilogue the expansion uses (even = ct + sub).
+  Status relin_chunk(const std::vector<const u64*>& in3, const std::vector<u64*>& out2,
+                     std::size_t first, std::size_t b) {
+    OMBRA_TRY(ensure_scratch(b));
+    const std::vector<const u64*> hin(in3.begin() + first, in3.begin() + first + b);
+    const std::vector<u64*> hout(out2.begin() + first, out2.begin() + first + b);
+    OMBRA_TRY(set_ptrs(hin, hout, {}));
+    OMBRA_TRY(digits((u32)b, 2));
+    OMBRA_TRY(inner_relin((u32)b));
+    OMBRA_TRY(mod_down_combine((u32)b, nullptr, false));
+    OMBRA_CUDA_CHECK_LAUNCH();
+    return {};
+  }
+
+  Status ensure_rs(std::size_t nodes) {
+    if (nodes <= rs_cap) return {};
+    OMBRA_CUDA_CHECK(cudaDeviceSynchronize());
+    OMBRA_TRY(rs_last.allocate(nodes * 2 * n));
+    OMBRA_TRY(rs_tmp.allocate(nodes * 2 * (nq - 1) * n));
+    OMBRA_TRY(rs_ptrs.allocate(nodes * 2));
+    rs_cap = nodes;
+    return {};
+  }
+
+  // One chunk of rescales (steps in the comment of rescale.cu).
+  Status rescale_chunk(const std::vector<const u64*>& in2, const std::vector<u64*>& out2,
+                       std::size_t first, std::size_t b) {
+    OMBRA_TRY(ensure_scratch(b));
+    OMBRA_TRY(ensure_rs(b));
+    const std::vector<const u64*> hin(in2.begin() + first, in2.begin() + first + b);
+    const std::vector<u64*> hout(out2.begin() + first, out2.begin() + first + b);
+    OMBRA_TRY(set_ptrs(hin, hout, {}));
+    std::vector<const u64*> last(2 * b);  // the dropped tower of every (node, component)
+    for (std::size_t k = 0; k < b; ++k) {
+      for (std::size_t r = 0; r < 2; ++r) last[2 * k + r] = hin[k] + (r * nq + (nq - 1)) * n;
+    }
+    OMBRA_CUDA_CHECK(cudaMemcpyAsync(rs_ptrs.get(), last.data(), last.size() * sizeof(u64*),
+                                     cudaMemcpyHostToDevice, nullptr));
+    const u32 z = (u32)(2 * b);
+    OMBRA_CUDA_CHECK(launch_ntt_inverse(
+        rs_last.get(), rows_inv_last.get(), 1, ntt(), nullptr, {z, n},
+        NttSource{reinterpret_cast<const u64* const*>(rs_ptrs.get()), 0}));
+    const RescaleDims rd{n, nq};
+    OMBRA_CUDA_CHECK(launch_rescale_switch(rs_last.get(), rs_tmp.get(), tc.get(), rd, z, nullptr));
+    OMBRA_CUDA_CHECK(launch_ntt_forward(rs_tmp.get(), rows_fwd_rs.get(), (u32)(nq - 1), ntt(),
+                                        nullptr, {z, (nq - 1) * n}));
+    OMBRA_CUDA_CHECK(launch_rescale_combine(in_ptrs(), rs_tmp.get(), even_ptrs(), ql_inv.get(),
+                                            tc.get(), rd, (u32)b, nullptr));
+    OMBRA_CUDA_CHECK_LAUNCH();
+    return {};
+  }
+
+  Status multiply_chunk(const std::vector<const u64*>& a, const std::vector<const u64*>& b,
+                        const std::vector<u64*>& out3, std::size_t first, std::size_t cnt) {
+    OMBRA_TRY(ensure_scratch(cnt));
+    const std::vector<const u64*> ha(a.begin() + first, a.begin() + first + cnt);
+    const std::vector<const u64*> hb(b.begin() + first, b.begin() + first + cnt);
+    const std::vector<u64*> ho(out3.begin() + first, out3.begin() + first + cnt);
+    OMBRA_CUDA_CHECK(cudaMemcpyAsync(ptrs.get(), ha.data(), cnt * sizeof(u64*),
+                                     cudaMemcpyHostToDevice, nullptr));
+    OMBRA_CUDA_CHECK(cudaMemcpyAsync(ptrs.get() + cap, hb.data(), cnt * sizeof(u64*),
+                                     cudaMemcpyHostToDevice, nullptr));
+    OMBRA_CUDA_CHECK(cudaMemcpyAsync(ptrs.get() + 2 * cap, ho.data(), cnt * sizeof(u64*),
+                                     cudaMemcpyHostToDevice, nullptr));
+    OMBRA_CUDA_CHECK(launch_ct_tensor(in_ptrs(),
+                                      reinterpret_cast<const u64* const*>(ptrs.get() + cap),
+                                      odd_ptrs(), tc.get(), RescaleDims{n, nq}, (u32)cnt, nullptr));
+    OMBRA_CUDA_CHECK_LAUNCH();
     return {};
   }
 
@@ -412,10 +512,101 @@ ExpansionDevice::ExpansionDevice(const ExpansionTables& tables) : impl_(std::mak
   require(tables.p_mod_q.size() == s.nq && tables.p_inv_mod_q.size() == s.nq &&
               tables.p_hat_inv_mod_p.size() == s.np && tables.p_hat_mod_q.size() == s.np * s.nq,
           "ModDown table sizes");
+  require(tables.ql_inv_mod_q.empty() || tables.ql_inv_mod_q.size() == s.nq - 1,
+          "rescale table size");
   s.init().throw_if_error();
 }
 
 ExpansionDevice::~ExpansionDevice() = default;
+
+void ExpansionDevice::set_relin_key(const std::vector<std::uint64_t>& key_words) {
+  Impl& s = *impl_;
+  require(key_words.size() == s.nd * 2 * s.qp * s.n, "key size");
+  KeyDev k;
+  to_device(k.words, key_words).throw_if_error();
+  s.relin_key = std::move(k);
+  s.has_relin_key = true;
+}
+
+void ExpansionDevice::relinearize(const std::vector<const std::uint64_t*>& in3,
+                                  const std::vector<std::uint64_t*>& out2) {
+  Impl& s = *impl_;
+  require(s.has_relin_key, "no relinearization key");
+  require(in3.size() == out2.size(), "relinearize sizes");
+  const auto go = [&]() -> Status {
+    for (std::size_t first = 0; first < in3.size(); first += s.max_batch) {
+      OMBRA_TRY(s.relin_chunk(in3, out2, first, std::min(s.max_batch, in3.size() - first)));
+    }
+    return {};
+  };
+  go().throw_if_error();
+}
+
+void ExpansionDevice::rescale(const std::vector<const std::uint64_t*>& in2,
+                              const std::vector<std::uint64_t*>& out2) {
+  Impl& s = *impl_;
+  require(s.nq >= 2 && !s.t.ql_inv_mod_q.empty(), "nothing to drop or no rescale table");
+  require(in2.size() == out2.size(), "rescale sizes");
+  const auto go = [&]() -> Status {
+    for (std::size_t first = 0; first < in2.size(); first += s.max_batch) {
+      OMBRA_TRY(s.rescale_chunk(in2, out2, first, std::min(s.max_batch, in2.size() - first)));
+    }
+    return {};
+  };
+  go().throw_if_error();
+}
+
+void ExpansionDevice::multiply(const std::vector<const std::uint64_t*>& a,
+                               const std::vector<const std::uint64_t*>& b,
+                               const std::vector<std::uint64_t*>& out3) {
+  Impl& s = *impl_;
+  require(a.size() == b.size() && a.size() == out3.size(), "multiply sizes");
+  const auto go = [&]() -> Status {
+    for (std::size_t first = 0; first < a.size(); first += s.max_batch) {
+      OMBRA_TRY(s.multiply_chunk(a, b, out3, first, std::min(s.max_batch, a.size() - first)));
+    }
+    return {};
+  };
+  go().throw_if_error();
+}
+
+struct DeviceWords::Impl {
+  DeviceBuffer<u64> buf;
+  std::size_t count = 0;
+};
+
+DeviceWords::DeviceWords(std::size_t count) : impl_(std::make_unique<Impl>()) {
+  impl_->count = count;
+  const auto go = [&]() -> Status { return impl_->buf.allocate(count == 0 ? 1 : count); };
+  go().throw_if_error();
+}
+DeviceWords::~DeviceWords() = default;
+DeviceWords::DeviceWords(DeviceWords&&) noexcept = default;
+DeviceWords& DeviceWords::operator=(DeviceWords&&) noexcept = default;
+std::uint64_t* DeviceWords::data() const { return impl_->buf.get(); }
+std::size_t DeviceWords::size() const { return impl_->count; }
+
+void DeviceWords::upload(const std::vector<std::uint64_t>& words, std::size_t offset) {
+  require(offset + words.size() <= impl_->count, "DeviceWords upload out of range");
+  const auto go = [&]() -> Status {
+    OMBRA_CUDA_CHECK(cudaMemcpy(impl_->buf.get() + offset, words.data(),
+                                words.size() * sizeof(u64), cudaMemcpyHostToDevice));
+    return {};
+  };
+  go().throw_if_error();
+}
+
+std::vector<std::uint64_t> DeviceWords::download(std::size_t offset, std::size_t count) const {
+  require(offset + count <= impl_->count, "DeviceWords download out of range");
+  std::vector<u64> out(count);
+  const auto go = [&]() -> Status {
+    OMBRA_CUDA_CHECK(cudaMemcpy(out.data(), impl_->buf.get() + offset, count * sizeof(u64),
+                                cudaMemcpyDeviceToHost));
+    return {};
+  };
+  go().throw_if_error();
+  return out;
+}
 
 void ExpansionDevice::add_key(std::uint32_t galois, const std::vector<std::uint32_t>& auto_map,
                               const std::vector<std::uint64_t>& key_words) {
@@ -459,6 +650,11 @@ std::vector<std::uint64_t> ExpansionDevice::download(const CtHandle& ct) {
   std::vector<u64> out;
   impl_->copy_out(out, ct->data(), impl_->ct_words()).throw_if_error();
   return out;
+}
+
+const std::uint64_t* ExpansionDevice::device_ptr(const CtHandle& ct) const {
+  if (!ct) throw std::invalid_argument("expansion: null handle");
+  return ct->data();
 }
 
 void ExpansionDevice::synchronize() {

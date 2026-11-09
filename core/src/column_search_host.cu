@@ -3,6 +3,7 @@
 
 #include "ombra/core/column_search.hpp"
 
+#include <chrono>
 #include <stdexcept>
 
 #include "device_buffer.cuh"
@@ -44,6 +45,7 @@ struct ColumnSearchDevice::Impl {
     DeviceBuffer<u64> stored, query, out;
     DeviceBuffer<TowerConst> tc;
     cudaEvent_t start = nullptr, stop = nullptr;
+    double last_upload_s = 0;
 
     ~Impl() {
         // Destructors cannot return a Status; failures are ignored on purpose (nothing to recover).
@@ -116,8 +118,12 @@ void ColumnSearchDevice::upload_block(std::size_t block, const std::uint64_t* wo
         throw std::invalid_argument("column_search: bad block index or size");
     }
     check_reduced(words, count, s, impl_->moduli);
+    const auto t0 = std::chrono::steady_clock::now();
     impl_->copy_in(impl_->stored.get() + block * s.block_words(), words, count).throw_if_error();
+    impl_->last_upload_s = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
 }
+
+double ColumnSearchDevice::last_upload_seconds() const { return impl_->last_upload_s; }
 
 void ColumnSearchDevice::copy_block(std::size_t src, std::size_t dst) {
     if (src >= impl_->shape.blocks || dst >= impl_->shape.blocks) {
@@ -133,6 +139,18 @@ void ColumnSearchDevice::upload_query(const std::uint64_t* words, std::size_t co
     impl_->copy_in(impl_->query.get(), words, count).throw_if_error();
 }
 
+void ColumnSearchDevice::set_query_column_from_device(std::size_t j, const std::uint64_t* src) {
+    const ColumnSearchShape& s = impl_->shape;
+    if (j >= s.dims || src == nullptr) throw std::invalid_argument("column_search: bad column");
+    const std::size_t words = 2 * s.poly_words();
+    const auto go = [&]() -> Status {
+        OMBRA_CUDA_CHECK(cudaMemcpy(impl_->query.get() + j * words, src, words * sizeof(u64),
+                                    cudaMemcpyDeviceToDevice));
+        return {};
+    };
+    go().throw_if_error();
+}
+
 double ColumnSearchDevice::run() {
     double seconds = 0;
     impl_->run_kernel(seconds).throw_if_error();
@@ -142,6 +160,8 @@ double ColumnSearchDevice::run() {
 void ColumnSearchDevice::download_result(std::vector<std::uint64_t>& out) {
     impl_->copy_out(out).throw_if_error();
 }
+
+const std::uint64_t* ColumnSearchDevice::result_device() const { return impl_->out.get(); }
 
 struct BatchedColumnSearchDevice::Impl {
     ColumnSearchShape shape;

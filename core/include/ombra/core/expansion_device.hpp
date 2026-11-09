@@ -38,6 +38,30 @@ struct ExpansionTables {
   std::vector<std::uint64_t> p_inv_mod_q;      // [num_q] P^-1 mod q_i
   std::vector<std::uint64_t> p_hat_inv_mod_p;  // [num_p] (P/p_j)^-1 mod p_j
   std::vector<std::uint64_t> p_hat_mod_q;      // [num_p][num_q] (P/p_j) mod q_i
+
+  // Rescale (T1.2, dropping the last Q tower): q_{num_q-1}^-1 mod q_i for i < num_q - 1
+  // (CryptoParametersCKKSRNS::GetqlInvModq). Empty if num_q == 1 (nothing to drop).
+  std::vector<std::uint64_t> ql_inv_mod_q;
+};
+
+// An owned device array of 64-bit words, for the raw-pointer operations of ExpansionDevice
+// (relinearize, rescale, multiply) and the GPU search pipeline. Synchronous copies.
+class DeviceWords {
+ public:
+  explicit DeviceWords(std::size_t count);
+  ~DeviceWords();
+  DeviceWords(DeviceWords&&) noexcept;
+  DeviceWords& operator=(DeviceWords&&) noexcept;
+  DeviceWords(const DeviceWords&) = delete;
+  DeviceWords& operator=(const DeviceWords&) = delete;
+  std::uint64_t* data() const;
+  std::size_t size() const;
+  void upload(const std::vector<std::uint64_t>& words, std::size_t offset = 0);
+  std::vector<std::uint64_t> download(std::size_t offset, std::size_t count) const;
+
+ private:
+  struct Impl;
+  std::unique_ptr<Impl> impl_;
 };
 
 // Timing of the pieces of one split (profiling only, see ExpansionDevice::profile_split).
@@ -70,6 +94,9 @@ class ExpansionDevice {
 
   CtHandle upload(const std::vector<std::uint64_t>& words);  // [comp][Q tower][N]
   std::vector<std::uint64_t> download(const CtHandle& ct);
+  // T1.3: device pointer to the words of a ciphertext ([component][Q tower][N], 2 * num_q * N
+  // words), valid while a handle to it is alive. For device-to-device handoff of expansion leaves.
+  const std::uint64_t* device_ptr(const CtHandle& ct) const;
   void synchronize();
 
   // (c + tau_g(c), (c - tau_g(c)) * X^-shift); the second is null unless want_odd. Asynchronous.
@@ -106,6 +133,24 @@ class ExpansionDevice {
   // identical splits of `c` (nodes <= max_batch), `reps` times.
   SplitProfile profile_level(const CtHandle& c, std::uint32_t galois, std::size_t level,
                              std::size_t nodes, int reps);
+
+  // --- T1.2: relinearize, rescale and ciphertext multiply on raw device pointers. A "ciphertext"
+  // here is [component][Q tower][N] words with this device's num_q towers (rescale outputs have
+  // num_q - 1). All pointers are device pointers (DeviceWords::data() + offset), asynchronous on
+  // the default stream. Outputs must not alias inputs.
+  // Public EvalMult key (the key-switching key of s^2), in the layout of add_key's key_words.
+  void set_relin_key(const std::vector<std::uint64_t>& key_words);
+  // 3 -> 2 components: KeySwitchCore of component 2 with the relin key, added to components 0, 1
+  // (LeveledSHEBase::RelinearizeInPlace). in3[k] has 3 * num_q * N words, out2[k] 2 * num_q * N.
+  void relinearize(const std::vector<const std::uint64_t*>& in3,
+                   const std::vector<std::uint64_t*>& out2);
+  // Drops the last Q tower and divides by it (ModReduceInternalInPlace, one level). in2[k] is
+  // 2 * num_q * N words, out2[k] 2 * (num_q - 1) * N. Needs tables.ql_inv_mod_q.
+  void rescale(const std::vector<const std::uint64_t*>& in2,
+               const std::vector<std::uint64_t*>& out2);
+  // Tensor product of 2-component ciphertexts (EvalMultCore): out3[k] has 3 * num_q * N words.
+  void multiply(const std::vector<const std::uint64_t*>& a, const std::vector<const std::uint64_t*>& b,
+                const std::vector<std::uint64_t*>& out3);
 
   // Synchronous stage entry points for the oracle tests (copy results to the host).
   // NTT of rows [rows][N]; tower[r] is the QP tower (modulus) of row r.

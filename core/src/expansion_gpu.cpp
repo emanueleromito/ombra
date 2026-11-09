@@ -139,6 +139,14 @@ ExpansionTables extract_expansion_tables(const CryptoContext<DCRTPoly>& cc,
     if (p_hat_mod[j].size() < nq) fail("PHatModq columns");
     for (std::size_t i = 0; i < nq; ++i) t.p_hat_mod_q.push_back(to_u64(p_hat_mod[j][i]));
   }
+
+  // Rescale (T1.2): q_l^-1 mod q_i for the last tower of this level (ModReduceInternalInPlace uses
+  // GetqlInvModq(diffQl) with diffQl = full Q towers - towers of the ciphertext).
+  const std::size_t full_q = cp->GetElementParams()->GetParams().size();
+  if (nq >= 2 && full_q >= nq) {
+    t.ql_inv_mod_q = to_u64(cp->GetqlInvModq(full_q - nq));
+    if (t.ql_inv_mod_q.size() != nq - 1) fail("qlInvModq size");
+  }
   return t;
 }
 

@@ -138,6 +138,10 @@ struct KsDims {
   u64 num_q;     // Q towers of the ciphertext
   u64 num_qp;    // Q towers + P towers
   u64 digits;    // key-switch digits in use
+  // T1.2: which component of the ciphertext is being key-switched (1 for the automorphism, 2 for
+  // relinearization) and whether the inner product adds c0 * P (automorphism only).
+  u32 src_comp = 1;
+  u32 add_c0_p = 1;
 };
 // Test/oracle aid, not on the hot path: writes component 1 of every node's ciphertext into the
 // digit slot that holds the tower itself, digits[z][digit_of_tower[i]][i][k] (stride digits *
@@ -147,7 +151,8 @@ cudaError_t launch_ks_copy_own_digits(const u64* const* ct, u64* digits, const u
                                       const KsDims& dims, u32 batch, cudaStream_t stream);
 // digits: stride digits * num_qp * N per node (only the converted towers are read; a digit's own
 // towers are read from component 1 of ct[z]); ext: stride 2 * num_qp * N; c0 of node z is
-// component 0 of ct[z]. digit_of_tower has num_qp entries, 0xFFFFFFFF for the P towers.
+// component 0 of ct[z]. digit_of_tower has num_qp entries, 0xFFFFFFFF for the P towers. auto_map
+// may be null (identity permutation); p_mod_q is only read if dims.add_c0_p != 0.
 cudaError_t launch_ks_inner_product(const u64* digits, const u64* key, const u64* const* ct,
                                     const u32* auto_map, const u64* p_mod_q,
                                     const u32* digit_of_tower, u64* ext, const TowerConst* tc,
@@ -173,6 +178,29 @@ cudaError_t launch_encode_finish(const double2* buf, u64 cols, u64 slots, double
 cudaError_t launch_plain_search(const u64* plain, const u64* query, u64* out, const TowerConst* tc,
                                 u64 dims, u64 blocks, u64 num_towers, u64 ring_dim,
                                 cudaStream_t stream);
+
+// rescale.cu (T1.2): CKKS FIXEDMANUAL rescale and the ciphertext x ciphertext tensor product, see
+// the comments above the kernels. Nodes are addressed through pointer arrays.
+struct RescaleDims {
+  u64 ring_dim;  // N
+  u64 num_q;     // towers of the input ciphertext (the last one is dropped)
+};
+// Step 2 of the rescale. last: [z][N] coefficient-form words of the last tower (z = node * 2 +
+// component); tmp: [z][num_q - 1][N] = last switched to modulus q_i with the centered representative
+// (NativeVector(v, q_i) in DCRTPoly::DropLastElementAndScale). nodes2 = 2 * nodes.
+cudaError_t launch_rescale_switch(const u64* last, u64* tmp, const TowerConst* tc,
+                                  const RescaleDims& dims, u32 nodes2, cudaStream_t stream);
+// Step 4: out[node][r][i][k] = (in[node][r][i][k] - tmp[z][i][k]) * ql_inv[i] mod q_i, i < num_q - 1;
+// `in` is [2][num_q][N] and `out` is [2][num_q - 1][N] per node. tmp holds the forward NTT of
+// the output of launch_rescale_switch.
+cudaError_t launch_rescale_combine(const u64* const* in, const u64* tmp, u64* const* out,
+                                   const u64* ql_inv, const TowerConst* tc, const RescaleDims& dims,
+                                   u32 nodes, cudaStream_t stream);
+// out[node] = tensor product of the 2-component ciphertexts a[node], b[node] (all [2][num_q][N]):
+// out = [a0 b0, a0 b1 + a1 b0, a1 b1], [3][num_q][N] per node (LeveledSHEBase::EvalMultCore).
+cudaError_t launch_ct_tensor(const u64* const* a, const u64* const* b, u64* const* out,
+                             const TowerConst* tc, const RescaleDims& dims, u32 nodes,
+                             cudaStream_t stream);
 
 // An empty kernel, only to measure launch overhead when profiling.
 cudaError_t launch_noop(cudaStream_t stream);
