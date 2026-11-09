@@ -95,7 +95,7 @@ T0.5b and T0.7 both touch the expansion code: run them one after the other, not 
 **Depends on:** T0.4, T0.5
 **Steps:** for d = 384, 768 and 1536, and for both modes (plaintext DB and encrypted DB), measure storage per million vectors, bytes per dimension per vector, query upload size, score download size and evaluation-key size. Compare with a plain float32 vector DB (4 bytes per dimension). The expected figure at `m0_depth2` is about 96 bytes per dimension per vector for encrypted DB (2 polynomials x 3 towers x 8 bytes over N/2 slots); confirm or correct it.
 **Done when:** a size table is recorded in `results/`, including the ratio to float32 and how many vectors fit in A100 memory per mode and dimension.
-**Status:** todo
+**Status:** done
 
 ### T0.5b Faster query expansion
 
