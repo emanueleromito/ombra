@@ -21,6 +21,18 @@
       "scaling_technique": "FIXEDMANUAL",
       "key_switch_technique": "HYBRID",
       "num_large_digits": 3
+    },
+    "m1_composite_n16384": {
+      "security_level": "HEStd_128_classic",
+      "ring_dim": 16384,
+      "multiplicative_depth": 2,
+      "scaling_mod_size": 58,
+      "first_mod_size": 62,
+      "batch_size": 8192,
+      "scaling_technique": "COMPOSITESCALINGMANUAL",
+      "key_switch_technique": "HYBRID",
+      "composite_degree": 2,
+      "register_word_size": 32
     }
   }
 }
