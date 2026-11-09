@@ -32,7 +32,7 @@ constexpr int kBlockTile = 4;  // stored blocks per thread: the query words are 
 // Launch shape: grid.x = ceil(P / kBlockThreads), grid.y = ceil(blocks / kBlockTile) (<= 65535),
 // block = kBlockThreads, no shared memory. 2 * kBlockTile accumulators per thread; per dimension
 // and block it does 2 modular multiplications and 2 additions.
-__global__ void plain_search_kernel(const u64* __restrict__ plain, const u64* __restrict__ query,
+__global__ void __launch_bounds__(kBlockThreads, 4) plain_search_kernel(const u64* __restrict__ plain, const u64* __restrict__ query,
                                     u64* __restrict__ out, const TowerConst* __restrict__ tc,
                                     u64 dims, u64 blocks, u64 ring_dim, u64 poly_words) {
   const u64 e = blockIdx.x * (u64)blockDim.x + threadIdx.x;
