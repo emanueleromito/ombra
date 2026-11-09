@@ -81,7 +81,7 @@ T1.1, T1.2, T1.4 and T1.6 can start in parallel. T1.2 and T1.4 both touch the se
 **Depends on:** T1.1 to T1.7
 **Steps:** summarize the review findings and their status, the end-to-end latency, the speedups, and the preset results; recommend "fast", "balanced" and "precise".
 **Done when:** `results/m1-report.md` exists with the numbers and a recommendation for each preset and each proposed decision.
-**Status:** todo
+**Status:** done
 
 ---
 
