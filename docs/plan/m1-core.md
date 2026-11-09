@@ -159,7 +159,7 @@ One task per high or medium finding in `results/m1-crypto-review.md`. T1.10 shou
 **Depends on:** none
 **Steps:** write a decision on the IND-CPA-D position; pin the CKKS data type and decryption mode in the presets; add a test that two decryptions of one ciphertext differ.
 **Done when:** the decision is **proposed**, the presets pin both settings and the test passes.
-**Status:** todo
+**Status:** in progress: decision 0017 proposed; the pins and the test wait for it to be accepted
 
 ### T1.18 Decision on plaintext-DB disclosure (F10, medium)
 
@@ -167,7 +167,7 @@ One task per high or medium finding in `results/m1-crypto-review.md`. T1.10 shou
 **Depends on:** none
 **Steps:** write a decision on who this mode protects; update the threat model.
 **Done when:** the decision is **proposed** and `docs/product-requirements.md` states the limit.
-**Status:** todo
+**Status:** in progress: decision 0018 proposed; the requirements change waits for it to be accepted
 
 ### T1.19 Required check for the oracles (F11, medium)
 
