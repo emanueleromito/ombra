@@ -63,7 +63,7 @@ def test_other_paths_excluded(path: str) -> None:
 @pytest.mark.parametrize(
     "path",
     ["core/CMakeLists.txt", "CMakeLists.txt", "pyproject.toml", "conftest.py", "Makefile",
-     "modal_app.py", "modal_upload.py", "tests/test_modal_upload.py", "client/ombra/__init__.py",
+     "modal_app.py", "tests/test_modal_upload.py", "client/ombra/__init__.py",
      "core/params/ckks_presets.json"],
 )
 def test_required_files_included(path: str) -> None:

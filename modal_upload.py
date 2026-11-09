@@ -1,7 +1,7 @@
 """What `modal_app.py` uploads into the image: an allowlist, minus secrets and build output.
 
-Pure Python with no `modal` import, so a CPU test can run it. It is uploaded with the repo
-because `modal_app.py` imports it inside the container too.
+Pure Python with no `modal` import, so a CPU test can run it. `modal_app.py` calls it locally at
+image build, so the file itself is not uploaded.
 """
 
 from __future__ import annotations
@@ -20,7 +20,6 @@ ALLOWED_TOP_LEVEL = (
     "conftest.py",
     "Makefile",
     "modal_app.py",
-    "modal_upload.py",
 )
 
 # Credential-like names, matched against every path component. Keep in step with the secrets

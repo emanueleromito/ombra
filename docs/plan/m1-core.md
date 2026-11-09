@@ -175,7 +175,7 @@ One task per high or medium finding in `results/m1-crypto-review.md`. T1.10 shou
 **Depends on:** none
 **Steps:** add a CI job for `make test` on every PR and `make test-gpu` on PRs touching `core/`, with Modal credentials as repository secrets; make it a required check.
 **Done when:** a PR with a failing oracle cannot be merged.
-**Status:** todo
+**Status:** in progress: `.github/workflows/ci.yml` added; needs the repository secrets and the required-check setting
 
 ### T1.20 Restrict what is uploaded to Modal (F12, medium)
 
