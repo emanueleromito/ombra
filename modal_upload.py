@@ -1,7 +1,8 @@
 """What `modal_app.py` uploads into the image: an allowlist, minus secrets and build output.
 
 Pure Python with no `modal` import, so a CPU test can run it. `modal_app.py` calls it locally at
-image build. The file is still uploaded, because pytest collects its test in the container.
+image build. This file and `.gitignore` are still uploaded, because pytest collects their test in
+the container.
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ ALLOWED_TOP_LEVEL = (
     "Makefile",
     "modal_app.py",
     "modal_upload.py",
+    ".gitignore",
 )
 
 # Credential-like names, matched against every path component. Keep in step with the secrets
