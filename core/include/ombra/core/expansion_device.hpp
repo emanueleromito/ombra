@@ -85,6 +85,20 @@ class ExpansionDevice {
                                                          const std::vector<char>& want_odd);
   // Largest chunk of nodes per batch (default from a ~1 GiB scratch budget); tests lower it to
   // exercise chunking. The scratch grows to the largest chunk used and is never shrunk.
+  // Memory planning (T0.7). Bytes of one ciphertext on the device; bytes of scratch for a chunk of
+  // `nodes` nodes (what the scratch holds once it has grown to that chunk size).
+  std::size_t ct_bytes() const;
+  std::size_t scratch_bytes(std::size_t nodes) const;
+  // Ciphertexts live in slabs of slab_slots() slots (one cudaMalloc each, about 256 MiB). slab_bytes()
+  // is the driver's footprint of one slab (rounded to 2 MiB), so a ciphertext costs
+  // slab_bytes() / slab_slots() bytes plus at most one partly used slab. pool_bytes() is the
+  // footprint of the slabs currently allocated.
+  std::size_t slab_slots() const;
+  std::size_t slab_bytes() const;
+  std::size_t pool_bytes() const;
+  // Frees every slab without a live handle (the pool otherwise keeps its peak forever and reuses
+  // it). Waits for the device. Slabs that still hold live handles are kept.
+  void release_pool();
   void set_max_batch(std::size_t nodes);
   std::size_t max_batch() const;
 

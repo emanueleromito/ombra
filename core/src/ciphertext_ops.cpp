@@ -219,4 +219,69 @@ std::vector<Ciphertext<DCRTPoly>> gpu_eval_column_search(
     return results;
 }
 
+std::vector<std::vector<Ciphertext<DCRTPoly>>> gpu_eval_column_search_batched(
+    const std::vector<std::vector<Ciphertext<DCRTPoly>>>& stored_blocks,
+    const std::vector<std::vector<Ciphertext<DCRTPoly>>>& queries) {
+    if (stored_blocks.empty() || queries.empty() || queries[0].empty()) {
+        throw std::invalid_argument("column search: no stored blocks or empty queries");
+    }
+    const std::size_t dims = queries[0].size();
+    std::vector<std::uint64_t> qwords;
+    FlatCiphertexts fq0;
+    for (std::size_t q = 0; q < queries.size(); ++q) {
+        if (queries[q].size() != dims) {
+            throw std::invalid_argument("column search: queries differ in dimensions");
+        }
+        FlatCiphertexts fq = flatten_ciphertexts(queries[q]);
+        if (q == 0) {
+            qwords.reserve(queries.size() * fq.words.size());
+            fq0 = fq;
+        } else if (fq.level != fq0.level || fq.scaling_factor != fq0.scaling_factor ||
+                   fq.noise_scale_deg != fq0.noise_scale_deg || fq.moduli != fq0.moduli) {
+            throw std::invalid_argument("column search: queries differ in level, degree or scale");
+        }
+        qwords.insert(qwords.end(), fq.words.begin(), fq.words.end());
+    }
+    const ColumnSearchShape shape{dims, stored_blocks.size(), fq0.num_towers, fq0.ring_dim};
+
+    BatchedColumnSearchDevice dev(shape, fq0.moduli, queries.size());
+    for (std::size_t b = 0; b < stored_blocks.size(); ++b) {
+        if (stored_blocks[b].size() != dims) {
+            throw std::invalid_argument("column search: block and query differ in dimensions");
+        }
+        const FlatCiphertexts fb = flatten_ciphertexts(stored_blocks[b]);
+        if (fb.level != fq0.level || fb.scaling_factor != fq0.scaling_factor ||
+            fb.noise_scale_deg != fq0.noise_scale_deg || fb.num_towers != fq0.num_towers ||
+            fb.ring_dim != fq0.ring_dim || fb.moduli != fq0.moduli) {
+            throw std::invalid_argument(
+                "column search: stored and query differ in level, noise degree, scale or moduli");
+        }
+        dev.upload_block(b, fb.words.data(), fb.words.size());
+    }
+    for (std::size_t q = 0; q < queries.size(); ++q) {
+        dev.upload_query(q, qwords.data() + q * shape.query_words(), shape.query_words());
+    }
+    dev.run(queries.size());
+    std::vector<std::uint64_t> out;
+    dev.download_result(queries.size(), out);
+
+    Flat meta;
+    meta.shape = RnsShape{3, shape.num_towers, shape.ring_dim};
+    meta.moduli = fq0.moduli;
+    std::vector<std::vector<Ciphertext<DCRTPoly>>> results(queries.size());
+    for (std::size_t q = 0; q < queries.size(); ++q) {
+        for (std::size_t b = 0; b < stored_blocks.size(); ++b) {
+            Ciphertext<DCRTPoly> r = stored_blocks[b][0]->Clone();
+            r->GetElements().push_back(r->GetElements()[0]);
+            write_back(r->GetElements(), meta,
+                       out.data() + (q * shape.blocks + b) * 3 * shape.poly_words());
+            r->SetLevel(fq0.level);
+            r->SetNoiseScaleDeg(fq0.noise_scale_deg * 2);
+            r->SetScalingFactor(fq0.scaling_factor * fq0.scaling_factor);
+            results[q].push_back(std::move(r));
+        }
+    }
+    return results;
+}
+
 }  // namespace ombra::core

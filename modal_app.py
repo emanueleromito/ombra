@@ -55,6 +55,9 @@ image = (
         "cmake --install /opt/openfhe-python-build",
     )
     .env({"LD_LIBRARY_PATH": "/usr/local/lib"})
+    # T0.8: reads the Hugging Face parquet embedding shards. A layer after the OpenFHE build, so
+    # OpenFHE is not rebuilt. (ann-benchmarks.com does not host the dbpedia hdf5, so no h5py.)
+    .pip_install("pyarrow==17.0.0")
     # Source code last, so code changes don't rebuild OpenFHE.
     .add_local_dir(
         ".",
@@ -200,3 +203,32 @@ def profile_expand(dims: str = "1536") -> None:
         ]
     )
     volume.commit()
+
+
+# T0.8: the run encrypts 13 database blocks plus 3 centers blocks (about 19 GB of ciphertexts on the
+# container's local disk, kept on the GPU as well: about 20 GB of the A100's 40 GB). The host holds
+# one block at a time (3 to 4 GB) plus the dataset subset (about 1 GB as float64) and faiss.
+@app.function(gpu="A100", cpu=8.0, memory=32768, timeout=14400, volumes={DATA_DIR: volume})
+def recall(dry_run: bool = False, queries: int = 100) -> None:
+    """Release build; T0.8 recall@10 of the encrypted pipeline. `--dry-run`: 10,000 vectors."""
+    _build("Release", targets=("ombra_recall_search",))
+    out_dir = Path(DATA_DIR) / "results"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        "python",
+        str(Path(REPO_DIR) / "core" / "bench" / "recall.py"),
+        "--out",
+        str(out_dir),
+        "--datasets",
+        str(Path(DATA_DIR) / "datasets"),
+        "--scratch",
+        "/tmp",  # noqa: S108 - container-local scratch for the encrypted data
+        "--queries",
+        str(queries),
+    ]
+    if dry_run:
+        cmd.append("--small")
+    try:
+        _run(cmd)
+    finally:
+        volume.commit()
