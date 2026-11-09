@@ -128,6 +128,17 @@ Ciphertext<DCRTPoly> gpu_eval_mult_plain(ConstCiphertext<DCRTPoly>& ct, ConstPla
     return result;
 }
 
+Ciphertext<DCRTPoly> unflatten_ciphertext(const Ciphertext<DCRTPoly>& like,
+                                          const std::vector<std::uint64_t>& words) {
+    const Flat shape = flatten(like->GetElements());
+    if (words.size() != shape.shape.total_words()) {
+        throw std::invalid_argument("unflatten: word count does not match the template");
+    }
+    Ciphertext<DCRTPoly> result = like->Clone();
+    write_back(result->GetElements(), shape, words.data());
+    return result;
+}
+
 FlatCiphertexts flatten_ciphertexts(const std::vector<Ciphertext<DCRTPoly>>& cts) {
     if (cts.empty()) throw std::invalid_argument("no ciphertexts to flatten");
     FlatCiphertexts out;

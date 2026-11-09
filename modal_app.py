@@ -74,7 +74,8 @@ def _run(cmd: list[str], cwd: str = REPO_DIR, ok_codes: tuple[int, ...] = (0,)) 
         raise SystemExit(f"command failed with exit code {code}: {' '.join(cmd)}")
 
 
-def _build(build_type: str) -> None:
+def _build(build_type: str, targets: tuple[str, ...] = ()) -> None:
+    """Configure and build; `targets` limits the build to those CMake targets (default: all)."""
     _run(
         [
             "cmake",
@@ -89,7 +90,10 @@ def _build(build_type: str) -> None:
             "-DOMBRA_ENABLE_CUDA=ON",
         ]
     )
-    _run(["cmake", "--build", BUILD_DIR, "-j"])
+    build_cmd = ["cmake", "--build", BUILD_DIR, "-j"]
+    if targets:
+        build_cmd += ["--target", *targets]
+    _run(build_cmd)
 
 
 @app.function(gpu="A10", timeout=600)
@@ -136,10 +140,20 @@ def test_gpu(pytest_args: str = "") -> None:
     )
 
 
-@app.function(cpu=4.0, memory=8192, timeout=1800, volumes={DATA_DIR: volume})
+# memory: with --expansion-large the C++ expansion driver holds all d = 1536 expanded ciphertexts
+# (about 1.2 GB) plus its tree levels and automorphism keys, while the pytest process keeps its keys
+# and one score accumulator; 16 GiB leaves headroom over that estimate of about 5 to 6 GB.
+@app.function(cpu=4.0, memory=16384, timeout=3600, volumes={DATA_DIR: volume})
 def test_openfhe(pytest_args: str = "") -> None:
-    """Run tests marked `openfhe` on CPU. Zero collected tests (exit code 5) is a failure."""
-    _run(["python", "-m", "pytest", "-m", "openfhe", *pytest_args.split()], ok_codes=(0,))
+    """Run tests marked `openfhe` on CPU. Zero collected tests (exit code 5) is a failure.
+
+    First builds the CPU-side C++ drivers those tests call. Compiling needs the CUDA toolchain
+    (the targets link the CUDA library) but no GPU, and the drivers make no CUDA calls at runtime.
+    Release build, so the CPU timings are meaningful.
+    """
+    _build("Release", targets=("ombra_expand", "ombra_encoding_check"))
+    cmd = ["python", "-m", "pytest", "-m", "openfhe", "-v", "-s", *pytest_args.split()]
+    _run(cmd, ok_codes=(0,))
     volume.commit()
 
 

@@ -12,6 +12,7 @@
 
 namespace ombra::core {
 
+using u32 = std::uint32_t;
 using u64 = std::uint64_t;
 using u128 = unsigned __int128;
 
@@ -45,6 +46,9 @@ __host__ __device__ inline u64 add_mod(u64 a, u64 b, u64 q) {
     const u64 r = a + b;
     return r >= q ? r - q : r;
 }
+
+// (a - b) mod q for reduced a, b < q.
+__host__ __device__ inline u64 sub_mod(u64 a, u64 b, u64 q) { return a >= b ? a - b : a + q - b; }
 
 // Host: builds the constants; throws std::invalid_argument for a modulus outside [2, 2^60).
 inline std::vector<TowerConst> make_tower_consts(const std::vector<u64>& moduli) {

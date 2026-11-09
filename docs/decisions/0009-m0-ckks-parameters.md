@@ -22,3 +22,22 @@ B: preset `m0_depth2` in `core/params/ckks_presets.json`, using HEStd_128_classi
 ## Consequences
 
 The measured log2(QP) is 280, below the 438-bit limit, and a test asserts this on every `make test-openfhe` run. FIXEDMANUAL means callers must rescale explicitly. The product presets ("fast", "balanced", "precise") are still to be defined and may differ.
+
+## Addendum (2026-11-09): the 2^L expansion factor and the level budget
+
+The expansion tree of decision 0010 multiplies every value by 2^L, L = ceil(log2(2d)). The client removes that factor by multiplying q by 2^-L before encoding. The server does no multiplication and no scale change during expansion. Two alternatives were rejected.
+
+**Adjusting the ciphertext scale does not work under FIXEDMANUAL.** Multiplying the ciphertext's scaling factor by 2^L only changes metadata. On decryption under FIXEDMANUAL, `CKKSPackedEncoding::Decode` (OpenFHE v1.6.1, `ckkspackedencoding.cpp:315-361`) divides by powers of 2^p fixed by the preset and by `noiseScaleDeg`; it reads the ciphertext's scaling factor only in the FLEXIBLEAUTO, FLEXIBLEAUTOEXT and composite-scaling branches. The leaves would still decrypt to 2^L * q_j.
+
+**A server-side EvalMult by 2^-L costs the mask's level.** `EvalMult` by a double raises `noiseScaleDeg` by one (`ckksrns-leveledshe.cpp:855`), so a leaf leaves expansion at degree 2 and must be rescaled, which uses one of the preset's two levels. Query x stored then uses the other, and nothing remains for the filter mask (decision 0005) without moving to depth 3, which T0.6 forbids.
+
+**Level budget at `m0_depth2`:**
+
+| Step | Levels used |
+| --- | --- |
+| Query expansion | 0 |
+| Query x stored (column-packed sum, then rescale) | 1 |
+| Filter mask (then rescale) | 1 |
+| **Total** | **2** |
+
+The expansion driver (`core/src/ombra_expand.cpp`) refuses any leaf not at level 0 and degree 1, and `tests/test_query_expansion.py` asserts that the masked score has used exactly 2 levels. Measured errors are in `docs/plan/results/`.

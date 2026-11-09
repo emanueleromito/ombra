@@ -7,6 +7,15 @@ from the `m0_depth2` preset and a key pair, writes ONLY the context and the publ
 temporary directory (the secret key is never serialized or used), and runs the C++ benchmark binary
 `ombra_bench_column_search` once per dimension. It merges the binary's per-run JSON into
 `<out>/t0.4-a100.json`. Nothing written contains plaintext or keys.
+
+T0.5: GPU query expansion time for d = 384, 768, 1536 (`ombra_bench_expand`, one run per d). Per d
+this script generates the automorphism keys for N/2^k + 1, k < ceil(log2(2d)), in-process (that
+needs the secret key, which stays in this process and is never written), and writes ONLY the
+context, the public key and the automorphism keys (public evaluation keys) to a temporary
+directory. Output: `<out>/t0.5-a100.json` with d, L, nodes, automorphisms, keys, key_bytes,
+gpu_seconds and iterations per d.
+
+    python core/bench/run.py --task t0.5 --out <dir>
 """
 
 from __future__ import annotations
@@ -32,6 +41,7 @@ BLOCK_DIM_BUDGET = 16 * 1536
 DEFAULT_WARMUP = 2
 DEFAULT_ITERS = 10
 DEFAULT_OUT_NAME = "t0.4-a100.json"
+T05_OUT_NAME = "t0.5-a100.json"
 
 
 def find_binary(name: str) -> Path:
@@ -123,22 +133,97 @@ def run_t04(
     return out_path
 
 
+def run_t05(out_dir: Path, dims: tuple[int, ...], warmup: int, iters: int, out_name: str) -> Path:
+    import openfhe as ofhe
+    from ombra import params as ombra_params
+    from ombra import query as oq
+
+    binary = find_binary("ombra_bench_expand")
+    _, cc = ombra_params.make_context(PRESET)
+    keys = cc.KeyGen()
+    ring = cc.GetRingDimension()
+
+    results = []
+    gpu_name = "unknown"
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        # Public material only. The secret key is used in-process to derive the automorphism
+        # keys and is never serialized.
+        if not ofhe.SerializeToFile(str(tmp_dir / "context.bin"), cc, ofhe.BINARY):
+            raise SystemExit("cannot serialize context")
+        if not ofhe.SerializeToFile(str(tmp_dir / "public_key.bin"), keys.publicKey, ofhe.BINARY):
+            raise SystemExit("cannot serialize public key")
+        for d in dims:
+            indices = oq.automorphism_indices(ring, d)
+            cc.ClearEvalAutomorphismKeys()  # the key store is static: exactly this d's indices
+            cc.EvalAutomorphismKeyGen(keys.secretKey, indices)
+            key_path = tmp_dir / f"autokeys_{d}.bin"
+            if not cc.SerializeEvalAutomorphismKey(str(key_path), ofhe.BINARY):
+                raise SystemExit("cannot serialize automorphism keys")
+            part = tmp_dir / f"part_{d}.json"
+            cmd = [
+                str(binary),
+                str(tmp_dir / "context.bin"),
+                str(tmp_dir / "public_key.bin"),
+                str(key_path),
+                str(d),
+                str(warmup),
+                str(iters),
+                str(part),
+            ]
+            print("$", " ".join(cmd), flush=True)
+            subprocess.run(cmd, check=True)  # noqa: S603
+            entry = json.loads(part.read_text())
+            gpu_name = entry.pop("gpu_name")
+            results.append(entry)
+            print(
+                f"d={d} L={entry['L']} automorphisms={entry['automorphisms']} "
+                f"keys={entry['keys']} key_bytes={entry['key_bytes']} "
+                f"gpu_seconds={entry['gpu_seconds']:.4f}",
+                flush=True,
+            )
+
+    record = {
+        "task": "t0.5",
+        "format_version": 1,
+        "preset": PRESET,
+        "openfhe_version": openfhe_version(),
+        "gpu_name": gpu_name,
+        "note": (
+            "GPU query expansion tree (one key-switched automorphism per split, d leaves). "
+            "gpu_seconds is the median wall time of the whole tree with leaves resident on the "
+            "device, excluding key and root upload and warm-up. key_bytes is the size of the "
+            "serialized automorphism key file."
+        ),
+        "results": results,
+    }
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / out_name
+    out_path.write_text(json.dumps(record, indent=2) + "\n")
+    print(f"wrote {out_path}")
+    return out_path
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--task", default="all", help="t0.4 or all")
+    parser.add_argument("--task", default="all", help="t0.4, t0.5 or all")
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument("--dims", default=",".join(map(str, T04_DIMS)))
     parser.add_argument("--blocks", type=int, default=None, help="override the block count")
     parser.add_argument("--warmup", type=int, default=DEFAULT_WARMUP)
     parser.add_argument("--iters", type=int, default=DEFAULT_ITERS)
     parser.add_argument("--name", default=DEFAULT_OUT_NAME, help="output file name for t0.4")
+    parser.add_argument("--name-t05", default=T05_OUT_NAME, help="output file name for t0.5")
     args = parser.parse_args()
 
     task = args.task.lower()
-    if task not in ("all", "t0.4"):
+    if task not in ("all", "t0.4", "t0.5"):
         raise SystemExit(f"unknown task {args.task!r}")
     dims = tuple(int(x) for x in args.dims.split(","))
-    run_t04(args.out, dims, args.blocks, args.warmup, args.iters, args.name)
+    if task in ("all", "t0.4"):
+        run_t04(args.out, dims, args.blocks, args.warmup, args.iters, args.name)
+    if task in ("all", "t0.5"):
+        run_t05(args.out, dims, args.warmup, args.iters, args.name_t05)
 
 
 if __name__ == "__main__":

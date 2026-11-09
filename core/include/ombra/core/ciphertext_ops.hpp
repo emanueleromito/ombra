@@ -36,6 +36,12 @@ struct FlatCiphertexts {
 // std::invalid_argument if they differ in level, noise degree, scale, shape or moduli.
 FlatCiphertexts flatten_ciphertexts(const std::vector<lbcrypto::Ciphertext<lbcrypto::DCRTPoly>>& cts);
 
+// Inverse of flatten_ciphertexts for one ciphertext: a copy of `like` (context, key tag, level,
+// noise degree, scaling factor) whose RNS words are replaced by `words` ([component][tower][coeff],
+// evaluation form, same shape and moduli as `like`).
+lbcrypto::Ciphertext<lbcrypto::DCRTPoly> unflatten_ciphertext(
+    const lbcrypto::Ciphertext<lbcrypto::DCRTPoly>& like, const std::vector<std::uint64_t>& words);
+
 lbcrypto::Ciphertext<lbcrypto::DCRTPoly> gpu_eval_add(
     lbcrypto::ConstCiphertext<lbcrypto::DCRTPoly>& a,
     lbcrypto::ConstCiphertext<lbcrypto::DCRTPoly>& b);
