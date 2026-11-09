@@ -255,6 +255,10 @@ struct PlainSearchDevice::Impl {
   }
 
   Status init() {
+    for (u64 q : moduli) {
+      // the search kernel multiplies with Montgomery reduction (needs odd q; RNS primes are odd)
+      if ((q & 1) == 0) throw std::invalid_argument("plain_search: moduli must be odd");
+    }
     OMBRA_TRY(to_device(tc, make_tower_consts(moduli)));
     OMBRA_TRY(query.allocate(shape.query_words()));
     OMBRA_TRY(out.allocate(shape.out_words()));

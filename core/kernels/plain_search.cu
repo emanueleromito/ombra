@@ -14,7 +14,9 @@
 //   plain: [block][dim][tower][coeff]           blocks * dims * P words
 //   query: [dim][component 0..1][tower][coeff]  dims * 2 * P words
 //   out:   [block][component 0..1][tower][coeff] blocks * 2 * P words
-// All input words must be reduced (< their modulus); moduli < 2^60.
+// All input words must be reduced (< their modulus); moduli < 2^60 and odd.
+// Products are Montgomery products accumulated and corrected once at the end (mont_finish), exactly
+// as in column_search.cu (T1.4); the output is the standard-form residue.
 
 #include <algorithm>
 
@@ -50,8 +52,8 @@ __global__ void plain_search_kernel(const u64* __restrict__ plain, const u64* __
     for (int k = 0; k < kBlockTile; ++k) {
       if ((u64)k < nb) {
         const u64 p = plain[((b0 + k) * dims + j) * poly_words + e];
-        acc0[k] = add_mod(acc0[k], mul_mod(p, q0, c), c.q);
-        acc1[k] = add_mod(acc1[k], mul_mod(p, q1, c), c.q);
+        acc0[k] = add_mod(acc0[k], mont_mul(p, q0, c), c.q);
+        acc1[k] = add_mod(acc1[k], mont_mul(p, q1, c), c.q);
       }
     }
   }
@@ -59,8 +61,8 @@ __global__ void plain_search_kernel(const u64* __restrict__ plain, const u64* __
   for (int k = 0; k < kBlockTile; ++k) {
     if ((u64)k < nb) {
       const u64 o = ((b0 + k) * 2) * poly_words + e;
-      out[o] = acc0[k];
-      out[o + poly_words] = acc1[k];
+      out[o] = mont_finish(acc0[k], c);
+      out[o + poly_words] = mont_finish(acc1[k], c);
     }
   }
 }

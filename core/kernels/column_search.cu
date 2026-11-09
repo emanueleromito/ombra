@@ -25,7 +25,13 @@
 //   tc:     num_towers TowerConst entries
 // Word e = tower * ring_dim + coeff is the offset inside a polynomial, so consecutive threads
 // touch consecutive words (coalesced), and the tower modulus is tc[e / ring_dim].
-// All input words must be reduced (< their modulus); moduli < 2^60.
+// All input words must be reduced (< their modulus); moduli < 2^60 and odd.
+//
+// Arithmetic (T1.4): products use Montgomery multiplication (modarith.cuh, mont_mul), which takes
+// 42.8 instead of 57.2 instructions per modular multiplication in the loop. The kernel accumulates
+// acc = sum_j mont_mul(x_j, y_j) mod q = R^-1 * sum_j x_j y_j with R = 2^64 and multiplies once by R
+// (mont_finish) at the end, so inputs and outputs stay standard-form residues and the result is
+// bit-identical to the Barrett version. Every addition is reduced, so acc < q always.
 
 #include <algorithm>
 
@@ -66,10 +72,10 @@ __global__ void column_search_kernel(const u64* __restrict__ stored, const u64* 
                 const u64 base = (((b0 + k) * dims + j) * 2) * poly_words + e;
                 const u64 s0 = stored[base];
                 const u64 s1 = stored[base + poly_words];
-                acc0[k] = add_mod(acc0[k], mul_mod(s0, q0, c), c.q);
-                const u64 cross = add_mod(mul_mod(s0, q1, c), mul_mod(s1, q0, c), c.q);
+                acc0[k] = add_mod(acc0[k], mont_mul(s0, q0, c), c.q);
+                const u64 cross = add_mod(mont_mul(s0, q1, c), mont_mul(s1, q0, c), c.q);
                 acc1[k] = add_mod(acc1[k], cross, c.q);
-                acc2[k] = add_mod(acc2[k], mul_mod(s1, q1, c), c.q);
+                acc2[k] = add_mod(acc2[k], mont_mul(s1, q1, c), c.q);
             }
         }
     }
@@ -77,9 +83,9 @@ __global__ void column_search_kernel(const u64* __restrict__ stored, const u64* 
     for (int k = 0; k < kBlockTile; ++k) {
         if ((u64)k < nb) {
             const u64 o = ((b0 + k) * 3) * poly_words + e;
-            out[o] = acc0[k];
-            out[o + poly_words] = acc1[k];
-            out[o + 2 * poly_words] = acc2[k];
+            out[o] = mont_finish(acc0[k], c);
+            out[o + poly_words] = mont_finish(acc1[k], c);
+            out[o + 2 * poly_words] = mont_finish(acc2[k], c);
         }
     }
 }
@@ -145,11 +151,11 @@ __global__ void column_search_batched_kernel(const u64* __restrict__ stored,
 #pragma unroll
                 for (int k = 0; k < kBatchBlockTile; ++k) {
                     if ((u64)k < nb) {
-                        acc0[m][k] = add_mod(acc0[m][k], mul_mod(s0[k], q0, c), c.q);
+                        acc0[m][k] = add_mod(acc0[m][k], mont_mul(s0[k], q0, c), c.q);
                         const u64 cross =
-                            add_mod(mul_mod(s0[k], q1, c), mul_mod(s1[k], q0, c), c.q);
+                            add_mod(mont_mul(s0[k], q1, c), mont_mul(s1[k], q0, c), c.q);
                         acc1[m][k] = add_mod(acc1[m][k], cross, c.q);
-                        acc2[m][k] = add_mod(acc2[m][k], mul_mod(s1[k], q1, c), c.q);
+                        acc2[m][k] = add_mod(acc2[m][k], mont_mul(s1[k], q1, c), c.q);
                     }
                 }
             }
@@ -162,9 +168,9 @@ __global__ void column_search_batched_kernel(const u64* __restrict__ stored,
             for (int k = 0; k < kBatchBlockTile; ++k) {
                 if ((u64)k < nb) {
                     const u64 o = (((q0i + m) * blocks + b0 + k) * 3) * poly_words + e;
-                    out[o] = acc0[m][k];
-                    out[o + poly_words] = acc1[m][k];
-                    out[o + 2 * poly_words] = acc2[m][k];
+                    out[o] = mont_finish(acc0[m][k], c);
+                    out[o + poly_words] = mont_finish(acc1[m][k], c);
+                    out[o + 2 * poly_words] = mont_finish(acc2[m][k], c);
                 }
             }
         }

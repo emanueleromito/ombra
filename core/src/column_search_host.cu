@@ -19,6 +19,10 @@ void validate_shape(const ColumnSearchShape& s, const std::vector<u64>& moduli) 
     if (moduli.size() != s.num_towers) {
         throw std::invalid_argument("column_search: one modulus per tower is required");
     }
+    for (std::uint64_t q : moduli) {
+        // the kernels multiply with Montgomery reduction, which needs an odd modulus
+        if ((q & 1) == 0) throw std::invalid_argument("column_search: moduli must be odd");
+    }
     if ((s.blocks + 3) / 4 > 65535) {
         throw std::invalid_argument("column_search: too many blocks for one launch");
     }
