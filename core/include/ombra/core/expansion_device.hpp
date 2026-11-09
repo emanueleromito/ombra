@@ -89,8 +89,15 @@ class ExpansionDevice {
   // `nodes` nodes (what the scratch holds once it has grown to that chunk size).
   std::size_t ct_bytes() const;
   std::size_t scratch_bytes(std::size_t nodes) const;
-  // Frees the ciphertext buffers that dropped handles returned to the pool (the pool otherwise
-  // keeps the peak forever and reuses it). Waits for the device. Live handles are not affected.
+  // Ciphertexts live in slabs of slab_slots() slots (one cudaMalloc each, about 256 MiB). slab_bytes()
+  // is the driver's footprint of one slab (rounded to 2 MiB), so a ciphertext costs
+  // slab_bytes() / slab_slots() bytes plus at most one partly used slab. pool_bytes() is the
+  // footprint of the slabs currently allocated.
+  std::size_t slab_slots() const;
+  std::size_t slab_bytes() const;
+  std::size_t pool_bytes() const;
+  // Frees every slab without a live handle (the pool otherwise keeps its peak forever and reuses
+  // it). Waits for the device. Slabs that still hold live handles are kept.
   void release_pool();
   void set_max_batch(std::size_t nodes);
   std::size_t max_batch() const;

@@ -70,6 +70,15 @@ def test_bench_batch_tiny(tmp_path: Path) -> None:
             assert r["total_seconds_median"] > 0
             assert r["queries_per_second"] > 0
             assert r["speedup_vs_q1"] > 0
+    for r in entry["expansion"]:
+        # Slab pool: a ciphertext costs its nominal size plus rounding well under 1 percent, the
+        # pool holds at least one slab at the peak, and release_pool() frees all of it.
+        assert r["ciphertext_footprint_bytes"] >= r["ciphertext_nominal_bytes"]
+        assert r["ciphertext_footprint_bytes"] < 1.01 * r["ciphertext_nominal_bytes"]
+        assert r["pool_bytes_at_peak"] >= r["slab_bytes"] > 0
+        assert r["pool_bytes_after_release"] == 0
+    assert "phase search d=4 Q=1" in proc.stdout
+    assert "phase expansion d=4 Q=5" in proc.stdout
     for r in entry["search"]:
         assert r["pass_bytes_loaded"] > 0
         assert r["pass_bytes_written"] > 0

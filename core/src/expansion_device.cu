@@ -44,8 +44,23 @@ std::vector<u64> shoup_of(const std::vector<u64>& w, const std::vector<u64>& q_o
   return out;
 }
 
+// Ciphertext memory comes in slabs: one cudaMalloc per slab, carved into fixed-size slots. A
+// cudaMalloc of one ciphertext (786,432 bytes at the preset) is rounded up by the driver to its
+// allocation granularity, so one allocation per ciphertext wastes most of the memory; a slab pays
+// that rounding once. A slot returns to the free list when its last handle goes away.
+struct Slab {
+  DeviceBuffer<u64> buf;     // empty once released
+  std::size_t in_use = 0;    // slots handed out and not yet returned
+};
+struct Slot {
+  u64* ptr = nullptr;
+  std::size_t slab = 0;
+};
 struct Pool {
-  std::vector<DeviceBuffer<u64>> free_list;
+  std::size_t slot_words = 0;
+  std::size_t slots_per_slab = 0;
+  std::vector<Slab> slabs;
+  std::vector<Slot> free_slots;
 };
 
 struct KeyDev {
@@ -76,6 +91,7 @@ void require(bool ok, const char* what) {
   if (!ok) throw std::invalid_argument(std::string("expansion: ") + what);
 }
 
+constexpr std::size_t kSlabBytes = std::size_t{256} << 20;  // target size of one ciphertext slab
 constexpr std::size_t kScratchBudgetBytes = std::size_t{1} << 30;  // default scratch cap per chunk
 constexpr std::size_t kMaxBatchCeiling = 4096;
 
@@ -84,16 +100,18 @@ constexpr std::size_t kMaxBatchCeiling = 4096;
 // A ciphertext buffer; returns itself to the pool when the last handle goes away.
 class DeviceCt {
  public:
-  DeviceCt(std::shared_ptr<Pool> pool, DeviceBuffer<u64>&& buf)
-      : pool_(std::move(pool)), buf_(std::move(buf)) {}
-  ~DeviceCt() { pool_->free_list.push_back(std::move(buf_)); }
+  DeviceCt(std::shared_ptr<Pool> pool, Slot slot) : pool_(std::move(pool)), slot_(slot) {}
+  ~DeviceCt() {
+    --pool_->slabs[slot_.slab].in_use;
+    pool_->free_slots.push_back(slot_);
+  }
   DeviceCt(const DeviceCt&) = delete;
   DeviceCt& operator=(const DeviceCt&) = delete;
-  u64* data() const { return buf_.get(); }
+  u64* data() const { return slot_.ptr; }
 
  private:
   std::shared_ptr<Pool> pool_;
-  DeviceBuffer<u64> buf_;
+  Slot slot_;
 };
 
 struct ExpansionDevice::Impl {
@@ -227,15 +245,33 @@ struct ExpansionDevice::Impl {
     return {};
   }
 
-  Status acquire(CtHandle& out) {
-    DeviceBuffer<u64> buf;
-    if (!pool->free_list.empty()) {
-      buf = std::move(pool->free_list.back());
-      pool->free_list.pop_back();
-    } else {
-      OMBRA_TRY(buf.allocate(ct_words()));
+  // Slots per slab: about kSlabBytes per slab (at least one slot).
+  std::size_t slab_slots() const {
+    return std::max<std::size_t>(1, kSlabBytes / (ct_words() * sizeof(u64)));
+  }
+
+  Status add_slab() {
+    pool->slot_words = ct_words();
+    pool->slots_per_slab = slab_slots();
+    Slab slab;
+    OMBRA_TRY(slab.buf.allocate(pool->slot_words * pool->slots_per_slab));
+    u64* base = slab.buf.get();
+    pool->slabs.push_back(std::move(slab));
+    const std::size_t index = pool->slabs.size() - 1;
+    for (std::size_t k = pool->slots_per_slab; k-- > 0;) {
+      pool->free_slots.push_back({base + k * pool->slot_words, index});
     }
-    out = std::make_shared<DeviceCt>(pool, std::move(buf));
+    return {};
+  }
+
+  Status acquire(CtHandle& out) {
+    if (pool->free_slots.empty()) {
+      OMBRA_TRY(add_slab());
+    }
+    const Slot slot = pool->free_slots.back();
+    pool->free_slots.pop_back();
+    ++pool->slabs[slot.slab].in_use;
+    out = std::make_shared<DeviceCt>(pool, slot);
     return {};
   }
 
@@ -434,17 +470,41 @@ void ExpansionDevice::synchronize() {
 }
 
 void ExpansionDevice::release_pool() {
-  // Buffers of dropped handles sit in the free list; freeing them returns the memory to the driver.
-  // Handles still alive are untouched (they return to the now empty list when dropped).
+  // Frees every slab that has no live handle in it and takes its slots off the free list. Slabs
+  // that still hold live handles stay (their free slots too) until a later call.
   const auto go = [this]() -> Status {
     OMBRA_CUDA_CHECK(cudaDeviceSynchronize());  // pending kernels may still read freed handles
-    impl_->pool->free_list.clear();
+    Pool& pool = *impl_->pool;
+    std::vector<Slot> keep;
+    for (const Slot& s : pool.free_slots) {
+      if (pool.slabs[s.slab].in_use != 0) keep.push_back(s);
+    }
+    pool.free_slots = std::move(keep);
+    for (Slab& slab : pool.slabs) {
+      if (slab.in_use == 0) slab.buf = DeviceBuffer<u64>();
+    }
     return {};
   };
   go().throw_if_error();
 }
 
 std::size_t ExpansionDevice::ct_bytes() const { return impl_->ct_words() * sizeof(u64); }
+
+std::size_t ExpansionDevice::slab_slots() const { return impl_->slab_slots(); }
+
+std::size_t ExpansionDevice::slab_bytes() const {
+  const std::size_t raw = impl_->slab_slots() * impl_->ct_words() * sizeof(u64);
+  constexpr std::size_t kGranule = std::size_t{2} << 20;  // CUDA's usual allocation granularity
+  return (raw + kGranule - 1) / kGranule * kGranule;
+}
+
+std::size_t ExpansionDevice::pool_bytes() const {
+  std::size_t n = 0;
+  for (const Slab& s : impl_->pool->slabs) {
+    if (s.buf.get() != nullptr) ++n;
+  }
+  return n * slab_bytes();
+}
 
 std::size_t ExpansionDevice::scratch_bytes(std::size_t nodes) const {
   return (impl_->scratch_words_per_node() + 3) * nodes * sizeof(u64);

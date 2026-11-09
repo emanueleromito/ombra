@@ -175,6 +175,10 @@ int main(int argc, char** argv) {
       const std::size_t used_before = used_bytes();
       const std::size_t per_query =
           (shape.query_words() + shape.out_words()) * sizeof(std::uint64_t);
+      std::printf("phase search d=%zu Q=%zu: planning (used %.2f GiB, per query %.3f GiB)\n", d,
+                  total_q, static_cast<double>(used_before) / 1073741824.0,
+                  static_cast<double>(per_query) / 1073741824.0);
+      std::fflush(stdout);
       if (budget <= used_before + stored_bytes + per_query) {
         throw std::runtime_error("memory budget too small for the stored blocks and one query");
       }
@@ -263,18 +267,29 @@ int main(int argc, char** argv) {
     if (ct_bytes != ct_bytes_host) throw std::runtime_error("ciphertext size mismatch");
     const std::size_t peak_nodes = ombra::core::expansion_peak_nodes(d);
     const std::size_t scratch = gx.device().scratch_bytes(gx.device().max_batch());
-    const std::size_t per_query_exp = (peak_nodes + 1) * ct_bytes;
+    // Real footprint: ciphertexts live in slabs (one cudaMalloc each, rounded to the driver's
+    // granularity), so a ciphertext costs slab_bytes / slab_slots, and the last slab may be nearly
+    // empty, which is reserved as one more slab.
+    const std::size_t slab_bytes = gx.device().slab_bytes();
+    const std::size_t ct_footprint =
+        (slab_bytes + gx.device().slab_slots() - 1) / gx.device().slab_slots();
+    const std::size_t per_query_exp = (peak_nodes + 1) * ct_footprint;
+    const std::size_t exp_fixed = scratch + slab_bytes;
 
     std::ostringstream exp_json;
     exp_json << "[";
     for (std::size_t qi = 0; qi < qlist.size(); ++qi) {
       const std::size_t total_q = qlist[qi];
       const std::size_t used_before = used_bytes();
-      if (budget <= used_before + scratch + per_query_exp) {
+      std::printf("phase expansion d=%zu Q=%zu: planning (used %.2f GiB, per query %.3f GiB)\n", d,
+                  total_q, static_cast<double>(used_before) / 1073741824.0,
+                  static_cast<double>(per_query_exp) / 1073741824.0);
+      std::fflush(stdout);
+      if (budget <= used_before + exp_fixed + per_query_exp) {
         throw std::runtime_error("memory budget too small for one expansion tree");
       }
       const std::size_t cap =
-          std::min(pass_limit, (budget - used_before - scratch) / per_query_exp);
+          std::min(pass_limit, (budget - used_before - exp_fixed) / per_query_exp);
       const std::size_t qpass = std::min(total_q, cap);
       const std::size_t passes = (total_q + qpass - 1) / qpass;
       const std::size_t last_pass = total_q - (passes - 1) * qpass;
@@ -307,6 +322,11 @@ int main(int argc, char** argv) {
       }
       // Pool and scratch keep their peak until released, so this reading is the peak of the case.
       const std::size_t peak_used = used_bytes();
+      const std::size_t pool_at_peak = gx.device().pool_bytes();
+      roots.clear();
+      gx.release_pool();  // frees every slab: nothing carries over to the next Q
+      const std::size_t pool_after_release = gx.device().pool_bytes();
+      const std::size_t used_after_release = used_bytes();
       const double wall_med = median_of(wall);
       exp_json.precision(9);
       exp_json << (qi ? ",\n    " : "\n    ") << "{\"queries\": " << total_q
@@ -317,6 +337,11 @@ int main(int argc, char** argv) {
                << ", \"stored_bytes\": " << stored_bytes
                << ", \"nodes_peak_per_query\": " << peak_nodes + 1
                << ", \"planned_bytes_per_query\": " << per_query_exp
+               << ", \"ciphertext_nominal_bytes\": " << ct_bytes
+               << ", \"ciphertext_footprint_bytes\": " << ct_footprint
+               << ", \"slab_bytes\": " << slab_bytes << ", \"pool_bytes_at_peak\": " << pool_at_peak
+               << ", \"pool_bytes_after_release\": " << pool_after_release
+               << ", \"device_bytes_used_after_release\": " << used_after_release
                << ", \"scratch_bytes_reserved\": " << scratch
                << ", \"peak_device_bytes_used\": " << peak_used << ", \"budget_bytes\": " << budget
                << ", \"within_budget\": " << (peak_used <= budget ? "true" : "false")
@@ -327,8 +352,10 @@ int main(int argc, char** argv) {
                << ", \"latency_per_query_amortized_seconds\": "
                << wall_med / static_cast<double>(total_q)
                << ", \"first_pass_latency_seconds_median\": " << median_of(first_pass) << "}";
-      roots.clear();
-      gx.release_pool();  // nothing carries over to the next Q
+      std::printf("phase expansion d=%zu Q=%zu: done, %zu passes, pool %.2f -> %.2f GiB\n", d,
+                  total_q, passes, static_cast<double>(pool_at_peak) / 1073741824.0,
+                  static_cast<double>(pool_after_release) / 1073741824.0);
+      std::fflush(stdout);
     }
     exp_json << "\n  ]";
 
