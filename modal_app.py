@@ -235,7 +235,7 @@ def recall(dry_run: bool = False, queries: int = 100) -> None:
 
 
 @app.function(gpu="A100", memory=16384, timeout=3600)
-def profile_search(ncu: bool = True) -> None:
+def profile_search(ncu: bool = True, micro: bool = True) -> None:
     """T1.4 profiling: micro kernels, instruction mix and an Nsight Compute attempt on an A100."""
     import json
     import shutil
@@ -249,7 +249,8 @@ def profile_search(ncu: bool = True) -> None:
     bits = ",".join([str(p["first_mod_size"])] + [str(p["scaling_mod_size"])] * (towers - 1))
     exe = f"{BUILD_DIR}/core/ombra_profile_search"
     common = ["--ring", str(p["ring_dim"]), "--bits", bits]
-    _run([exe, *common])
+    if micro:
+        _run([exe, *common])
     _run(
         [
             "python",
@@ -269,6 +270,8 @@ def profile_search(ncu: bool = True) -> None:
     # Hardware counters may be refused inside the container; report whatever happens.
     cmd = [
         "ncu",
+        "--clock-control",
+        "none",  # the container may not lock clocks (first attempt failed on that)
         "--set",
         "full",
         "-k",
