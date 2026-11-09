@@ -1,8 +1,19 @@
-"""T0.8 accuracy: recall@10 of the encrypted pipeline against plaintext search.
+"""Recall-based acceptance check of a preset (T0.8 measurement, T1.6 rule): recall@10 of the
+encrypted pipeline against plaintext search.
 
-    python core/bench/recall.py --out <dir> --datasets <dir> [--small]
+    python core/bench/recall.py [--preset m0_depth2] [--dataset NAME ...|all] [--n 100000]
+                                [--queries 1000] [--out <dir>] [--datasets <dir>] [--small]
 
-Real pipeline, preset m0_depth2, end to end. The client (this process) encrypts the column-packed
+One command on Modal (A100):  modal run modal_app.py::recall  (options: --preset, --dataset,
+--n, --queries, --dry-run). Default datasets: one per dimension 1536, 384 and 768 (see DATASETS).
+
+A preset PASSES if, on at least two datasets with at least 1,000 queries each, recall@10 under
+encryption (no re-ranking) is within 0.005 of the plaintext recall at the same cluster settings, for
+every setting (full scan and each nlist x nprobe). The score error is reported as a safety margin,
+not as the rule. The rule is in recall_check.py. Exit code 0 for PASS or NOT ELIGIBLE (a run too
+small to count, such as --small), 1 for FAIL. The vectors per block (slots) come from the preset.
+
+Real pipeline end to end. The client (this process) encrypts the column-packed
 database blocks and the encrypted k-means centers with the PUBLIC key; each query goes through
 `oq.encode_query`, GPU expansion and GPU column-packed search (C++ driver `ombra_recall_search`);
 then OpenFHE Relinearize, Rescale, an all-ones encrypted mask at level 1, Rescale (scores at the
@@ -33,6 +44,9 @@ subset of N vectors and the queries are further seeded random vectors that are N
 from __future__ import annotations
 
 import argparse
+import csv
+import gzip
+import io
 import json
 import os
 import resource
@@ -50,6 +64,9 @@ import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "client"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import recall_check  # noqa: E402
 
 PRESET = "m0_depth2"
 K = 10
@@ -88,34 +105,170 @@ def find_binary(name: str) -> Path:
 # Dataset
 
 
-def load_dataset(
-    datasets_dir: Path, n: int, queries: int, shard_ids: tuple[int, ...]
-) -> tuple[np.ndarray, np.ndarray]:
-    """Download (idempotent) the shards and return normalized (db, queries), seeded, disjoint."""
-    import pyarrow.parquet as pq
+HF = "https://huggingface.co/datasets/"
+SUPABASE = "Supabase/wikipedia-en-embeddings"
 
-    folder = datasets_dir / "dbpedia-openai-1M"
-    folder.mkdir(parents=True, exist_ok=True)
-    parts = []
-    for sid in shard_ids:
-        path = folder / SHARDS[sid]
-        if not path.exists():
-            tmp = path.with_suffix(".part")
-            print(f"downloading shard {sid}", flush=True)
-            urllib.request.urlretrieve(HF_BASE + SHARDS[sid], tmp)  # noqa: S310
-            tmp.rename(path)
-        col = pq.read_table(path, columns=["openai"]).column("openai").combine_chunks()
-        dim = len(col[0])
-        parts.append(np.asarray(col.values, dtype=np.float32).reshape(-1, dim))
-    data = np.concatenate(parts)
-    if data.shape[0] < n + queries:
-        raise SystemExit(f"only {data.shape[0]} vectors for {n} + {queries} requested")
-    perm = np.random.default_rng(SEED).permutation(data.shape[0])
-    db = data[np.sort(perm[:n])].astype(np.float64)
-    qs = data[perm[n : n + queries]].astype(np.float64)
+# Public text-embedding datasets, one entry each. `license` is the license on the dataset card.
+# `pool_rows` is how many rows are read (the database and the queries are a seeded disjoint split of
+# this pool); the stream readers stop after that many rows, so the pool is the start of the file.
+DATASETS: dict[str, dict[str, Any]] = {
+    "dbpedia-ada002-1536": {
+        "kind": "parquet_shards",
+        "folder": "dbpedia-openai-1M",
+        "files": SHARDS,
+        "column": "openai",
+        "source_url": HF + DATASET_NAME,
+        "model": "OpenAI text-embedding-ada-002",
+        "dimension": 1536,
+        "license": "MIT (dataset card)",
+        "corpus": "DBpedia entities",
+    },
+    "wiki-simple-ada002-1536": {
+        "kind": "ndjson_gz",
+        "url": f"{HF}{SUPABASE}/resolve/main/wiki_openai.ndjson.gz",
+        "key": "openai",
+        "source_url": HF + SUPABASE,
+        "model": "OpenAI text-embedding-ada-002",
+        "dimension": 1536,
+        "license": "MIT (dataset card; Wikipedia text under its own terms)",
+        "corpus": "Simple English Wikipedia",
+    },
+    "wiki-simple-minilm-384": {
+        "kind": "ndjson_gz",
+        "url": f"{HF}{SUPABASE}/resolve/main/wiki_minilm.ndjson.gz",
+        "key": "all-MiniLM-L6-v2",
+        "source_url": HF + SUPABASE,
+        "model": "sentence-transformers/all-MiniLM-L6-v2",
+        "dimension": 384,
+        "license": "MIT (dataset card; Wikipedia text under its own terms)",
+        "corpus": "Simple English Wikipedia",
+    },
+    "wiki-simple-gte-small-384": {
+        "kind": "ndjson_gz",
+        "url": f"{HF}{SUPABASE}/resolve/main/wiki_gte.ndjson.gz",
+        "key": "gte-small",
+        "source_url": HF + SUPABASE,
+        "model": "thenlper/gte-small",
+        "dimension": 384,
+        "license": "MIT (dataset card; Wikipedia text under its own terms)",
+        "corpus": "Simple English Wikipedia",
+    },
+    "wiki-simple-cohere-768": {
+        "kind": "csv",
+        "url": f"{HF}timescale/wikipedia-22-12-simple-embeddings/resolve/main/wiki.csv",
+        "column": "embedding",
+        "source_url": HF + "timescale/wikipedia-22-12-simple-embeddings",
+        "model": "Cohere multilingual-22-12 (as in Cohere/wikipedia-22-12-simple-embeddings)",
+        "dimension": 768,
+        "license": "Apache-2.0 (dataset card)",
+        "corpus": "Simple English Wikipedia",
+    },
+    "arxiv-instructorxl-768": {
+        "kind": "parquet_urls",
+        "folder": "arxiv-instructorxl",
+        "files": {i: f"part-0{i}-arxiv-titles-instructorxl.parquet" for i in range(3)},
+        "base": f"{HF}Qdrant/arxiv-titles-instructorxl-embeddings/resolve/main/data/",
+        "column": "vector",
+        "source_url": HF + "Qdrant/arxiv-titles-instructorxl-embeddings",
+        "model": "hkunlp/instructor-xl",
+        "dimension": 768,
+        "license": "not stated on the dataset card (titles from arXiv metadata)",
+        "corpus": "arXiv paper titles",
+    },
+}
+# One dataset per dimension: the default acceptance set (three datasets, at least two required).
+DEFAULT_DATASETS = ("dbpedia-ada002-1536", "wiki-simple-minilm-384", "wiki-simple-cohere-768")
+
+
+def dataset_meta(name: str) -> dict[str, Any]:
+    """Name, source URL, model, dimension and license, recorded in every result file."""
+    spec = DATASETS[name]
+    keys = ("source_url", "model", "dimension", "license", "corpus")
+    return {"name": name} | {k: spec[k] for k in keys}
+
+
+def _download(url: str, path: Path) -> None:
+    tmp = path.with_suffix(path.suffix + ".part")
+    print(f"downloading {path.name}", flush=True)
+    urllib.request.urlretrieve(url, tmp)  # noqa: S310
+    tmp.rename(path)
+
+
+def _read_stream(spec: dict[str, Any], rows: int) -> np.ndarray:
+    """Read the first `rows` embeddings of a streamed ndjson.gz or csv file (early stop)."""
+    out: list[np.ndarray] = []
+    with urllib.request.urlopen(spec["url"], timeout=120) as resp:  # noqa: S310
+        if spec["kind"] == "ndjson_gz":
+            with gzip.GzipFile(fileobj=resp) as gz:
+                for line in gz:
+                    out.append(np.asarray(json.loads(line)[spec["key"]], dtype=np.float32))
+                    if len(out) >= rows:
+                        break
+        else:
+            csv.field_size_limit(1 << 30)
+            reader = csv.reader(io.TextIOWrapper(resp, encoding="utf-8", newline=""))
+            col = next(reader).index(spec["column"])
+            for row in reader:
+                out.append(np.fromstring(row[col].strip("[]"), dtype=np.float32, sep=","))
+                if len(out) >= rows:
+                    break
+    return np.stack(out)
+
+
+def load_pool(
+    name: str, datasets_dir: Path, rows: int, small: bool = False
+) -> tuple[np.ndarray, dict[str, Any]]:
+    """Return (float32 pool [R, d], dataset metadata). Downloads and caches idempotently."""
+    spec = DATASETS[name]
+    meta = dataset_meta(name)
+    if spec["kind"] in ("parquet_shards", "parquet_urls"):
+        import pyarrow.parquet as pq
+
+        folder = datasets_dir / spec["folder"]
+        folder.mkdir(parents=True, exist_ok=True)
+        ids = tuple(spec["files"])
+        if small:
+            ids = ids[:1]
+        parts = []
+        for sid in ids:
+            path = folder / spec["files"][sid]
+            if not path.exists():
+                base = HF_BASE if spec["kind"] == "parquet_shards" else spec["base"]
+                _download(base + spec["files"][sid], path)
+            col = pq.read_table(path, columns=[spec["column"]]).column(spec["column"])
+            col = col.combine_chunks()
+            dim = len(col[0])
+            parts.append(np.asarray(col.values, dtype=np.float32).reshape(-1, dim))
+        pool = np.concatenate(parts)
+    else:
+        folder = datasets_dir / "stream-cache"
+        folder.mkdir(parents=True, exist_ok=True)
+        cache = folder / f"{name}-first{rows}.npy"
+        if not cache.exists():
+            print(f"streaming the first {rows} rows of {name}", flush=True)
+            pool = _read_stream(spec, rows)
+            with open(cache.with_suffix(".part"), "wb") as f:
+                np.save(f, pool)
+            cache.with_suffix(".part").rename(cache)
+        pool = np.load(cache)
+    if pool.shape[1] != spec["dimension"]:
+        raise SystemExit(f"{name}: expected d={spec['dimension']}, found {pool.shape[1]}")
+    return pool, meta
+
+
+def load_dataset(
+    name: str, datasets_dir: Path, n: int, queries: int, small: bool = False
+) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
+    """Normalized float64 (db, queries, metadata): a seeded disjoint split of the pool."""
+    pool, meta = load_pool(name, datasets_dir, rows=2 * (n + queries), small=small)
+    if pool.shape[0] < n + queries:
+        raise SystemExit(f"{name}: only {pool.shape[0]} vectors for {n} + {queries} requested")
+    perm = np.random.default_rng(SEED).permutation(pool.shape[0])
+    db = pool[np.sort(perm[:n])].astype(np.float64)
+    qs = pool[perm[n : n + queries]].astype(np.float64)
     db /= np.linalg.norm(db, axis=1, keepdims=True)
     qs /= np.linalg.norm(qs, axis=1, keepdims=True)
-    return db, qs
+    return db, qs, meta
 
 
 # ---------------------------------------------------------------------------------------------
@@ -218,6 +371,7 @@ def encrypted_scan(
     centers: dict[int, np.ndarray],
     work: Path,
     log: dict[str, Any],
+    preset: str = PRESET,
 ) -> tuple[np.ndarray, dict[int, np.ndarray], dict[str, float]]:
     """Run the encrypted pipeline. Returns decrypted scores [Q, N], per-nlist center scores
     [Q, nlist] and max errors against numpy."""
@@ -227,10 +381,10 @@ def encrypted_scan(
 
     n, d = db.shape
     nq = queries.shape[0]
-    _, cc = ombra_params.make_context(PRESET)
+    _, cc = ombra_params.make_context(preset)
     keys = cc.KeyGen()
     cc.EvalMultKeyGen(keys.secretKey)
-    slots = ombra_params.get_preset(PRESET)["batch_size"]
+    slots = ombra_params.get_preset(preset)["batch_size"]
     indices = oq.automorphism_indices(cc.GetRingDimension(), d)
     cc.ClearEvalAutomorphismKeys()  # the key store is static: hold exactly this d's indices
     cc.EvalAutomorphismKeyGen(keys.secretKey, indices)
@@ -263,10 +417,22 @@ def encrypted_scan(
         assert ofhe.SerializeToFile(str(in_dir / f"query_{i}.bin"), qct, ofhe.BINARY)
     log["encode_queries_seconds"] = time.time() - t0
 
+    # The driver writes each query's results atomically (temporary name, then rename). The client
+    # decrypts them while the driver works on later queries, and deletes each file after use, so the
+    # disk holds the encrypted database plus a few queries' results instead of all of them.
     stats_path = work / "driver_stats.json"
+    driver_log = work / "driver.log"
+    ones = cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(np.ones(slots).tolist(), 1, 1))
+    nb = len(db_blocks)
+    nbt = len(all_blocks)
+    scores = np.zeros((nq, n))
+    cscores = {nl: np.zeros((nq, nl)) for nl in nlists}
+    err_scan = err_centers = 0.0
+    decrypt_seconds = 0.0
+    final_level = None
     t0 = time.time()
-    with GpuMemoryPoller() as poller:
-        proc = subprocess.run(  # noqa: S603
+    with GpuMemoryPoller() as poller, open(driver_log, "w") as logf:
+        proc = subprocess.Popen(  # noqa: S603
             [
                 str(find_binary("ombra_recall_search")),
                 str(work / "context.bin"),
@@ -274,53 +440,66 @@ def encrypted_scan(
                 str(in_dir),
                 str(out_dir),
                 str(d),
-                str(len(all_blocks)),
+                str(nbt),
                 str(nq),
                 str(stats_path),
             ],
-            capture_output=True,
+            stdout=logf,
+            stderr=subprocess.STDOUT,
             text=True,
         )
-    log["gpu_search_driver_wall_seconds"] = time.time() - t0
+        try:
+            for i in range(nq):
+                last = out_dir / f"scores_{i}_{nbt - 1}.bin"
+                while not last.exists():  # present only once the whole query is written
+                    if proc.poll() is not None and not last.exists():
+                        raise SystemExit(
+                            f"ombra_recall_search exited ({proc.returncode}) before query {i}:\n"
+                            + driver_log.read_text()[-2000:]
+                        )
+                    time.sleep(0.05)
+                t1 = time.time()
+                for b in range(nbt):
+                    path = out_dir / f"scores_{i}_{b}.bin"
+                    ct, ok = ofhe.DeserializeCiphertext(str(path), ofhe.BINARY)
+                    assert ok
+                    path.unlink()
+                    score = cc.Rescale(cc.Relinearize(ct))
+                    final = cc.Rescale(cc.EvalMult(score, ones))
+                    if final_level is None:
+                        final_level = final.GetLevel()
+                    assert final.GetLevel() == final_level
+                    dec = cc.Decrypt(final, keys.secretKey)
+                    dec.SetLength(slots)
+                    got = np.array(dec.GetRealPackedValue())
+                    if b < nb:
+                        lo, hi = b * slots, min(n, (b + 1) * slots)
+                        scores[i, lo:hi] = got[: hi - lo]
+                    else:
+                        nl = nlists[b - nb]
+                        cscores[nl][i] = got[:nl]
+                err_scan = max(err_scan, float(np.max(np.abs(scores[i] - db @ queries[i]))))
+                for nl in nlists:
+                    err_centers = max(
+                        err_centers,
+                        float(np.max(np.abs(cscores[nl][i] - centers[nl] @ queries[i]))),
+                    )
+                decrypt_seconds += time.time() - t1
+                if (i + 1) % 100 == 0:
+                    print(f"decrypted {i + 1}/{nq} queries", flush=True)
+            code = proc.wait()
+        except BaseException:
+            proc.kill()
+            raise
+    log["gpu_search_and_decrypt_wall_seconds"] = time.time() - t0
     log["gpu_memory_peak_mib_whole_device"] = poller.peak
-    print(proc.stdout, end="")
-    if proc.returncode != 0:
-        raise SystemExit(f"ombra_recall_search failed (exit {proc.returncode}): {proc.stderr}")
+    print(driver_log.read_text(), end="")
+    if code != 0:
+        raise SystemExit(f"ombra_recall_search failed (exit {code})")
     log["driver"] = json.loads(stats_path.read_text())
     shutil.rmtree(in_dir)  # frees the disk: the encrypted database is the bulk of it
-
-    # Decrypt: Relinearize, Rescale, all-ones mask at level 1, Rescale -> level 2.
-    ones = cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(np.ones(slots).tolist(), 1, 1))
-    nb = len(db_blocks)
-    scores = np.zeros((nq, n))
-    cscores = {nl: np.zeros((nq, nl)) for nl in nlists}
-    err_scan = err_centers = 0.0
-    t0 = time.time()
-    for i in range(nq):
-        for b in range(len(all_blocks)):
-            path = out_dir / f"scores_{i}_{b}.bin"
-            ct, ok = ofhe.DeserializeCiphertext(str(path), ofhe.BINARY)
-            assert ok
-            path.unlink()
-            score = cc.Rescale(cc.Relinearize(ct))
-            final = cc.Rescale(cc.EvalMult(score, ones))
-            assert final.GetLevel() == 2
-            dec = cc.Decrypt(final, keys.secretKey)
-            dec.SetLength(slots)
-            got = np.array(dec.GetRealPackedValue())
-            if b < nb:
-                lo, hi = b * slots, min(n, (b + 1) * slots)
-                scores[i, lo:hi] = got[: hi - lo]
-            else:
-                nl = nlists[b - nb]
-                cscores[nl][i] = got[:nl]
-        err_scan = max(err_scan, float(np.max(np.abs(scores[i] - db @ queries[i]))))
-        for nl in nlists:
-            err_centers = max(
-                err_centers, float(np.max(np.abs(cscores[nl][i] - centers[nl] @ queries[i])))
-            )
-    log["decrypt_seconds"] = time.time() - t0
-    log["final_level"] = 2
+    log["decrypt_seconds"] = decrypt_seconds
+    log["final_level"] = final_level
     return scores, cscores, {"scan": err_scan, "centers": err_centers}
 
 
@@ -334,8 +513,12 @@ def measure(
     nlists: tuple[int, ...],
     nprobes: tuple[int, ...],
     work: Path,
+    preset: str = PRESET,
 ) -> dict[str, Any]:
     """Whole measurement; returns the result dict (aggregates only)."""
+    from ombra import params as ombra_params
+
+    slots = ombra_params.get_preset(preset)["batch_size"]
     t_start = time.time()
     n, d = db.shape
     nq = queries.shape[0]
@@ -348,7 +531,7 @@ def measure(
     log["kmeans_seconds"] = time.time() - t0
 
     scores, cscores, errs = encrypted_scan(
-        db, queries, {nl: c[0] for nl, c in clusters.items()}, work, log
+        db, queries, {nl: c[0] for nl, c in clusters.items()}, work, log, preset
     )
 
     all_cand = np.ones(n, dtype=bool)
@@ -406,16 +589,15 @@ def measure(
         settings[str(nl)] = per_nl
 
     return {
-        "task": "T0.8",
-        "preset": PRESET,
-        "dataset": DATASET_NAME,
-        "dataset_note": "ada-002; no query split: db and queries are disjoint seeded subsets",
+        "task": "T1.6",
+        "preset": preset,
+        "dataset_note": "no query split: db and queries are disjoint seeded subsets of a pool",
         "n_vectors": n,
         "dims": d,
         "n_queries": nq,
         "k": K,
         "rerank_candidates": RERANK_MULT * K,
-        "vectors_per_block": 8192,
+        "vectors_per_block": slots,
         "kmeans": f"faiss spherical, {KMEANS_ITERS} iterations, seed {SEED}",
         "method_note": (
             "encrypted scan run once per query over all vectors; decrypted scores restricted to "
@@ -425,7 +607,7 @@ def measure(
         "clustered": settings,
         "max_abs_score_error_scan": errs["scan"],
         "max_abs_score_error_center_scores": errs["centers"],
-        "error_bound": ERROR_BOUND,
+        "reference_error_bound_not_pass_fail": ERROR_BOUND,
         "timing_and_memory": {
             **log,
             "total_wall_seconds": time.time() - t_start,
@@ -435,36 +617,78 @@ def measure(
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--out", type=Path, required=True)
-    ap.add_argument("--datasets", type=Path, required=True)
-    ap.add_argument("--small", action="store_true", help="small run: 10,000 vectors, 5 queries")
-    ap.add_argument("--n", type=int, default=100_000)
-    ap.add_argument("--queries", type=int, default=100)
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument(
+        "--preset", default=PRESET, help="preset name from core/params (default: m0_depth2)"
+    )
+    ap.add_argument(
+        "--dataset",
+        nargs="+",
+        default=list(DEFAULT_DATASETS),
+        help=f"dataset names, or 'all' for every configured one: {', '.join(DATASETS)}",
+    )
+    ap.add_argument("--out", type=Path, default=REPO_ROOT / "data" / "recall-results")
+    ap.add_argument("--datasets", type=Path, default=REPO_ROOT / "data" / "datasets")
+    ap.add_argument("--small", action="store_true", help="dry run: 10,000 vectors, 5 queries")
+    ap.add_argument("--n", type=int, default=100_000, help="database size")
+    ap.add_argument("--queries", type=int, default=recall_check.MIN_QUERIES)
+    ap.add_argument("--tolerance", type=float, default=recall_check.TOLERANCE)
+    ap.add_argument("--min-datasets", type=int, default=recall_check.MIN_DATASETS)
     ap.add_argument("--scratch", type=Path, default=None, help="directory for encrypted data")
     args = ap.parse_args()
 
+    names = list(DATASETS) if args.dataset == ["all"] else args.dataset
+    unknown = [x for x in names if x not in DATASETS]
+    if unknown:
+        raise SystemExit(f"unknown dataset(s) {unknown}; choose from {list(DATASETS)} or 'all'")
     if args.small:
-        n, nq, shards = 10_000, 5, (0,)
+        n, nq = 10_000, 5
         nlists, nprobes = (100,), (1, 5, 20)
-        name = "t0.8-recall-small.json"
+        suffix = "-small"
     else:
-        n, nq, shards = args.n, args.queries, tuple(SHARDS)
+        n, nq = args.n, args.queries
         nlists, nprobes = DEFAULT_NLISTS, DEFAULT_NPROBES
-        name = "t0.8-recall.json"
-    db, qs = load_dataset(args.datasets, n, nq, shards)
+        suffix = ""
     args.out.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(dir=args.scratch) as tmp:
-        work = Path(tmp) / "work"
-        work.mkdir()
-        result = measure(db, qs, nlists, nprobes, work)
-    (args.out / name).write_text(json.dumps(result, indent=2) + "\n")
-    print(f"wrote {args.out / name}")
-    print(
-        f"full scan recall@{K}: no_rerank={result['full_scan']['encrypted_no_rerank']:.4f} "
-        f"rerank={result['full_scan']['encrypted_rerank']:.4f} "
-        f"max_score_error={result['max_abs_score_error_scan']:.3e}"
-    )
+
+    checks: dict[str, dict[str, Any]] = {}
+    margins: dict[str, float] = {}
+    for name in names:
+        print(f"=== {name} (preset {args.preset}, N={n}, {nq} queries)", flush=True)
+        db, qs, meta = load_dataset(name, args.datasets, n, nq, small=args.small)
+        with tempfile.TemporaryDirectory(dir=args.scratch) as tmp:
+            work = Path(tmp) / "work"
+            work.mkdir()
+            result = measure(db, qs, nlists, nprobes, work, args.preset)
+        check = recall_check.check_dataset(result, args.tolerance)
+        result["dataset"] = meta
+        result["acceptance"] = check
+        path = args.out / f"recall-{args.preset}-{name}{suffix}.json"
+        path.write_text(json.dumps(result, indent=2) + "\n")
+        checks[name] = check
+        margins[name] = result["max_abs_score_error_scan"]
+        print(f"wrote {path}")
+        print(recall_check.format_report({name: check}, {"verdict": check["verdict"]}, margins))
+        del db, qs, result
+
+    overall = recall_check.check_overall(checks, args.min_datasets)
+    summary = {
+        "task": "T1.6",
+        "preset": args.preset,
+        "n_vectors": n,
+        "tolerance": args.tolerance,
+        "datasets": {name: dataset_meta(name) for name in names},
+        "per_dataset": {
+            name: {k: v for k, v in c.items() if k != "settings"} for name, c in checks.items()
+        },
+        "max_abs_score_error_scan": margins,
+        "overall": overall,
+    }
+    summary_path = args.out / f"recall-{args.preset}-summary{suffix}.json"
+    summary_path.write_text(json.dumps(summary, indent=2, default=str) + "\n")
+    print(f"wrote {summary_path}")
+    print(recall_check.format_report(checks, overall, margins))
+    sys.exit(1 if overall["verdict"] == recall_check.FAIL else 0)
 
 
 if __name__ == "__main__":

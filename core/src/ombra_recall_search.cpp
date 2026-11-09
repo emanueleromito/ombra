@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <exception>
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <string>
@@ -175,9 +176,13 @@ int main(int argc, char** argv) {
             make_result(like, result.data() + b * 3 * shape.poly_words(), shape.poly_words());
         const std::string path =
             out_dir + "/scores_" + std::to_string(i) + "_" + std::to_string(b) + ".bin";
-        if (!Serial::SerializeToFile(path, r, SerType::BINARY)) {
+        // Written under a temporary name and renamed, so the client can decrypt a query's results
+        // while the driver works on later queries (it waits for the file of the last block).
+        const std::string tmp = path + ".tmp";
+        if (!Serial::SerializeToFile(tmp, r, SerType::BINARY)) {
           throw std::runtime_error("cannot write " + path);
         }
+        std::filesystem::rename(tmp, path);
       }
       write_total += seconds_since(t0);
     }
