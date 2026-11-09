@@ -12,7 +12,7 @@ Background, in this order:
 3. `docs/decisions/`: one file per decision, with the reasoning
 4. `docs/plan/`: milestones and the current tasks
 
-**Current stage:** milestone M1, the core library (`docs/plan/m1-core.md`). M0 is done; its findings are in `docs/plan/results/spike-report.md`. Do not build the server, storage, API or packaging yet unless a task says so.
+**Current stage:** milestone M2, the minimal server (`docs/plan/m2-server.md`), with M3 (`docs/plan/m3-client.md`) next. M1 is done (`docs/plan/results/m1-report.md`); M0 findings are in `docs/plan/results/spike-report.md`. Build only what the current M2 task asks for.
 
 ## Layout
 

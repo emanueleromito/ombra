@@ -14,13 +14,13 @@ All numbers are on the A100 with `m0_depth2` unless stated. Sources are in `docs
 
 | # | Decision | Status | Recommendation |
 | --- | --- | --- | --- |
-| 0012 | Recall-based preset acceptance | proposed | Accept |
+| 0012 | Recall-based preset acceptance | accepted | Accepted 2026-11-09 |
 | 0013 | `m0_compact_n8192` as "fast" | proposed | Accept, after its end-to-end latency is measured |
 | 0014 | Composite scaling preset | rejected | Done; code removed |
-| 0015 | Encoder tolerance only for FFT and rounding | proposed | Accept |
-| 0016 | File envelope; driver fixtures stay raw until M2 | proposed | Accept |
-| 0017 | Keep default decryption noise, pin it, claim no IND-CPA-D | proposed | Accept option A |
-| 0018 | Plaintext-DB mode only for corpora any client may read | proposed | Accept option B |
+| 0015 | Encoder tolerance only for FFT and rounding | accepted | Accepted 2026-11-09 |
+| 0016 | File envelope; driver fixtures stay raw until M2 | accepted | Accepted 2026-11-09 |
+| 0017 | Keep default decryption noise, pin it, claim no IND-CPA-D | accepted (option A) | Accepted 2026-11-09 |
+| 0018 | Plaintext-DB mode only for corpora any client may read | accepted (option B) | Accepted 2026-11-09 |
 
 ## Crypto review (T1.1)
 
@@ -31,10 +31,10 @@ All numbers are on the A100 with `m0_depth2` unless stated. Sources are in `docs
 | F1 (high), F7, F12 | T1.9, T1.15, T1.20 | Done, PR #28 |
 | F11 | T1.19 | Workflow in PR #28; needs Modal repository secrets and the required-check setting |
 | F2 to F6, F8 | T1.10 to T1.14, T1.16 | Done, PR #29 |
-| F9, F10 | T1.17, T1.18 | Decision proposed; the rest waits on 0017 and 0018 |
+| F9, F10 | T1.17, T1.18 | 0018 done; 0017 accepted, its pins, test and rule are still to do |
 | F13 to F27 (low) | None | Open |
 
-No real bug appeared in the code the new oracles cover. Hard rule 6 stays unmet for test-driver fixtures until 0016 is accepted.
+No real bug appeared in the code the new oracles cover. Hard rule 6 stays unmet for test-driver fixtures (0016 is accepted; storage in M2 must use the envelope).
 
 ## GPU pipeline and accuracy
 

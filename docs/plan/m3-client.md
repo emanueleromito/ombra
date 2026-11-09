@@ -1,0 +1,108 @@
+# M3: Client and LangChain
+
+**Goal:** a Python client that a user can install, create a collection with, insert into and search in 10 minutes, with the LangChain adapter on top. Keys, documents and metadata stay on the client side.
+
+**Starting point:** the M2 server and its gRPC API v1 (`m2-server.md`), the 0016 file envelope, and the decisions on decryption noise (0017) and the plaintext-DB mode (0018).
+**Python:** 3.11 or newer.
+**Security levels:** Fast, Decoy and Strict (decision 0004).
+
+**Order and parallel work:**
+
+```
+T3.1 (layout) --> T3.2 (key file) --> T3.4 (documents) --+
+              \-> T3.3 (presets)  --> T3.5 (collection) -+--> T3.6 (insert, delete, search) --> T3.8 (LangChain) --> T3.10 (quickstart)
+                                                         |          |
+                                                         |          +--> T3.9 (recall tool)
+                                                         +--> T3.7 (local mode)
+```
+
+T3.2 and T3.3 can run in parallel after T3.1. T3.6 needs the server API from M2 (T2.4, T2.7), except where it runs against the local mode (T3.7).
+
+---
+
+### T3.1 Python package layout
+
+**Why:** one package layout and one API for both client styles keeps the code and the docs small.
+**Depends on:** none
+**Steps:** package `ombra` with `Client` (sync) and `AsyncClient` (async) exposing the same methods; share the logic in a core layer that does no I/O; typed public functions; extras `[local]` and `[langchain]` declared; version number and API version exposed.
+**Done when:** both clients import and expose identical method names and signatures (checked by a test), `make test` and `make lint` pass, and the package builds a wheel.
+**Status:** todo
+
+### T3.2 Key file
+
+**Why:** the secret key must stay on the client and be recoverable without being exposed (hard rule 2).
+**Depends on:** T3.1
+**Steps:** a key file in the 0016 envelope holding the secret key and the document master key, protected by a passphrase (a memory-hard key derivation and an authenticated cipher, parameters recorded in the file); create, export and import; permissions 0600; never log or print key material (hard rule 4).
+**Done when:** tests show a round trip, a wrong passphrase being refused, a changed byte being refused, and an unknown version being refused; no key material appears in logs or error messages.
+**Status:** todo
+
+### T3.3 Presets and parameter derivation
+
+**Why:** users choose a preset and a dimension, never ring sizes or moduli (hard rule 1).
+**Depends on:** T3.1
+**Steps:** map preset name and vector dimension to the parameters in `core/params`; derive the column count and block layout; refuse any combination below 128-bit security, with a clear error; the accepted preset names follow decisions 0009 and 0013.
+**Done when:** a test covers every supported preset and dimension (384, 768, 1536) and a refusal for an unsupported dimension and for any parameter set below the floor; the derived values match the C++ presets.
+**Status:** todo
+
+### T3.4 Documents and metadata with envelope encryption
+
+**Why:** the server must store documents and metadata it cannot read, and re-ranking needs exact vectors.
+**Depends on:** T3.2
+**Steps:** a fresh AES-256-GCM key per document, wrapped with the document master key; encrypt document text and metadata; store an AES-GCM-encrypted copy of each vector with its document, for exact re-ranking on the client; bind the document id and collection id as associated data; define the stored layout and its version.
+**Done when:** tests show a round trip, refusal of a changed ciphertext, refusal of a document moved to another id (associated data), and that the stored record holds no plaintext.
+**Status:** todo
+
+### T3.5 Collection create
+
+**Why:** clustering and encrypted centers are what make the two-stage search possible.
+**Depends on:** T3.2, T3.3, T2.4
+**Steps:** cluster the vectors with faiss k-means; encrypt the cluster centers; generate the evaluation keys and upload them once; create the collection on the server; a re-clustering job that builds a new clustering and swaps it in.
+**Done when:** a test on a synthetic corpus creates a collection against the server (or the local mode) and the clusters, centers and keys are present; re-clustering keeps search working and the results correct during and after.
+**Status:** todo
+
+### T3.6 Insert, delete and search
+
+**Why:** it is the product's main path.
+**Depends on:** T3.4, T3.5, T2.7
+**Steps:** insert (assign to a cluster, encrypt, upload with the encrypted document and vector copy); delete; search with security levels Fast, Decoy and Strict, filters (as designed in T2.3), top-k, and re-ranking with the exact vectors; decrypt in parallel (T2.1). The search never sends a decrypted value to the server beyond the cluster and id choices the threat model names.
+**Done when:** an end-to-end test shows that top-k with re-ranking matches a plaintext search on the same data at each security level and with a filter, and that deleted vectors are not returned.
+**Status:** todo
+
+### T3.7 Local mode
+
+**Why:** a user should be able to try Ombra without a GPU server.
+**Depends on:** T3.6
+**Steps:** the `[local]` extra runs the CPU (OpenFHE) server in-process behind the same API; the same client code works in both modes; document its speed limits.
+**Done when:** the end-to-end test from T3.6 runs in local mode and gives the same results, and installing the extra on a machine without a GPU works.
+**Status:** todo
+
+### T3.8 `langchain-ombra`
+
+**Why:** most users reach a vector database through LangChain.
+**Depends on:** T3.6
+**Steps:** package `langchain-ombra` with a `VectorStore` implementation (add texts, delete, similarity search with and without scores, `from_texts`); an example that runs end to end.
+**Done when:** the example runs against the local mode, and the package passes LangChain's own vector store tests that apply.
+**Status:** todo
+
+### T3.9 Recall tool on the user's own data
+
+**Why:** users need to see what the encryption costs them in recall, on their data.
+**Depends on:** T3.6
+**Steps:** build on the T1.6 recall check; a command that takes the user's vectors and a sample of queries, runs plaintext and encrypted search at the chosen settings and prints recall@10 and the gap, with no data written out.
+**Done when:** the tool runs on a sample corpus and prints recall@10 for plaintext and encrypted search, and the 0012 rule's pass or fail.
+**Status:** todo
+
+### T3.10 Quickstart docs
+
+**Why:** the first ten minutes decide whether a user stays.
+**Depends on:** T3.7, T3.8
+**Steps:** a page that goes from install to first search (local mode first, then a server), with copy-and-paste code; a short key-handling note (back up the key file); the limits stated in the threat model.
+**Done when:** someone who has not seen the project follows the page and runs a first search in 10 minutes, and the code samples run in CI.
+**Status:** todo
+
+---
+
+## Not in M3
+
+- **Migration tool, key rotation and LlamaIndex adapter:** after M3.
+- **Router, sharding and several nodes:** after M2.

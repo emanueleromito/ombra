@@ -1,6 +1,6 @@
 # 0017. Position on decryption noise (IND-CPA-D)
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-11-09
 
 ## Context
@@ -15,8 +15,8 @@ Decision 0010 calls "noise flooding on decryption" the mitigation against key re
 
 ## Decision
 
-Proposed: A, and correct 0010's wording, since flooding is not what runs. Ask for an outside analysis of the ordinal leak before the product is offered where a client's choices can be observed by an active attacker. Revisit B if that analysis finds a practical attack.
+A, and correct 0010's wording, since flooding is not what runs. Ask for an outside analysis of the ordinal leak before the product is offered where a client's choices can be observed by an active attacker. Revisit B if that analysis finds a practical attack.
 
 ## Consequences
 
-Not implemented yet. If accepted, T1.17 still needs the two preset pins (`m0_depth2` and `m0_compact_n8192`, with the same values they use by default today), the two-decryptions test, the rule in `CLAUDE.md`, and the 0010 correction. The product must not claim IND-CPA-D security.
+Accepted 2026-11-09 (option A). Not implemented yet: T1.17 still needs the two preset pins (`m0_depth2` and `m0_compact_n8192`, with the same values they use by default today), the two-decryptions test, the rule in `CLAUDE.md`, and the 0010 correction. The product must not claim IND-CPA-D security.

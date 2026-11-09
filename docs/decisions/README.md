@@ -15,12 +15,12 @@ One short file per design decision, so the reasoning survives. New decisions cop
 | [0009](0009-m0-ckks-parameters.md) | CKKS parameter preset for the M0 spike: ring dimension 16384, depth 2 | accepted |
 | [0010](0010-query-expansion-via-automorphisms.md) | Query expansion via automorphisms, using no multiplication level | accepted |
 | [0011](0011-batching-is-not-the-main-lever.md) | Batching is not the main throughput lever | accepted |
-| [0012](0012-recall-based-preset-acceptance.md) | Recall-based acceptance rule for presets | proposed |
+| [0012](0012-recall-based-preset-acceptance.md) | Recall-based acceptance rule for presets | accepted |
 | [0013](0013-compact-preset-as-fast.md) | Propose `m0_compact_n8192` as the "fast" product preset | proposed |
 | [0014](0014-composite-scaling-preset.md) | Composite scaling preset with 32-bit limbs: not adopted, keep `m0_depth2`, code removed | rejected |
-| [0015](0015-gpu-encoder-tolerance.md) | GPU encoder: tolerance only for the FFT and rounding, integer steps exact | proposed |
-| [0016](0016-ciphertext-file-envelope.md) | Ciphertext and key file envelope (magic, version, kind, preset, OpenFHE version); drivers keep raw files | proposed |
-| [0017](0017-decryption-noise-position.md) | Position on decryption noise: keep the default, pin it, do not claim IND-CPA-D | proposed |
-| [0018](0018-plaintext-db-disclosure.md) | Plaintext-DB mode: only for corpora any client may read | proposed |
+| [0015](0015-gpu-encoder-tolerance.md) | GPU encoder: tolerance only for the FFT and rounding, integer steps exact | accepted |
+| [0016](0016-ciphertext-file-envelope.md) | Ciphertext and key file envelope (magic, version, kind, preset, OpenFHE version); drivers keep raw files | accepted |
+| [0017](0017-decryption-noise-position.md) | Position on decryption noise: keep the default, pin it, do not claim IND-CPA-D | accepted |
+| [0018](0018-plaintext-db-disclosure.md) | Plaintext-DB mode: only for corpora any client may read | accepted |
 
 Smaller decisions (key management, threat model, accuracy, deletes, migrations, key rotation, parameter presets, format versioning, storage, API, client packaging) are recorded directly in [product-requirements.md](../product-requirements.md) and [architecture.md](../architecture.md).
