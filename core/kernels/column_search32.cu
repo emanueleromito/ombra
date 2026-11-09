@@ -16,8 +16,8 @@
 // All input words must be reduced (< their modulus); moduli odd and below 2^31.
 //
 // Arithmetic: Montgomery with R = 2^32 (mont_mul32 in modarith.cuh): the kernel accumulates
-// acc = sum_j mont_mul32(x_j, y_j) = R^-1 * sum_j x_j y_j (mod q) with a reduced addition each time,
-// then multiplies once by R (mont_finish32), so inputs and outputs are standard residues.
+// acc = sum_j mont_mul32(x_j, y_j) = R^-1 * sum_j x_j y_j (mod q) with a reduced addition each
+// time, then multiplies once by R (mont_finish32), so inputs and outputs are standard residues.
 
 #include <algorithm>
 

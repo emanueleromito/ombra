@@ -60,8 +60,8 @@ void save_ct(const std::string& path, const Ct& ct) {
 }
 
 // The OpenFHE rescale used as the oracle. FIXEDMANUAL: CryptoContext::Rescale. Under
-// COMPOSITESCALINGMANUAL the public Rescale does nothing (OpenFHE v1.6.1 rns-leveledshe.cpp:352 acts
-// only for FIXEDMANUAL), so the oracle is the scheme's ModReduceInternal with compositeDegree
+// COMPOSITESCALINGMANUAL the public Rescale does nothing (OpenFHE v1.6.1 rns-leveledshe.cpp:352
+// acts only for FIXEDMANUAL), so the oracle is the scheme's ModReduceInternal with compositeDegree
 // levels, which is what EvalMult itself calls to rescale a degree-2 operand.
 Ct cpu_rescale(const CryptoContext<DCRTPoly>& cc, const Ct& ct) {
   const auto cp = std::dynamic_pointer_cast<CryptoParametersCKKSRNS>(cc->GetCryptoParameters());
