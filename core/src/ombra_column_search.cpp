@@ -21,6 +21,7 @@
 #include "ciphertext-ser.h"
 #include "cryptocontext-ser.h"
 #include "ombra/core/ciphertext_ops.hpp"
+#include "ombra/core/oracle_compare.hpp"
 #include "ombra/core/security_floor_context.hpp"
 #include "openfhe.h"
 #include "scheme/ckksrns/ckksrns-ser.h"
@@ -43,28 +44,8 @@ void save_ct(const std::string& path, const Ciphertext<DCRTPoly>& ct) {
     }
 }
 
-// Exact comparison of all RNS words, moduli and metadata.
 bool identical(const Ciphertext<DCRTPoly>& x, const Ciphertext<DCRTPoly>& y) {
-    if (x->GetLevel() != y->GetLevel() || x->GetNoiseScaleDeg() != y->GetNoiseScaleDeg() ||
-        x->GetScalingFactor() != y->GetScalingFactor() ||
-        x->GetElements().size() != y->GetElements().size()) {
-        return false;
-    }
-    for (std::size_t c = 0; c < x->GetElements().size(); ++c) {
-        const DCRTPoly& px = x->GetElements()[c];
-        const DCRTPoly& py = y->GetElements()[c];
-        if (px.GetFormat() != py.GetFormat() || px.GetNumOfElements() != py.GetNumOfElements()) {
-            return false;
-        }
-        for (std::size_t t = 0; t < px.GetNumOfElements(); ++t) {
-            const auto& tx = px.GetElementAtIndex(t);
-            const auto& ty = py.GetElementAtIndex(t);
-            if (tx.GetModulus() != ty.GetModulus() || !(tx.GetValues() == ty.GetValues())) {
-                return false;
-            }
-        }
-    }
-    return true;
+    return ombra::core::identical_ciphertexts(x, y);  // shared oracle comparator
 }
 
 }  // namespace

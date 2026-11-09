@@ -39,6 +39,7 @@
 #include "ciphertext-ser.h"
 #include "cryptocontext-ser.h"
 #include "ombra/core/ciphertext_ops.hpp"
+#include "ombra/core/oracle_compare.hpp"
 #include "ombra/core/expansion_gpu.hpp"
 #include "ombra/core/plain_search.hpp"
 #include "ombra/core/security_floor_context.hpp"
@@ -97,18 +98,7 @@ std::vector<u64> poly_words(const DCRTPoly& poly, Format fmt) {
 }
 
 bool identical(const Ct& x, const Ct& y) {
-  if (x->GetLevel() != y->GetLevel() || x->GetNoiseScaleDeg() != y->GetNoiseScaleDeg() ||
-      x->GetScalingFactor() != y->GetScalingFactor() ||
-      x->GetElements().size() != y->GetElements().size()) {
-    return false;
-  }
-  for (std::size_t c = 0; c < x->GetElements().size(); ++c) {
-    if (poly_words(x->GetElements()[c], Format::EVALUATION) !=
-        poly_words(y->GetElements()[c], Format::EVALUATION)) {
-      return false;
-    }
-  }
-  return true;
+  return ombra::core::identical_ciphertexts(x, y);  // shared oracle comparator
 }
 
 ombra::core::PlainFormat parse_format(const std::string& s) {

@@ -38,13 +38,15 @@ bool same_meta(const CtMeta& a, const CtMeta& b) {
 
 GpuCtOps::GpuCtOps(const CryptoContext<DCRTPoly>& cc, const Ct& sample,
                    const EvalKey<DCRTPoly>& relin_key)
-    : cc_((require_security_floor(cc), cc)),
+    : cc_((require_security_floor(cc),
+           require_eval_key_matches(relin_key, sample, "relinearization key"), cc)),
       tables_(extract_expansion_tables(cc, sample)),
       device_(tables_) {
   const auto cp = std::dynamic_pointer_cast<CryptoParametersCKKSRNS>(cc->GetCryptoParameters());
   if (!cp || cp->GetScalingTechnique() != FIXEDMANUAL) {
     fail("only CKKS with FIXEDMANUAL scaling is supported");
   }
+  key_tag_ = sample->GetKeyTag();
   composite_degree_ = cp->GetCompositeDegree();
   if (tables_.num_q >= 2) mod_reduce_factor_ = cp->GetModReduceFactor(tables_.num_q - 1);
   const std::size_t full_q = cp->GetElementParams()->GetParams().size();
@@ -52,6 +54,7 @@ GpuCtOps::GpuCtOps(const CryptoContext<DCRTPoly>& cc, const Ct& sample,
 }
 
 std::vector<u64> GpuCtOps::checked_words(const Ct& ct, std::size_t components) const {
+  if (ct->GetKeyTag() != key_tag_) fail("ciphertext is encrypted under a different key");
   FlatOne f = flatten_one(ct);
   if (f.components != components) fail("unexpected number of components");
   if (f.num_towers != tables_.num_q || f.ring_dim != tables_.ring_dim) {
@@ -153,6 +156,7 @@ GpuSearch::GpuSearch(const CryptoContext<DCRTPoly>& cc, const Ct& stored_sample,
     : impl_(std::make_unique<Impl>()) {
   Impl& s = *impl_;
   if (dims == 0 || blocks == 0) fail("empty shape");
+  require_same_key(stored_sample, mask_sample, "search samples");
   s.cc = cc;
   s.dims = dims;
   s.blocks = blocks;
@@ -193,6 +197,10 @@ void GpuSearch::upload_block(std::size_t block, const std::vector<Ct>& columns) 
 void GpuSearch::upload_block_flat(std::size_t block, const FlatCiphertexts& f) {
   Impl& s = *impl_;
   if (block >= s.blocks || f.count != s.dims) fail("bad block index or dimension count");
+  if (f.key_tag != s.stored_template->GetKeyTag() ||
+      f.encoding != s.stored_template->GetEncodingType()) {
+    fail("block is encrypted under a different key");
+  }
   if (f.num_towers != s.nq0 || f.ring_dim != s.n) fail("block has a different level or ring dim");
   const CtMeta m{f.level, f.noise_scale_deg, f.scaling_factor};
   if (s.have_stored && !same_meta(m, s.stored_meta))

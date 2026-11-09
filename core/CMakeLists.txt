@@ -100,6 +100,10 @@ target_link_libraries(ombra_profile_search PRIVATE ombra_rns_cuda)
 add_executable(ombra_search_gpu src/ombra_search_gpu.cpp)
 target_link_libraries(ombra_search_gpu PRIVATE ombra_core)
 
+# T1.12-T1.14: sends mixed keys, metadata and shapes to every GPU entry point, prints the refusals.
+add_executable(ombra_refusal_check src/ombra_refusal_check.cpp)
+target_link_libraries(ombra_refusal_check PRIVATE ombra_core)
+
 # T1.15: calls the library entry points directly (no driver-side check) to show each one refuses.
 add_executable(ombra_security_floor_wiring src/ombra_security_floor_wiring.cpp)
 target_link_libraries(ombra_security_floor_wiring PRIVATE ombra_core)

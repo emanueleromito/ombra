@@ -13,6 +13,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include "openfhe.h"
@@ -30,10 +31,13 @@ struct FlatCiphertexts {
     std::size_t level = 0;
     std::size_t noise_scale_deg = 0;
     double scaling_factor = 0;
+    std::string key_tag;  // the key the ciphertexts were encrypted under (all equal)
+    lbcrypto::PlaintextEncodings encoding = lbcrypto::INVALID_ENCODING;
 };
 
 // Flattens 2-component, evaluation-form CKKS FIXEDMANUAL ciphertexts. Throws
-// std::invalid_argument if they differ in level, noise degree, scale, shape or moduli.
+// std::invalid_argument if they differ in level, noise degree, scale, shape, moduli, key tag or
+// encoding type (the checks OpenFHE's TypeCheck makes, which the GPU paths would otherwise skip).
 FlatCiphertexts flatten_ciphertexts(const std::vector<lbcrypto::Ciphertext<lbcrypto::DCRTPoly>>& cts);
 
 // One ciphertext of any number of components (T1.2: 3-component products, rescaled ciphertexts),
@@ -47,8 +51,19 @@ struct FlatOne {
     std::size_t level = 0;
     std::size_t noise_scale_deg = 0;
     double scaling_factor = 0;
+    std::string key_tag;  // the key the ciphertexts were encrypted under (all equal)
+    lbcrypto::PlaintextEncodings encoding = lbcrypto::INVALID_ENCODING;
 };
 FlatOne flatten_one(const lbcrypto::Ciphertext<lbcrypto::DCRTPoly>& ct);
+
+// Throws std::invalid_argument ("<what>: ...") unless `a` and `b` carry the same key tag and
+// encoding type (OpenFHE TypeCheck, cryptocontext.h). Used before any data reaches the device.
+void require_same_key(lbcrypto::ConstCiphertext<lbcrypto::DCRTPoly> a,
+                      lbcrypto::ConstCiphertext<lbcrypto::DCRTPoly> b, const std::string& what);
+// Throws unless the evaluation key was generated for the key that `ct` is encrypted under.
+void require_eval_key_matches(const lbcrypto::EvalKey<lbcrypto::DCRTPoly>& key,
+                              lbcrypto::ConstCiphertext<lbcrypto::DCRTPoly> ct,
+                              const std::string& what);
 
 // A ciphertext with `components` polynomials of `towers` towers (a prefix of the towers of `like`),
 // RNS words `words` ([component][tower][coeff], evaluation form) and the given metadata; context,

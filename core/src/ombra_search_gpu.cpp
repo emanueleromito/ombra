@@ -75,6 +75,9 @@ void check(const std::string& stage, const Ct& gpu, const Ct& cpu) {
       a.moduli != b.moduli) {
     std::printf("%s: FAIL (shape or moduli differ)\n", stage.c_str());
     ok = false;
+  } else if (a.key_tag != b.key_tag || a.encoding != b.encoding) {
+    std::printf("%s: FAIL (key tag or encoding type differs)\n", stage.c_str());
+    ok = false;
   } else if (a.level != b.level || a.noise_scale_deg != b.noise_scale_deg ||
              a.scaling_factor != b.scaling_factor) {
     std::printf("%s: FAIL (level %zu/%zu, noise degree %zu/%zu, scaling factor %s)\n",

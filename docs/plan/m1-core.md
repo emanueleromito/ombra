@@ -119,7 +119,7 @@ One task per high or medium finding in `results/m1-crypto-review.md`. T1.10 shou
 **Depends on:** none
 **Steps:** reject uploads whose level, degree or scale differ from the sample; check every query in `ombra_recall_search`; add negative tests.
 **Done when:** a root with a different degree or scale is refused, covered by a test.
-**Status:** todo
+**Status:** done
 
 ### T1.13 Key, context and encoding checks on GPU operations (F5, medium)
 
@@ -127,7 +127,7 @@ One task per high or medium finding in `results/m1-crypto-review.md`. T1.10 shou
 **Depends on:** T1.12
 **Steps:** record key tag and encoding type when flattening and reject mixes; check evaluation-key tags; share one oracle comparator that includes these fields; add negative tests with two key pairs.
 **Done when:** every GPU entry point refuses mixed keys and the tests pass on the A10.
-**Status:** todo
+**Status:** done
 
 ### T1.14 Shape check in batched search (F6, medium)
 
@@ -135,7 +135,7 @@ One task per high or medium finding in `results/m1-crypto-review.md`. T1.10 shou
 **Depends on:** T1.13
 **Steps:** compare ring dimension and tower count across queries; check the buffer size before upload; add a negative test.
 **Done when:** a mismatched query is refused, covered by a test.
-**Status:** todo
+**Status:** done
 
 ### T1.15 Enforce the 128-bit floor in C++ (F7, medium)
 
