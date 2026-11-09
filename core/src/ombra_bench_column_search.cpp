@@ -129,12 +129,8 @@ int main(int argc, char** argv) {
                                   ? times[times.size() / 2]
                                   : 0.5 * (times[times.size() / 2 - 1] + times[times.size() / 2]);
         const std::size_t vectors = blocks * slots;
-        // Stored and query words are 4 bytes each in the 32-bit-limb mode (T1.5), else 8; the
-        // result is always 8-byte words.
-        const std::size_t in_word_bytes = dev->uses_32bit_words() ? 4 : 8;
         const std::size_t device_bytes =
-            (shape.stored_words() + shape.query_words()) * in_word_bytes +
-            shape.out_words() * sizeof(std::uint64_t);
+            (shape.stored_words() + shape.query_words() + shape.out_words()) * sizeof(std::uint64_t);
 
         std::ofstream out(argv[7]);
         out.precision(9);
@@ -158,9 +154,6 @@ int main(int argc, char** argv) {
             << "  \"copy_note\": \"h2d seconds include a host check that all words are reduced; "
                "blocks 1.. are filled by device-to-device copy of block 0 and are not timed\",\n"
             << "  \"device_memory_bytes\": " << device_bytes << ",\n"
-            << "  \"stored_word_bytes\": " << in_word_bytes << ",\n"
-            << "  \"stored_bytes_per_ciphertext\": " << 2 * shape.poly_words() * in_word_bytes
-            << ",\n"
             << "  \"gpu_name\": \"" << ombra::core::cuda_device_name() << "\",\n"
             << "  \"note\": \"relinearization and rescale are excluded; result has 3 components "
                "per block\"\n"

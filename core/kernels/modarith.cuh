@@ -91,52 +91,6 @@ __host__ __device__ inline u64 add_mod(u64 a, u64 b, u64 q) {
 // (a - b) mod q for reduced a, b < q.
 __host__ __device__ inline u64 sub_mod(u64 a, u64 b, u64 q) { return a >= b ? a - b : a + q - b; }
 
-// ---- 32-bit limbs (T1.5) ----
-// For moduli q < 2^31 (odd): residues fit a u32 and the sum of two residues does not overflow it.
-// Montgomery with R = 2^32.
-struct TowerConst32 {
-  u32 q;
-  u32 qinv;  // q^-1 mod 2^32
-  u32 r2;    // 2^64 mod q
-};
-
-// a * b * R^-1 mod q, R = 2^32, for a * b < q * 2^32 (any reduced a, b). Same argument as mont_mul:
-// t = a * b < q * R, m = (t mod R) * qinv mod R, t - m * q is divisible by R, hi(t) < q and
-// hi(m * q) < q, so one conditional add of q gives the residue in [0, q).
-__host__ __device__ inline u32 mont_mul32(u32 a, u32 b, const TowerConst32& c) {
-  const u64 t = (u64)a * b;
-  const u32 m = (u32)t * c.qinv;
-  const u32 hi = (u32)(t >> 32);
-  const u32 mq = (u32)(((u64)m * c.q) >> 32);
-  return hi >= mq ? hi - mq : hi + c.q - mq;
-}
-
-// acc * R mod q: turns sum_j mont_mul32(x_j, y_j) = R^-1 * sum_j x_j y_j into the standard residue.
-__host__ __device__ inline u32 mont_finish32(u32 acc, const TowerConst32& c) {
-  return mont_mul32(acc, c.r2, c);
-}
-
-// (a + b) mod q for reduced a, b < q < 2^31.
-__host__ __device__ inline u32 add_mod32(u32 a, u32 b, u32 q) {
-  const u32 r = a + b;
-  return r >= q ? r - q : r;
-}
-
-// Host: constants for 32-bit limbs; throws std::invalid_argument for an even modulus or one >= 2^31.
-inline std::vector<TowerConst32> make_tower_consts32(const std::vector<u64>& moduli) {
-  std::vector<TowerConst32> out;
-  for (u64 q : moduli) {
-    if (q < 3 || q >= (u64(1) << 31) || (q & 1) == 0) {
-      throw std::invalid_argument("rns32: modulus must be odd and satisfy 3 <= q < 2^31");
-    }
-    u32 qinv = (u32)q;  // Newton iteration, each step doubles the correct low bits
-    for (int i = 0; i < 5; ++i) qinv *= 2 - (u32)q * qinv;
-    const u64 r1 = (u64(1) << 32) % q;
-    out.push_back({(u32)q, qinv, (u32)(r1 * r1 % q)});
-  }
-  return out;
-}
-
 // Host: builds the constants; throws std::invalid_argument for a modulus outside [2, 2^60).
 inline std::vector<TowerConst> make_tower_consts(const std::vector<u64>& moduli) {
   std::vector<TowerConst> out;

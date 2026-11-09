@@ -25,7 +25,7 @@ T1.1, T1.2, T1.4 and T1.6 can start in parallel. T1.2 and T1.4 both touch the se
 **Depends on:** none
 **Steps:** a reviewer with no part in writing the M0 code (a fresh agent session or subagent, started without the M0 conversation) reads all of `core/`, `client/` and the tests against the hard rules in `CLAUDE.md`. Check in particular: parameters only from `core/params/` and at least 128-bit; no secret key outside the client; every kernel has an exact OpenFHE oracle test, and the oracle really compares RNS words rather than only decrypted values; no plaintext logged or written outside synthetic tests; format version headers; correct handling of OpenFHE's level, noise-scale degree and scaling factor metadata. The reviewer writes findings only and changes no code.
 **Done when:** `results/m1-crypto-review.md` lists every finding with file, line, severity and a suggested fix, and each finding of severity high or medium has an open follow-up task or a fix PR.
-**Status:** todo
+**Status:** done
 
 ### T1.2 GPU relinearize, rescale and ciphertext mask
 

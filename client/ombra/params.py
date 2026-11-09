@@ -86,12 +86,6 @@ def make_ckks_params(preset: dict[str, Any]) -> Any:
     # The digit count sets the size of the special modulus P, hence log2(QP).
     if "num_large_digits" in preset:
         params.SetNumLargeDigits(preset["num_large_digits"])
-    # Optional, composite scaling only (T1.5): towers per rescale and the register word size that
-    # bounds every prime (32 bit limbs). Absent for all FIXEDMANUAL presets.
-    if "composite_degree" in preset:
-        params.SetCompositeDegree(preset["composite_degree"])
-    if "register_word_size" in preset:
-        params.SetRegisterWordSize(preset["register_word_size"])
     return params
 
 
