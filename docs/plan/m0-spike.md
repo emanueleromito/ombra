@@ -114,7 +114,7 @@ T0.5b and T0.7 both touch the expansion code: run them one after the other, not 
 2. **Compact plaintext storage (plaintext-DB mode):** store column-packed plaintext vectors as fp16 and as int8, and encode them on the GPU (FFT and NTT into RNS form) just before the multiply. Measure storage per vector, search throughput against T0.4 and score error.
 3. **Seeded encryption (encrypted-DB mode), write-up only:** with secret-key encryption, half of each ciphertext is randomness that could be regenerated from a seed, halving storage. Find out whether OpenFHE supports seeded or compressed ciphertexts, and what reproducing its random generator on the GPU would take. No implementation: it touches hard rule 3.
 **Done when:** results for steps 1 and 2 are recorded in `results/`, step 3 is a short note in `results/`, and any preset that passes is proposed as a new decision record (not adopted).
-**Status:** todo
+**Status:** done (no preset passed, so none is proposed; see the results file)
 
 ### T0.10 Spike report
 
