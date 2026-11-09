@@ -25,7 +25,7 @@ np = pytest.importorskip("numpy")
 
 pytestmark = pytest.mark.gpu
 
-PRESETS = ["m0_depth2", "m0_compact_n8192"]  # T0.11: every test runs on both
+PRESETS = ["m0_depth2", "m0_compact_n8192", "m1_composite_n16384"]  # T0.11, T1.5
 SEED = 20260109
 
 # Max |decrypted slot - q_j| for GPU leaves, and between GPU and CPU leaves. Same agreed bound as

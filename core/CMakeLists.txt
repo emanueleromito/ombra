@@ -21,6 +21,7 @@ add_library(
   ombra_rns_cuda STATIC
   kernels/rns_basic.cu
   kernels/column_search.cu
+  kernels/column_search32.cu
   kernels/ntt.cu
   kernels/keyswitch.cu
   kernels/rescale.cu

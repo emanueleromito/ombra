@@ -28,7 +28,7 @@ np = pytest.importorskip("numpy")
 
 pytestmark = pytest.mark.gpu
 
-PRESETS = ["m0_depth2", "m0_compact_n8192"]
+PRESETS = ["m0_depth2", "m0_compact_n8192", "m1_composite_n16384"]
 SEED = 20260110  # same seed and data as test_gpu_filter_mask.py
 
 # Max |decrypted slot - (stored @ q) * mask|. Same agreed bound as T0.2 to T0.6; do not loosen.
@@ -78,6 +78,7 @@ def test_gpu_relin_rescale_mask_and_search(tmp_path: Path, d: int, preset: str) 
     keys = cc.KeyGen()
     cc.EvalMultKeyGen(keys.secretKey)
     slots = ombra_params.get_preset(preset)["batch_size"]
+    cd = cc.GetCompositeDegree()  # towers per rescale: 1 under FIXEDMANUAL, 2 for the T1.5 preset
 
     indices = oq.automorphism_indices(cc.GetRingDimension(), d)
     cc.ClearEvalAutomorphismKeys()  # the key store is static: hold exactly this d's indices
@@ -124,7 +125,7 @@ def test_gpu_relin_rescale_mask_and_search(tmp_path: Path, d: int, preset: str) 
     random_mask[0], random_mask[1] = 0.0, 1.0  # both values present whatever the draw
     masks = {"random": random_mask, "ones": np.ones(slots), "zeros": np.zeros(slots)}
     for kind, mask in masks.items():
-        mask_ct = cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(mask.tolist(), 1, 1))
+        mask_ct = cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(mask.tolist(), 1, cd))
         assert ofhe.SerializeToFile(str(in_dir / f"mask_{kind}.bin"), mask_ct, ofhe.BINARY)
 
     out_dir = tmp_path / "search_out"
@@ -158,7 +159,7 @@ def test_gpu_relin_rescale_mask_and_search(tmp_path: Path, d: int, preset: str) 
     def decrypt(name: str) -> np.ndarray:
         ct, ok = ofhe.DeserializeCiphertext(str(out_dir / name), ofhe.BINARY)
         assert ok
-        assert ct.GetLevel() == 2
+        assert ct.GetLevel() == 2 * cd
         dec = cc.Decrypt(ct, keys.secretKey)
         dec.SetLength(slots)
         got = np.array(dec.GetRealPackedValue())
@@ -176,7 +177,7 @@ def test_gpu_relin_rescale_mask_and_search(tmp_path: Path, d: int, preset: str) 
         )
         errs[kind] = (err_gpu, err_cpu)
 
-    bound = TOLERANCE if preset == "m0_depth2" else COMPACT_SANITY_BOUND
+    bound = COMPACT_SANITY_BOUND if preset == "m0_compact_n8192" else TOLERANCE
     for kind, (err_gpu, err_cpu) in errs.items():
         assert err_gpu < bound, kind
         assert err_cpu < bound, kind

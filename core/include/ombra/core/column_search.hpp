@@ -36,6 +36,10 @@ class ColumnSearchDevice {
     ColumnSearchDevice(const ColumnSearchDevice&) = delete;
     ColumnSearchDevice& operator=(const ColumnSearchDevice&) = delete;
 
+    // T1.5: true if every modulus is below 2^31 and the stored and query words are held as 32-bit
+    // words and searched with 32-bit arithmetic (column_search32.cu). The public interface still
+    // takes and returns 64-bit words, and the result is identical to the 64-bit kernel's.
+    bool uses_32bit_words() const;
     // Copy one stored block (shape.block_words() words) to the device. Words must be reduced.
     void upload_block(std::size_t block, const std::uint64_t* words, std::size_t count);
     // T1.3: seconds the cudaMemcpy of the last upload_block took (excludes the range check).

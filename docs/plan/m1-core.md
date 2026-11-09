@@ -57,7 +57,7 @@ T1.1, T1.2, T1.4 and T1.6 can start in parallel. T1.2 and T1.4 both touch the se
 **Depends on:** T1.4
 **Steps:** define a candidate preset using OpenFHE's composite scaling with ~30-bit primes, still depth 2 and at least 128-bit security (checked against the HomomorphicEncryption.org table in a test). Check that the kernels' assumptions (level, scale and rescale handling, metadata) hold under composite scaling, adapt the search kernel to 32-bit limbs, and keep the exact OpenFHE oracle. Measure search throughput, expansion time, storage per vector and score error against `m0_depth2`.
 **Done when:** the results file compares the candidate with `m0_depth2` on all four measures, the oracle passes, and a decision record is written as **proposed** (adopt or reject, with the numbers). `m0_depth2` is not changed.
-**Status:** todo
+**Status:** done
 
 ### T1.6 Recall-based acceptance check
 

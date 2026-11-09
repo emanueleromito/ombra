@@ -59,6 +59,18 @@ void save_ct(const std::string& path, const Ct& ct) {
   }
 }
 
+// The OpenFHE rescale used as the oracle. FIXEDMANUAL: CryptoContext::Rescale. Under
+// COMPOSITESCALINGMANUAL the public Rescale does nothing (OpenFHE v1.6.1 rns-leveledshe.cpp:352
+// acts only for FIXEDMANUAL), so the oracle is the scheme's ModReduceInternal with compositeDegree
+// levels, which is what EvalMult itself calls to rescale a degree-2 operand.
+Ct cpu_rescale(const CryptoContext<DCRTPoly>& cc, const Ct& ct) {
+  const auto cp = std::dynamic_pointer_cast<CryptoParametersCKKSRNS>(cc->GetCryptoParameters());
+  if (cp && cp->GetScalingTechnique() == COMPOSITESCALINGMANUAL) {
+    return cc->GetScheme()->ModReduceInternal(ct, cp->GetCompositeDegree());
+  }
+  return cc->Rescale(ct);
+}
+
 // Exact comparison; prints the first difference as indices only.
 void check(const std::string& stage, const Ct& gpu, const Ct& cpu) {
   const auto a = ombra::core::flatten_one(gpu);
@@ -140,14 +152,14 @@ int main(int argc, char** argv) {
     const Ct x3 = cc->EvalMultNoRelin(stored[0], query[0]);  // 3 components, stored level
     const Ct cpu_rel = cc->Relinearize(x3);
     check("relinearize, level 0", gs.level0().relinearize(x3), cpu_rel);
-    const Ct cpu_res = cc->Rescale(cpu_rel);
+    const Ct cpu_res = cpu_rescale(cc, cpu_rel);
     check("rescale, level 0 -> 1", gs.level0().rescale(cpu_rel), cpu_res);
     const Ct m3 = cc->EvalMultNoRelin(cpu_res, masks[0]);
     check("relinearize, level 1", gs.level1().relinearize(m3), cc->Relinearize(m3));
     const Ct cpu_masked = cc->EvalMult(cpu_res, masks[0]);
     check("ciphertext multiply with relinearization, level 1",
           gs.level1().multiply(cpu_res, masks[0]), cpu_masked);
-    check("rescale, level 1 -> 2", gs.level1().rescale(cpu_masked), cc->Rescale(cpu_masked));
+    check("rescale, level 1 -> 2", gs.level1().rescale(cpu_masked), cpu_rescale(cc, cpu_masked));
 
     // Stage B: the GPU-only pipeline against the OpenFHE chain.
     Ct sum = cc->EvalMultNoRelin(stored[0], query[0]);
@@ -155,7 +167,7 @@ int main(int argc, char** argv) {
       cc->EvalAddInPlace(sum, cc->EvalMultNoRelin(stored[j], query[j]));
     }
     const Ct ref_rel = cc->Relinearize(sum);
-    const Ct ref_res = cc->Rescale(ref_rel);
+    const Ct ref_res = cpu_rescale(cc, ref_rel);
 
     gs.upload_block(0, stored);
     gs.upload_query(query);
@@ -165,7 +177,7 @@ int main(int argc, char** argv) {
       ombra::core::GpuSearchTiming t = gs.run();
       if (m == 0) t = gs.run();  // second run: kernels loaded, no first-touch costs
       const Ct ref_masked = cc->EvalMult(ref_res, masks[m]);
-      const Ct ref_final = cc->Rescale(ref_masked);
+      const Ct ref_final = cpu_rescale(cc, ref_masked);
       const std::string tag = " (d=" + std::to_string(d) + ", mask " + name + ")";
       if (m == 0) check("pipeline stage: search sum" + tag, gs.download(SearchStage::kSum, 0), sum);
       check("pipeline stage: relinearize" + tag, gs.download(SearchStage::kRelin, 0), ref_rel);

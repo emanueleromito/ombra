@@ -23,7 +23,7 @@ np = pytest.importorskip("numpy")
 
 pytestmark = pytest.mark.gpu
 
-PRESETS = ["m0_depth2", "m0_compact_n8192"]  # T0.11: every test runs on both
+PRESETS = ["m0_depth2", "m0_compact_n8192", "m1_composite_n16384"]  # T0.11, T1.5
 SEED = 20260104
 
 # Max error of the decrypted scores against numpy dot products, and between GPU and OpenFHE CPU.

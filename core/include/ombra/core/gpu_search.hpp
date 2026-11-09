@@ -41,14 +41,22 @@ class GpuCtOps {
 
   // `sample` (2 components) fixes the level and tower count; `relin_key` is the public EvalMult key
   // (CryptoContextImpl::GetEvalMultKeyVector(tag)[0]). Throws std::invalid_argument unless the
-  // scheme is CKKS FIXEDMANUAL with HYBRID key switching.
+  // scheme is CKKS FIXEDMANUAL or COMPOSITESCALINGMANUAL (T1.5) with HYBRID key switching.
   GpuCtOps(const lbcrypto::CryptoContext<lbcrypto::DCRTPoly>& cc, const Ct& sample,
            const lbcrypto::EvalKey<lbcrypto::DCRTPoly>& relin_key);
 
   // 3 -> 2 components. Metadata unchanged.
   Ct relinearize(const Ct& ct3);
-  // Drops the last tower: level + 1, noise-scale degree - 1, scaling factor / modReduceFactor.
+  // Drops compositeDegree towers (1 under FIXEDMANUAL): level + compositeDegree, noise-scale
+  // degree - 1, scaling factor divided by the dropped primes one after the other.
   Ct rescale(const Ct& ct2);
+  // The same on raw device pointers ([component][tower][coeff], several nodes): in[k] has
+  // 2 * num_q * N words, out[k] 2 * (num_q - compositeDegree) * N. Under composite scaling this is
+  // compositeDegree single-tower rescales in a row (ModReduceInternalInPlace's loop), the
+  // intermediate results staying on the device.
+  void rescale_raw(const std::vector<const std::uint64_t*>& in,
+                   const std::vector<std::uint64_t*>& out);
+  std::size_t composite_degree() const { return composite_degree_; }
   // EvalMult(a, b) with the EvalMult key: level of a, degrees added, scaling factors multiplied.
   // a and b must have the same level and tower count.
   Ct multiply(const Ct& a, const Ct& b);
@@ -68,8 +76,12 @@ class GpuCtOps {
   lbcrypto::CryptoContext<lbcrypto::DCRTPoly> cc_;
   ExpansionTables tables_;
   ExpansionDevice device_;
-  double mod_reduce_factor_ = 0;
+  std::vector<double> mod_reduce_factors_;  // the primes dropped by one rescale, in order
   std::size_t composite_degree_ = 1;
+  // Composite scaling only: rescale_chain_[s - 1] is a device for the tables of num_q - s towers,
+  // which performs the s-th single-tower step of a composite rescale. Empty when the degree is 1.
+  std::vector<std::unique_ptr<ExpansionDevice>> rescale_chain_;
+  std::vector<std::unique_ptr<DeviceWords>> rescale_tmp_;  // output of step s (s < degree - 1)
 };
 
 enum class SearchStage {
@@ -115,7 +127,7 @@ class GpuSearch {
   // expansion's output is not an OpenFHE object. run() rejects a mismatch with the stored blocks.
   void set_query_from_device(const std::vector<const std::uint64_t*>& column_ptrs,
                              const CtMeta& meta);
-  void upload_mask(std::size_t block, const Ct& mask);  // level L + 1, same metadata for all
+  void upload_mask(std::size_t block, const Ct& mask);  // level L + compositeDegree
 
   // Runs all five steps on the GPU for every block; waits between steps to time them.
   GpuSearchTiming run();
@@ -129,7 +141,7 @@ class GpuSearch {
   CtMeta meta(SearchStage stage) const;
 
   GpuCtOps& level0();  // stored/query level L
-  GpuCtOps& level1();  // mask level L + 1
+  GpuCtOps& level1();  // mask level L + compositeDegree (L + 1 under FIXEDMANUAL)
 
  private:
   struct Impl;
