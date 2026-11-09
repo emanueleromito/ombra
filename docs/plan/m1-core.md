@@ -65,7 +65,7 @@ T1.1, T1.2, T1.4 and T1.6 can start in parallel. T1.2 and T1.4 both touch the se
 **Depends on:** none
 **Steps:** add a reusable recall check to `core/bench/recall.py`: a preset passes if recall@10 under encryption is within 0.005 of plaintext recall at the same cluster settings, on at least two public embedding datasets, with at least 1,000 queries. Keep the score-error measurement as a reported safety margin, not as the pass/fail rule. Write a decision record changing the acceptance rule for presets.
 **Done when:** the check runs with one command on `m0_depth2` and passes, results for both datasets are recorded, and the decision record is **proposed**.
-**Status:** todo
+**Status:** done
 
 ### T1.7 Recall at the compact preset
 
