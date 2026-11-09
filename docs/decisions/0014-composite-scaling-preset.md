@@ -1,6 +1,6 @@
 # 0014. Composite scaling preset with 32-bit limbs
 
-- **Status:** proposed
+- **Status:** rejected (the preset is not adopted)
 - **Date:** 2026-11-09
 
 ## Context
@@ -15,8 +15,8 @@ GPUs multiply 32-bit integers natively, and OpenFHE 1.6 has a composite scaling 
 
 ## Decision
 
-Proposed: B, do not adopt. Keep `m0_depth2` as the default. Leave `m1_composite_n16384` and its GPU path (exact against OpenFHE, tested) in the tree as a candidate, not offered to users; no recall check has been run for it.
+B. `m1_composite_n16384` is not adopted and `m0_depth2` stays the default. The candidate's code was removed from the tree; no recall check was run for it.
 
 ## Consequences
 
-`m0_depth2` stays the baseline for T1.8. The T1.5 code stays: composite rescale in `GpuCtOps`, 32-bit search kernel, `tests/test_composite_feasibility.py`, the preset fields `composite_degree` and `register_word_size`. Anyone using the preset must encrypt the mask at level 2 and rescale through the scheme's internal call, not `CryptoContext::Rescale`. If a future step makes the search kernel compute-bound again (for example a much larger d per ciphertext), or if a lower-error preset is wanted, the numbers here are the starting point. A recall check (decision 0012) was not run for the candidate.
+`m0_depth2` stays the baseline for T1.8. The T1.5 code (composite rescale in `GpuCtOps`, 32-bit search kernel, `tests/test_composite_feasibility.py`, the preset and its fields `composite_degree` and `register_word_size`) was removed; it is last present at commit `0a08d4b`, where the numbers above can be reproduced. If a future step makes the search kernel compute-bound again (for example a much larger d per ciphertext), or if a lower-error preset is wanted, these numbers and that commit are the starting point. Under this mode the mask must be encrypted at level 2, and rescaling must go through the scheme's internal call, not `CryptoContext::Rescale`.
