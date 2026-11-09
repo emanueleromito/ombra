@@ -1,6 +1,6 @@
 # 0016. Ciphertext and key file envelope
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-11-09
 
 ## Context

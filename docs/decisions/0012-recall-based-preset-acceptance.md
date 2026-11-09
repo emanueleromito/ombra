@@ -1,6 +1,6 @@
 # 0012. Recall-based acceptance rule for presets
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-11-09
 
 ## Context

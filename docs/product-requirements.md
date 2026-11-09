@@ -28,7 +28,7 @@ Both modes are supported, chosen per collection.
 
 | Mode | What stays private | Speed | Typical use |
 | --- | --- | --- | --- |
-| Encrypted query + plaintext DB | The query and the results | Faster | Private search over a corpus the server owner already holds (public or licensed data) |
+| Encrypted query + plaintext DB | The query and the results | Faster | Private search over a corpus whose owner accepts that every client with query access can read the searched vectors (public data) |
 | Encrypted query + encrypted DB | The query, the results and all stored vectors | Slower | A company's own sensitive data hosted on infrastructure it doesn't fully trust |
 
 ## Key features
@@ -60,6 +60,8 @@ We protect against an honest-but-curious server: it runs the software correctly 
 
 - **The server cannot see:** vectors, queries, documents, filter values or scores.
 - **The server can still learn:** collection size, number of queries, query timing, which clusters a query searched (except in strict mode), and which document IDs the client fetches after top-k.
+- **Fast and Decoy modes:** the server sees which clusters and IDs the client picks, and these choices come from decrypted results. We make no IND-CPA-D claim (decision 0017): decrypted values never leave the client, and the ordinal leak from fixed-noise decryption is stated, not analysed.
+- **Plaintext-DB mode:** it protects the query and the results from the server, not the corpus from clients. A client can recover the stored vectors with one query per dimension, so offer the mode only for corpora any client may read in full (decision 0018).
 - **Out of scope:** a server that deliberately returns wrong or incomplete results.
 
 ### Search and top-k

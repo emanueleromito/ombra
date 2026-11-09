@@ -1,6 +1,6 @@
 # 0018. Plaintext-DB mode: the corpus is readable by clients
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-11-09
 
 ## Context
@@ -17,8 +17,8 @@ Rate limits do not solve it: at d = 384 to 1536, recovery takes one query per di
 
 ## Decision
 
-Proposed: B. This mode protects the client's query and results from the server, and does nothing to protect the corpus from clients. Offer it only for corpora whose owner accepts that any client with query access can read the searched vectors. Remove "licensed" unless the licence allows that.
+B. This mode protects the client's query and results from the server, and does nothing to protect the corpus from clients. Offer it only for corpora whose owner accepts that any client with query access can read the searched vectors. Remove "licensed" unless the licence allows that.
 
 ## Consequences
 
-Not implemented yet. If accepted, T1.18 still needs `docs/product-requirements.md` changed: the mode's row and the threat model must state the limit. Option C stays open if a customer needs a protected corpus; it would need its own design and measurements.
+Accepted 2026-11-09 (option B). `docs/product-requirements.md` now states the limit in the mode's row and in the threat model. Option C stays open if a customer needs a protected corpus; it would need its own design and measurements.

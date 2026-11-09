@@ -1,6 +1,6 @@
 # 0015. GPU encoder: tolerance only for the FFT and rounding
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-11-09
 
 ## Context

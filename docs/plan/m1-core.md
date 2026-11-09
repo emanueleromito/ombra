@@ -81,7 +81,7 @@ T1.1, T1.2, T1.4 and T1.6 can start in parallel. T1.2 and T1.4 both touch the se
 **Depends on:** T1.1 to T1.7
 **Steps:** summarize the review findings and their status, the end-to-end latency, the speedups, and the preset results; recommend "fast", "balanced" and "precise".
 **Done when:** `results/m1-report.md` exists with the numbers and a recommendation for each preset and each proposed decision.
-**Status:** done
+**Status:** done (decisions 0012, 0015 to 0018 since accepted; 0013 stays proposed until T2.2)
 
 ---
 
@@ -151,7 +151,7 @@ One task per high or medium finding in `results/m1-crypto-review.md`. T1.10 shou
 **Depends on:** none
 **Steps:** define an envelope (magic, format version, preset, OpenFHE version), or write a decision on what counts as compliant for temporary spike files.
 **Done when:** the format or the decision is merged, and readers refuse an unknown version, before M2 storage starts.
-**Status:** done (envelope and decision 0016 committed; merge pending)
+**Status:** done (decision 0016 accepted)
 
 ### T1.17 Decision on decryption noise (F9, medium)
 
@@ -159,7 +159,7 @@ One task per high or medium finding in `results/m1-crypto-review.md`. T1.10 shou
 **Depends on:** none
 **Steps:** write a decision on the IND-CPA-D position; pin the CKKS data type and decryption mode in the presets; add a test that two decryptions of one ciphertext differ.
 **Done when:** the decision is **proposed**, the presets pin both settings and the test passes.
-**Status:** in progress: decision 0017 proposed; the pins and the test wait for it to be accepted
+**Status:** in progress: decision 0017 accepted (option A); still to do: the preset pins, the two-decryptions test, the `CLAUDE.md` rule and the 0010 correction
 
 ### T1.18 Decision on plaintext-DB disclosure (F10, medium)
 
@@ -167,7 +167,7 @@ One task per high or medium finding in `results/m1-crypto-review.md`. T1.10 shou
 **Depends on:** none
 **Steps:** write a decision on who this mode protects; update the threat model.
 **Done when:** the decision is **proposed** and `docs/product-requirements.md` states the limit.
-**Status:** in progress: decision 0018 proposed; the requirements change waits for it to be accepted
+**Status:** done (decision 0018 accepted, option B; the mode table and the threat model state the limit)
 
 ### T1.19 Required check for the oracles (F11, medium)
 
@@ -175,7 +175,7 @@ One task per high or medium finding in `results/m1-crypto-review.md`. T1.10 shou
 **Depends on:** none
 **Steps:** add a CI job for `make test` on every PR and `make test-gpu` on PRs touching `core/`, with Modal credentials as repository secrets; make it a required check.
 **Done when:** a PR with a failing oracle cannot be merged.
-**Status:** in progress: `.github/workflows/ci.yml` added; needs the repository secrets and the required-check setting
+**Status:** in progress: `.github/workflows/ci.yml` is on `main` and the secrets are set; the required-check setting on `main` is still to do
 
 ### T1.20 Restrict what is uploaded to Modal (F12, medium)
 
