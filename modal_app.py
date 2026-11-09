@@ -255,3 +255,69 @@ def recall(
         _run(cmd)
     finally:
         volume.commit()
+
+
+# "A100-40GB" pins the SXM4 40 GB part that T0.4 ran on (plain "A100" may be an 80 GB PCIe card).
+@app.function(gpu="A100-40GB", memory=16384, timeout=3600)
+def profile_search(ncu: bool = True, micro: bool = True) -> None:
+    """T1.4 profiling: micro kernels, instruction mix and an Nsight Compute attempt on an A100."""
+    import json
+    import shutil
+
+    _run(["nvidia-smi"])
+    print(
+        "ncu on PATH:", shutil.which("ncu"), "| cuobjdump:", shutil.which("cuobjdump"), flush=True
+    )
+    _build("Release", targets=("ombra_profile_search",))
+    preset = json.loads((Path(REPO_DIR) / "core/params/ckks_presets.json").read_text())
+    p = preset["presets"]["m0_depth2"]
+    towers = p["multiplicative_depth"] + 1
+    bits = ",".join([str(p["first_mod_size"])] + [str(p["scaling_mod_size"])] * (towers - 1))
+    exe = f"{BUILD_DIR}/core/ombra_profile_search"
+    common = ["--ring", str(p["ring_dim"]), "--bits", bits]
+    if micro:
+        _run([exe, *common])
+    _run(
+        [
+            "python",
+            str(Path(REPO_DIR) / "core/bench/sass_mix.py"),
+            exe,
+            "column_search_kernel",
+            "column_search_batched_kernel",
+            "plain_search_kernel",
+            "prof_kernelILi0ELi1ELb1E",
+            "prof_kernelILi1ELi1ELb1E",
+            "prof_kernelILi2ELi1ELb1E",
+            "prof_kernelILi4ELi1ELb0E",
+            "prof_kernelILi5ELi1ELb0E",
+            "prof_kernelILi6ELi1ELb0E",
+        ]
+    )
+    if not ncu:
+        return
+    # Hardware counters may be refused inside the container; report whatever happens.
+    cmd = [
+        "ncu",
+        "--clock-control",
+        "none",  # the container may not lock clocks (first attempt failed on that)
+        "--set",
+        "full",
+        "-k",
+        "regex:column_search_kernel",
+        "-c",
+        "1",
+        exe,
+        *common,
+        "--ref-only",
+        "--d",
+        "384",
+        "--blocks",
+        "16",
+        "--warmup",
+        "0",
+        "--iters",
+        "1",
+    ]
+    print("$", " ".join(cmd), flush=True)
+    code = subprocess.run(cmd, cwd=REPO_DIR).returncode
+    print("ncu exit code:", code, flush=True)
