@@ -23,6 +23,7 @@ add_library(
   kernels/column_search.cu
   kernels/ntt.cu
   kernels/keyswitch.cu
+  kernels/rescale.cu
   kernels/encode.cu
   kernels/plain_search.cu
   src/rns_basic_host.cu
@@ -34,7 +35,7 @@ target_include_directories(ombra_rns_cuda PUBLIC include PRIVATE kernels src)
 # this file needs nothing beyond C++17 device code.
 set_target_properties(ombra_rns_cuda PROPERTIES CUDA_SEPARABLE_COMPILATION OFF CUDA_STANDARD 17)
 
-add_library(ombra_core STATIC src/ciphertext_ops.cpp src/expansion_gpu.cpp)
+add_library(ombra_core STATIC src/ciphertext_ops.cpp src/expansion_gpu.cpp src/gpu_search.cpp)
 target_include_directories(
   ombra_core PUBLIC include ${OpenFHE_INCLUDE} ${OpenFHE_INCLUDE}/third-party/include
                     ${OpenFHE_INCLUDE}/core ${OpenFHE_INCLUDE}/pke ${OpenFHE_INCLUDE}/binfhe)
@@ -89,3 +90,6 @@ add_executable(ombra_profile_search bench/profile_search.cu)
 set_target_properties(ombra_profile_search PROPERTIES CUDA_STANDARD 17)
 target_include_directories(ombra_profile_search PRIVATE kernels)
 target_link_libraries(ombra_profile_search PRIVATE ombra_rns_cuda)
+
+add_executable(ombra_search_gpu src/ombra_search_gpu.cpp)
+target_link_libraries(ombra_search_gpu PRIVATE ombra_core)
