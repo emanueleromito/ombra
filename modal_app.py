@@ -208,12 +208,26 @@ def profile_expand(dims: str = "1536") -> None:
     volume.commit()
 
 
-# T0.8: the run encrypts 13 database blocks plus 3 centers blocks (about 19 GB of ciphertexts on the
-# container's local disk, kept on the GPU as well: about 20 GB of the A100's 40 GB). The host holds
-# one block at a time (3 to 4 GB) plus the dataset subset (about 1 GB as float64) and faiss.
-@app.function(gpu="A100", cpu=8.0, memory=32768, timeout=14400, volumes={DATA_DIR: volume})
-def recall(dry_run: bool = False, queries: int = 100) -> None:
-    """Release build; T0.8 recall@10 of the encrypted pipeline. `--dry-run`: 10,000 vectors."""
+# Recall acceptance check (T0.8, T1.6). At N = 100,000 and d = 1536 the run encrypts 13 database
+# blocks plus 3 centers blocks (about 19 GB of ciphertexts on the container's local disk, kept on
+# the GPU as well: about 20 GB of the A100's 40 GB). The host holds one block at a time (3 to 4 GB)
+# plus the dataset subset (about 1 GB as float64) and faiss. Query results are decrypted while the
+# search runs and deleted at once, so 1,000 queries do not add to the disk. Several datasets run
+# one after the other (default: one per dimension), so the timeout is long.
+@app.function(gpu="A100", cpu=8.0, memory=32768, timeout=43200, volumes={DATA_DIR: volume})
+def recall(
+    dry_run: bool = False,
+    queries: int = 1000,
+    preset: str = "m0_depth2",
+    dataset: str = "",
+    n: int = 100000,
+) -> None:
+    """Release build; recall@10 acceptance check of a preset on the encrypted pipeline.
+
+    `--dry-run`: 10,000 vectors and 5 queries. `--dataset`: space-separated names or `all`
+    (default: one dataset per dimension; names are listed by `recall.py --help`).
+    Example: modal run modal_app.py::recall --preset m0_depth2
+    """
     _build("Release", targets=("ombra_recall_search",))
     out_dir = Path(DATA_DIR) / "results"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -228,7 +242,13 @@ def recall(dry_run: bool = False, queries: int = 100) -> None:
         "/tmp",  # noqa: S108 - container-local scratch for the encrypted data
         "--queries",
         str(queries),
+        "--preset",
+        preset,
+        "--n",
+        str(n),
     ]
+    if dataset:
+        cmd += ["--dataset", *dataset.split()]
     if dry_run:
         cmd.append("--small")
     try:

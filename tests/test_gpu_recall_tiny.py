@@ -60,6 +60,14 @@ def test_recall_pipeline_tiny(tmp_path: Path) -> None:
     for row in rows.values():
         assert 0.0 <= row["encrypted_no_rerank"] <= 1.0
         assert 0.0 <= row["encrypted_rerank"] <= 1.0
+    # The T1.6 acceptance rule on real encrypted output: this small run must be within tolerance
+    # everywhere, count as eligible only with a lowered query minimum, and a tight tolerance must
+    # be able to fail (an impossible negative tolerance flags every setting).
+    check = recall.recall_check.check_dataset(result, min_queries=nq)
+    assert check["verdict"] == "PASS"
+    assert check["settings_checked"] == 1 + 3
+    assert recall.recall_check.check_dataset(result)["verdict"] == "NOT ELIGIBLE"
+    assert recall.recall_check.check_dataset(result, tolerance=-1.0)["verdict"] == "FAIL"
     print(
         f"tiny recall: err_scan={result['max_abs_score_error_scan']:.3e} "
         f"err_centers={result['max_abs_score_error_center_scores']:.3e}"
