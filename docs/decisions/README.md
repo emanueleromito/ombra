@@ -16,5 +16,6 @@ One short file per design decision, so the reasoning survives. New decisions cop
 | [0010](0010-query-expansion-via-automorphisms.md) | Query expansion via automorphisms, using no multiplication level | accepted |
 | [0011](0011-batching-is-not-the-main-lever.md) | Batching is not the main throughput lever | accepted |
 | [0012](0012-recall-based-preset-acceptance.md) | Recall-based acceptance rule for presets | proposed |
+| [0014](0014-composite-scaling-preset.md) | Composite scaling preset with 32-bit limbs: reject, keep `m0_depth2` | proposed |
 
 Smaller decisions (key management, threat model, accuracy, deletes, migrations, key rotation, parameter presets, format versioning, storage, API, client packaging) are recorded directly in [product-requirements.md](../product-requirements.md) and [architecture.md](../architecture.md).
