@@ -69,5 +69,8 @@ target_link_libraries(ombra_expand_gpu_batch PRIVATE ombra_core)
 add_executable(ombra_bench_expand src/ombra_bench_expand.cpp)
 target_link_libraries(ombra_bench_expand PRIVATE ombra_core)
 
+add_executable(ombra_recall_search src/ombra_recall_search.cpp)
+target_link_libraries(ombra_recall_search PRIVATE ombra_core)
+
 add_executable(ombra_encoding_check src/ombra_encoding_check.cpp)
 target_link_libraries(ombra_encoding_check PRIVATE ombra_core)

@@ -87,7 +87,7 @@ T0.5b and T0.7 both touch the expansion code: run them one after the other, not 
 **Depends on:** T0.4, T0.5
 **Steps:** on a real embedding set, compare encrypted top-k with plaintext top-k: full scan, then with k-means clusters (faiss) and different numbers of clusters searched, with and without client re-ranking.
 **Done when:** recall@10 for each setting is recorded in `results/`.
-**Status:** todo
+**Status:** done
 
 ### T0.9 Sizes
 
