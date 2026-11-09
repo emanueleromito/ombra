@@ -271,10 +271,12 @@ double GpuSearch::last_upload_seconds() const { return impl_->search->last_uploa
 std::size_t GpuSearch::device_bytes() const {
   const Impl& s = *impl_;
   const ColumnSearchShape sh{s.dims, s.blocks, s.nq0, s.n};
-  return (sh.stored_words() + sh.query_words() + sh.out_words() +
+  const std::size_t in_word_bytes = s.search->uses_32bit_words() ? sizeof(std::uint32_t) : sizeof(u64);
+  return (sh.stored_words() + sh.query_words()) * in_word_bytes +
+         (sh.out_words() +
           s.blocks *
               (s.words2_0() + 2 * s.words2_1() + s.words3_1() + s.words2_1() + s.words2_2())) *
-         sizeof(u64);
+             sizeof(u64);
 }
 
 void GpuSearch::set_query_from_device(const std::vector<const u64*>& column_ptrs,
