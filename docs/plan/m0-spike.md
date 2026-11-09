@@ -11,10 +11,14 @@
 
 ```
 T0.1 -> T0.2 -> T0.3 -> T0.4 + T0.5 (in parallel)
-                        T0.4 done      -> T0.6 + T0.7 (in parallel)
+                        T0.4 done       -> T0.6 + T0.7 (in parallel)
+                        T0.5 done       -> T0.5b
                         T0.4, T0.5 done -> T0.8 + T0.9 (in parallel)
+                        T0.9 done       -> T0.11
                         all done        -> T0.10
 ```
+
+T0.5b and T0.7 both touch the expansion code: run them one after the other, not in parallel.
 
 ---
 
@@ -69,9 +73,12 @@ T0.1 -> T0.2 -> T0.3 -> T0.4 + T0.5 (in parallel)
 ### T0.7 Query batching
 
 **Why:** batching is the main throughput lever (decision 0007).
-**Depends on:** T0.4
-**Steps:** run 1, 8, 32 and 128 queries in one pass over the same stored ciphertexts.
-**Done when:** throughput per batch size is recorded on A100, showing the speedup over one query at a time.
+**Depends on:** T0.4, T0.5 (and after T0.5b, which touches the same expansion code)
+**Steps:**
+- Search: run 1, 8, 32 and 128 queries in one pass over the same stored ciphertexts.
+- Expansion: run the expansion trees of 1, 8, 32 and 128 queries together, batching their splits so the GPU stays busy. Latency per query may not drop, but throughput should.
+- Report the achieved memory bandwidth of the search kernel against the A100's peak, to show how much headroom is left.
+**Done when:** search throughput and expansion throughput (queries per second) per batch size, and the search kernel's achieved bandwidth, are recorded on A100, showing the speedup over one query at a time.
 **Status:** todo
 
 ### T0.8 Accuracy
@@ -86,14 +93,33 @@ T0.1 -> T0.2 -> T0.3 -> T0.4 + T0.5 (in parallel)
 
 **Why:** feeds the sizing guide and the pitch.
 **Depends on:** T0.4, T0.5
-**Steps:** measure storage per million vectors, query upload size, score download size and evaluation-key size for each dimension.
-**Done when:** a size table is recorded in `results/`.
+**Steps:** for d = 384, 768 and 1536, and for both modes (plaintext DB and encrypted DB), measure storage per million vectors, bytes per dimension per vector, query upload size, score download size and evaluation-key size. Compare with a plain float32 vector DB (4 bytes per dimension). The expected figure at `m0_depth2` is about 96 bytes per dimension per vector for encrypted DB (2 polynomials x 3 towers x 8 bytes over N/2 slots); confirm or correct it.
+**Done when:** a size table is recorded in `results/`, including the ratio to float32 and how many vectors fit in A100 memory per mode and dimension.
+**Status:** todo
+
+### T0.5b Faster query expansion
+
+**Why:** at d = 1536 one expansion takes 0.63 s on A100, as much as scanning about 2.5M vectors (T0.4), so it dominates per-query latency. Splits currently run one at a time.
+**Depends on:** T0.5
+**Steps:** run all splits of the same tree level in one batched launch (nodes at a level are independent); fuse the automorphism with the key switch where possible; profile one split to find the bottleneck (NTT, key-switch inner product, ModDown). Keep the CPU tree as the exact RNS-level oracle.
+**Done when:** the oracle still matches exactly, and expansion time on A100 is recorded for d = 384, 768, 1536, with a target under 100 ms at d = 1536. If the target is missed, the results file says why and what limits it.
+**Status:** todo
+
+### T0.11 Compact configurations
+
+**Why:** storage is set by the number of RNS towers (each stored as a 64-bit word), not by bit sizes, so `m0_depth2` costs about 24x a float32 vector DB. This task measures the options that make Ombra smaller or faster, without changing `m0_depth2`, which stays the baseline for every other task.
+**Depends on:** T0.5, T0.9
+**Steps:**
+1. **Smaller ring:** add a second preset at ring dimension 8192 with a ~40-bit scale, still depth 2. Check log2(QP) against the HomomorphicEncryption.org 128-bit classic table (218 bits at N = 8192) in a test. Measure expansion time, key size and end-to-end score error (expansion, search, mask) against the 1e-6 bound.
+2. **Compact plaintext storage (plaintext-DB mode):** store column-packed plaintext vectors as fp16 and as int8, and encode them on the GPU (FFT and NTT into RNS form) just before the multiply. Measure storage per vector, search throughput against T0.4 and score error.
+3. **Seeded encryption (encrypted-DB mode), write-up only:** with secret-key encryption, half of each ciphertext is randomness that could be regenerated from a seed, halving storage. Find out whether OpenFHE supports seeded or compressed ciphertexts, and what reproducing its random generator on the GPU would take. No implementation: it touches hard rule 3.
+**Done when:** results for steps 1 and 2 are recorded in `results/`, step 3 is a short note in `results/`, and any preset that passes is proposed as a new decision record (not adopted).
 **Status:** todo
 
 ### T0.10 Spike report
 
 **Why:** decides whether the architecture stands as designed.
-**Depends on:** T0.1–T0.9
-**Steps:** summarize all results; compare with the blocked-packing fallback if expansion is slow; list any design changes.
+**Depends on:** T0.1–T0.9, T0.5b, T0.11
+**Steps:** summarize all results; compare with the blocked-packing fallback if expansion is slow; recommend the product presets based on T0.11; list any design changes.
 **Done when:** `results/spike-report.md` exists with the numbers, a go / change decision for each architecture choice, and any new decision records added to `docs/decisions/`.
 **Status:** todo
