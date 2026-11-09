@@ -138,6 +138,7 @@ def _gpu_name() -> str:
 
 
 def run_d(
+    preset: str,
     d: int,
     cases: list[tuple[int, float, int]],
     queries: int,
@@ -152,10 +153,10 @@ def run_d(
     from ombra import query as oq
 
     rng = np.random.default_rng(SEED + d)
-    _, cc = ombra_params.make_context(PRESET)
+    _, cc = ombra_params.make_context(preset)
     keys = cc.KeyGen()
     cc.EvalMultKeyGen(keys.secretKey)
-    slots = ombra_params.get_preset(PRESET)["batch_size"]
+    slots = ombra_params.get_preset(preset)["batch_size"]
     ring = cc.GetRingDimension()
     pk, sk = keys.publicKey, keys.secretKey
     cc.ClearEvalAutomorphismKeys()  # the key store is static: hold exactly this d's indices
@@ -374,6 +375,25 @@ def run_d(
     return records
 
 
+def _host_cpu() -> dict[str, Any]:
+    """CPU model (as the guest sees it) and core counts; the model may be hidden by the host."""
+    model = "unknown"
+    try:
+        for line in Path("/proc/cpuinfo").read_text().splitlines():
+            if line.lower().startswith("model name"):
+                model = line.split(":", 1)[1].strip()
+                break
+    except OSError:
+        pass
+    import os
+
+    return {
+        "model": model,
+        "os_cpu_count": os.cpu_count(),
+        "usable_cores": len(os.sched_getaffinity(0)),
+    }
+
+
 def run_t13(
     out_dir: Path,
     dims: tuple[int, ...],
@@ -384,13 +404,14 @@ def run_t13(
     cases_spec: list[tuple[int, float, int]] | None = None,
     name: str = "t1.3-a100.json",
     log: Callable[[str], None] = lambda s: print(s, flush=True),
+    preset: str = PRESET,
 ) -> Path:
     cases = cases_spec or [(n, f, nl) for n, nl in SIZES for f in FRACTIONS]
     binary = find_binary("ombra_bench_e2e")
     records: list[dict[str, Any]] = []
     for d in dims:
         with tempfile.TemporaryDirectory(dir="/tmp") as tmp:  # noqa: S108
-            records += run_d(d, cases, queries, warmup, binary, Path(tmp), log)
+            records += run_d(preset, d, cases, queries, warmup, binary, Path(tmp), log)
         for r in records[-len(cases) :]:
             log(
                 f"d={r['d']} N={r['n_vectors']} frac={r['fraction_searched']}: "
@@ -399,7 +420,8 @@ def run_t13(
             )
     result = {
         "task": "T1.3",
-        "preset": PRESET,
+        "preset": preset,
+        "host_cpu": _host_cpu(),
         "gpu_name": _gpu_name(),
         "openfhe_version": openfhe_version,
         "queries_per_case": queries,

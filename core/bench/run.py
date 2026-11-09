@@ -408,6 +408,12 @@ def main() -> None:
         "--profile", action="store_true", help="t0.5: also time the stages of one split"
     )
     parser.add_argument("--name-t13", default="t1.3-a100.json", help="output file name for t1.3")
+    parser.add_argument(
+        "--presets-t13",
+        default="",
+        help="t1.3: comma-separated presets from core/params, run in one go (T2.2); "
+        "empty = m0_depth2 only, written to --name-t13",
+    )
     parser.add_argument("--e2e-queries", type=int, default=20, help="t1.3: timed queries per case")
     parser.add_argument("--e2e-warmup", type=int, default=3, help="t1.3: untimed queries per case")
     parser.add_argument("--presets-t011", default="m0_depth2,m0_compact_n8192", help="t0.11")
@@ -439,15 +445,28 @@ def main() -> None:
     if task == "t1.3":
         from e2e import run_t13
 
-        run_t13(
-            args.out,
-            dims,
-            args.e2e_queries,
-            args.e2e_warmup,
-            find_binary,
-            openfhe_version(),
-            name=args.name_t13,
-        )
+        if args.presets_t13:
+            for preset in args.presets_t13.split(","):
+                run_t13(
+                    args.out,
+                    dims,
+                    args.e2e_queries,
+                    args.e2e_warmup,
+                    find_binary,
+                    openfhe_version(),
+                    name=f"t2.2-{preset}-a100.json",
+                    preset=preset,
+                )
+        else:
+            run_t13(
+                args.out,
+                dims,
+                args.e2e_queries,
+                args.e2e_warmup,
+                find_binary,
+                openfhe_version(),
+                name=args.name_t13,
+            )
     if task == "t0.11":
         from t011 import run_t011
 
