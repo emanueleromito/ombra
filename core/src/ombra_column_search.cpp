@@ -21,6 +21,7 @@
 #include "ciphertext-ser.h"
 #include "cryptocontext-ser.h"
 #include "ombra/core/ciphertext_ops.hpp"
+#include "ombra/core/security_floor_context.hpp"
 #include "openfhe.h"
 #include "scheme/ckksrns/ckksrns-ser.h"
 
@@ -80,6 +81,7 @@ int main(int argc, char** argv) {
         if (!Serial::DeserializeFromFile(argv[1], cc, SerType::BINARY)) {
             throw std::runtime_error("cannot read crypto context");
         }
+        ombra::core::require_security_floor(cc);
         const std::size_t blocks = std::stoul(argv[5]);
         std::vector<std::vector<Ciphertext<DCRTPoly>>> stored(blocks);
         std::vector<Ciphertext<DCRTPoly>> query;

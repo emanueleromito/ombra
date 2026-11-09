@@ -29,6 +29,7 @@
 #include "cryptocontext-ser.h"
 #include "key/key-ser.h"
 #include "ombra/core/expansion_tree.hpp"
+#include "ombra/core/security_floor_context.hpp"
 #include "openfhe.h"
 #include "openfhe_expand_ops.hpp"
 #include "scheme/ckksrns/ckksrns-ser.h"
@@ -55,6 +56,7 @@ int main(int argc, char** argv) {
         if (!Serial::DeserializeFromFile(argv[1], cc, SerType::BINARY)) {
             throw std::runtime_error("cannot read crypto context");
         }
+        ombra::core::require_security_floor(cc);
         std::ifstream keyfile(argv[3], std::ios::in | std::ios::binary);
         if (!keyfile.is_open() ||
             !CryptoContextImpl<DCRTPoly>::DeserializeEvalAutomorphismKey(keyfile, SerType::BINARY)) {

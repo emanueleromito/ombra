@@ -21,6 +21,7 @@
 #include "ciphertext-ser.h"
 #include "cryptocontext-ser.h"
 #include "ombra/core/ciphertext_ops.hpp"
+#include "ombra/core/security_floor_context.hpp"
 #include "openfhe.h"
 #include "scheme/ckksrns/ckksrns-ser.h"
 
@@ -91,6 +92,7 @@ int main(int argc, char** argv) {
         if (!Serial::DeserializeFromFile(argv[1], cc, SerType::BINARY)) {
             throw std::runtime_error("cannot read crypto context");
         }
+        ombra::core::require_security_floor(cc);
         const auto a = load_ct(argv[2]);
         const auto b = load_ct(argv[3]);
         // Same encoding call the Python side's expected values assume: scale degree 1, level 0.

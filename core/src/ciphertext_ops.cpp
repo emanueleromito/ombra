@@ -7,6 +7,7 @@
 
 #include "ombra/core/column_search.hpp"
 #include "ombra/core/rns_basic.hpp"
+#include "ombra/core/security_floor_context.hpp"
 
 namespace ombra::core {
 namespace {
@@ -73,6 +74,7 @@ void write_back(std::vector<DCRTPoly>& polys, const Flat& shape_src, const std::
 }
 
 void require_fixedmanual(const CiphertextImpl<DCRTPoly>& ct) {
+    require_security_floor(ct.GetCryptoContext());
     const auto params = std::dynamic_pointer_cast<CryptoParametersCKKSRNS>(ct.GetCryptoParameters());
     if (!params || params->GetScalingTechnique() != FIXEDMANUAL) {
         throw std::invalid_argument("only CKKS with FIXEDMANUAL scaling is supported");

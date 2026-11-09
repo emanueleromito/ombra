@@ -143,7 +143,7 @@ One task per high or medium finding in `results/m1-crypto-review.md`. T1.10 shou
 **Depends on:** none
 **Steps:** add one check used by the core entry points that rejects `HEStd_NotSet` and confirms log2(QP) against the standard's limit; add a negative test.
 **Done when:** a context below the floor is refused by every core entry point, covered by a test.
-**Status:** todo
+**Status:** done
 
 ### T1.16 Version headers for ciphertext and key files (F8, medium)
 

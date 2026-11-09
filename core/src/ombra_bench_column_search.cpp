@@ -29,6 +29,7 @@
 #include "key/key-ser.h"
 #include "ombra/core/ciphertext_ops.hpp"
 #include "ombra/core/column_search.hpp"
+#include "ombra/core/security_floor_context.hpp"
 #include "openfhe.h"
 #include "scheme/ckksrns/ckksrns-ser.h"
 
@@ -85,6 +86,7 @@ int main(int argc, char** argv) {
         if (!Serial::DeserializeFromFile(argv[1], cc, SerType::BINARY)) {
             throw std::runtime_error("cannot read crypto context");
         }
+        ombra::core::require_security_floor(cc);
         if (!Serial::DeserializeFromFile(argv[2], pk, SerType::BINARY)) {
             throw std::runtime_error("cannot read public key");
         }

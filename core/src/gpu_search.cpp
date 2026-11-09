@@ -7,6 +7,7 @@
 
 #include "ombra/core/ciphertext_ops.hpp"
 #include "ombra/core/expansion_gpu.hpp"
+#include "ombra/core/security_floor_context.hpp"
 
 namespace ombra::core {
 namespace {
@@ -37,7 +38,9 @@ bool same_meta(const CtMeta& a, const CtMeta& b) {
 
 GpuCtOps::GpuCtOps(const CryptoContext<DCRTPoly>& cc, const Ct& sample,
                    const EvalKey<DCRTPoly>& relin_key)
-    : cc_(cc), tables_(extract_expansion_tables(cc, sample)), device_(tables_) {
+    : cc_((require_security_floor(cc), cc)),
+      tables_(extract_expansion_tables(cc, sample)),
+      device_(tables_) {
   const auto cp = std::dynamic_pointer_cast<CryptoParametersCKKSRNS>(cc->GetCryptoParameters());
   if (!cp || cp->GetScalingTechnique() != FIXEDMANUAL) {
     fail("only CKKS with FIXEDMANUAL scaling is supported");

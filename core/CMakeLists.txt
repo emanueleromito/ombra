@@ -1,5 +1,10 @@
 # core/: GPU kernels and OpenFHE glue. Built only with CUDA (needs OpenFHE and a CUDA toolchain);
 # the CPU-only build (`make test`) skips everything here.
+# T1.15: pure-number unit test of the security floor (header only, no OpenFHE, builds on CPU).
+add_executable(ombra_security_floor_test src/security_floor_test.cpp)
+target_include_directories(ombra_security_floor_test PRIVATE include)
+add_test(NAME security_floor COMMAND ombra_security_floor_test)
+
 if(NOT OMBRA_ENABLE_CUDA)
   return()
 endif()
@@ -35,7 +40,8 @@ target_include_directories(ombra_rns_cuda PUBLIC include PRIVATE kernels src)
 # this file needs nothing beyond C++17 device code.
 set_target_properties(ombra_rns_cuda PROPERTIES CUDA_SEPARABLE_COMPILATION OFF CUDA_STANDARD 17)
 
-add_library(ombra_core STATIC src/ciphertext_ops.cpp src/expansion_gpu.cpp src/gpu_search.cpp)
+add_library(ombra_core STATIC src/ciphertext_ops.cpp src/expansion_gpu.cpp src/gpu_search.cpp
+                      src/security_floor.cpp)
 target_include_directories(
   ombra_core PUBLIC include ${OpenFHE_INCLUDE} ${OpenFHE_INCLUDE}/third-party/include
                     ${OpenFHE_INCLUDE}/core ${OpenFHE_INCLUDE}/pke ${OpenFHE_INCLUDE}/binfhe)
