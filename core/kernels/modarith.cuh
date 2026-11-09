@@ -21,7 +21,9 @@ using u128 = unsigned __int128;
 struct TowerConst {
   u64 q;
   u64 mu;
-  u64 n;  // bit length of q
+  u64 n;     // bit length of q
+  u64 qinv;  // q^-1 mod 2^64 (Montgomery); 0 if q is even (Montgomery then unusable)
+  u64 r2;    // 2^128 mod q (Montgomery); 0 if q is even
 };
 
 // x mod q for x < q^2, by Barrett reduction (HAC 14.42, b=2, k=n):
@@ -39,6 +41,31 @@ __host__ __device__ inline u64 barrett_reduce(u128 x, const TowerConst& c) {
 // (a * b) mod q for reduced a, b < q.
 __host__ __device__ inline u64 mul_mod(u64 a, u64 b, const TowerConst& c) {
   return barrett_reduce((u128)a * b, c);
+}
+
+// Montgomery product with R = 2^64: returns a * b * R^-1 mod q, for a * b < q * 2^64 (so for any
+// a < q, b < 2^64, and in particular a, b < q), q odd, q < 2^63, c.qinv = q^-1 mod 2^64.
+// Proof of exactness: t = a * b < q * R. m = (t mod R) * qinv mod R gives m * q == t (mod R), hence
+// t - m * q is divisible by R and equals R * (hi(t) - hi(m * q)) where hi(x) = floor(x / R) (the low
+// halves are equal). hi(t) < q because t < q * R, and hi(m * q) < q because m < R, so the difference
+// lies in (-q, q) and one conditional add of q gives the unique residue in [0, q) of t * R^-1.
+// Cost: 2 full 64x64 products (a*b: lo and hi; m*q: hi only) and one low product, against 5 products
+// plus two conditional subtractions for Barrett.
+__host__ __device__ inline u64 mont_mul(u64 a, u64 b, const TowerConst& c) {
+  const u128 t = (u128)a * b;
+  const u64 m = (u64)t * c.qinv;
+  const u64 hi = (u64)(t >> 64);
+  const u64 mq = (u64)(((u128)m * c.q) >> 64);
+  return hi >= mq ? hi - mq : hi + c.q - mq;
+}
+
+// Sum-of-products convention used by the search kernels: they accumulate
+//   acc = sum_j mont_mul(x_j, y_j) mod q = R^-1 * sum_j x_j y_j   (mod q)
+// with add_mod, then multiply once by R: mont_mul(acc, c.r2) = acc * R^2 * R^-1 = acc * R, so the
+// output is exactly sum_j x_j y_j mod q in standard form. Inputs and outputs of the kernels are
+// therefore unchanged (no Montgomery-form data is ever stored or transferred).
+__host__ __device__ inline u64 mont_finish(u64 acc, const TowerConst& c) {
+  return mont_mul(acc, c.r2, c);
 }
 
 // Shoup multiplication by a fixed multiplier w < q < 2^63 with wq = floor(w * 2^64 / q)
@@ -74,7 +101,14 @@ inline std::vector<TowerConst> make_tower_consts(const std::vector<u64>& moduli)
     u64 n = 0;
     while ((u64(1) << n) <= q) ++n;  // q < 2^n
     const u64 mu = (u64)((u128(1) << (2 * n)) / q);
-    out.push_back({q, mu, n});
+    u64 qinv = 0, r2 = 0;
+    if (q & 1) {
+      qinv = q;  // Newton iteration: q * q == 1 (mod 8), each step doubles the correct low bits
+      for (int i = 0; i < 6; ++i) qinv *= 2 - q * qinv;
+      const u64 r1 = (u64)((u128(1) << 64) % q);
+      r2 = (u64)((u128)r1 * r1 % q);
+    }
+    out.push_back({q, mu, n, qinv, r2});
   }
   return out;
 }

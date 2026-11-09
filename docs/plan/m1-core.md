@@ -49,7 +49,7 @@ T1.1, T1.2, T1.4 and T1.6 can start in parallel. T1.2 and T1.4 both touch the se
 **Depends on:** none (profiling only until T1.2 is merged)
 **Steps:** profile the T0.4 kernel with Nsight Compute on Modal if possible (otherwise use instruction counts and timing experiments); report achieved instruction throughput against the A100 peak, the instruction mix of one modular multiplication, occupancy and stall reasons. Try low-risk optimizations inside the 64-bit design (Barrett vs Montgomery, lazy reduction across the d-term sum, wider loads), each kept only if the exact oracle still passes.
 **Done when:** a results file explains what limits the kernel with profiler or experiment evidence, and records throughput before and after any kept optimization.
-**Status:** todo
+**Status:** done
 
 ### T1.5 Composite scaling preset with 32-bit limbs
 
