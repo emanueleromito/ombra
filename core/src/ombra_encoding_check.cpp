@@ -22,6 +22,8 @@
 #include "openfhe.h"
 #include "scheme/ckksrns/ckksrns-ser.h"
 
+#include "ombra/core/security_floor_context.hpp"
+
 using namespace lbcrypto;
 
 namespace {
@@ -48,6 +50,7 @@ int main(int argc, char** argv) {
         if (!Serial::DeserializeFromFile(argv[1], cc, SerType::BINARY)) {
             throw std::runtime_error("cannot read crypto context");
         }
+        ombra::core::require_security_floor(cc);
         const std::size_t d = std::stoul(argv[4]);
         const std::size_t ring = cc->GetRingDimension();
         if (d == 0 || d > ring / 2) {

@@ -8,6 +8,7 @@
 
 #include "ombra/core/ciphertext_ops.hpp"
 #include "ombra/core/expansion_tree.hpp"
+#include "ombra/core/security_floor_context.hpp"
 
 namespace ombra::core {
 namespace {
@@ -40,6 +41,7 @@ std::vector<u64> to_u64(const std::vector<NativeInteger>& v) {
 }
 
 std::shared_ptr<CryptoParametersRNS> rns_params(const CryptoContext<DCRTPoly>& cc) {
+  require_security_floor(cc);
   auto p = std::dynamic_pointer_cast<CryptoParametersCKKSRNS>(cc->GetCryptoParameters());
   if (!p) fail("only CKKS is supported");
   if (p->GetKeySwitchTechnique() != HYBRID) fail("only HYBRID key switching is supported");

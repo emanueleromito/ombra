@@ -95,7 +95,7 @@ One task per high or medium finding in `results/m1-crypto-review.md`. T1.10 shou
 **Depends on:** none
 **Steps:** test tower reduction and NTT exactly on OpenFHE's rounded integer coefficients; keep a tolerance only for the FFT and rounding; always compare the GPU evaluation form with OpenFHE's NTT of the GPU's own coefficients; record the tolerance as a decision.
 **Done when:** `ombra_plain_search` fails on any wrong reduction or NTT word even when coefficients differ by one unit, for both presets and all three formats, and the decision record exists.
-**Status:** todo
+**Status:** done
 
 ### T1.10 Multi-block oracle for relinearize, rescale and mask (F2, medium)
 
@@ -143,7 +143,7 @@ One task per high or medium finding in `results/m1-crypto-review.md`. T1.10 shou
 **Depends on:** none
 **Steps:** add one check used by the core entry points that rejects `HEStd_NotSet` and confirms log2(QP) against the standard's limit; add a negative test.
 **Done when:** a context below the floor is refused by every core entry point, covered by a test.
-**Status:** todo
+**Status:** done
 
 ### T1.16 Version headers for ciphertext and key files (F8, medium)
 
@@ -175,7 +175,7 @@ One task per high or medium finding in `results/m1-crypto-review.md`. T1.10 shou
 **Depends on:** none
 **Steps:** add a CI job for `make test` on every PR and `make test-gpu` on PRs touching `core/`, with Modal credentials as repository secrets; make it a required check.
 **Done when:** a PR with a failing oracle cannot be merged.
-**Status:** todo
+**Status:** in progress: `.github/workflows/ci.yml` added; needs the repository secrets and the required-check setting
 
 ### T1.20 Restrict what is uploaded to Modal (F12, medium)
 
@@ -183,7 +183,7 @@ One task per high or medium finding in `results/m1-crypto-review.md`. T1.10 shou
 **Depends on:** none
 **Steps:** replace the ignore list in `modal_app.py` with an allowlist of needed folders; add a test that the secret patterns in `.gitignore` are excluded.
 **Done when:** the test passes and `make test-gpu` still builds.
-**Status:** todo
+**Status:** done
 
 ---
 

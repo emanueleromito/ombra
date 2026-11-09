@@ -33,6 +33,15 @@ REPO_DIR = "/root/ombra"
 BUILD_DIR = "/root/ombra-build"
 DATA_DIR = "/data"
 
+
+def _upload_ignore(p: Path) -> bool:
+    # Runs only locally at image build; imported lazily because Modal puts only modal_app.py
+    # in the container, so a top-level import of modal_upload would fail there.
+    from modal_upload import is_excluded
+
+    return is_excluded(str(p))
+
+
 image = (
     modal.Image.from_registry(CUDA_IMAGE, add_python=PYTHON_VERSION)
     .apt_install("git", "build-essential", "cmake", "ninja-build", "libomp-dev")
@@ -59,11 +68,8 @@ image = (
     # OpenFHE is not rebuilt. (ann-benchmarks.com does not host the dbpedia hdf5, so no h5py.)
     .pip_install("pyarrow==17.0.0")
     # Source code last, so code changes don't rebuild OpenFHE.
-    .add_local_dir(
-        ".",
-        remote_path=REPO_DIR,
-        ignore=[".git", "build", "**/__pycache__", ".venv", "data", "*.key", ".env"],
-    )
+    # Allowlist, not a blocklist: see modal_upload.py. The callable gets paths relative to ".".
+    .add_local_dir(".", remote_path=REPO_DIR, ignore=_upload_ignore)
 )
 
 app = modal.App("ombra", image=image)

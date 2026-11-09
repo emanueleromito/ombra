@@ -101,7 +101,29 @@ __global__ void finish_kernel(const double2* buf, u64 total, u64 slots, u32 log_
   }
 }
 
+// Test aid for the exact oracle (T1.9): the reduction step of finish_kernel on given integers.
+// Launch shape: one thread per (col, coefficient), grid = ceil(cols * ring_dim / kThreads),
+// block = kThreads. in is int64 [col][ring_dim]; out is [col][tower][ring_dim].
+__global__ void reduce_ints_kernel(const long long* in, u64 total, u64 ring_dim,
+                                   const TowerConst* tc, u64 num_towers, u64* out) {
+  const u64 i = blockIdx.x * (u64)blockDim.x + threadIdx.x;
+  if (i >= total) return;
+  const u64 col = i / ring_dim, k = i % ring_dim;
+  for (u64 t = 0; t < num_towers; ++t) {
+    out[(col * num_towers + t) * ring_dim + k] = reduce_signed(in[i], tc[t].q);
+  }
+}
+
 }  // namespace
+
+cudaError_t launch_reduce_ints(const long long* in, u64 cols, u64 ring_dim, const TowerConst* tc,
+                               u64 num_towers, u64* out, cudaStream_t stream) {
+  const u64 total = cols * ring_dim;
+  if (total == 0) return cudaErrorInvalidValue;
+  reduce_ints_kernel<<<(unsigned)((total + kThreads - 1) / kThreads), kThreads, 0, stream>>>(
+      in, total, ring_dim, tc, num_towers, out);
+  return cudaGetLastError();
+}
 
 cudaError_t launch_encode_decode(CodeFormat fmt, const void* codes, u64 cols, u64 slots,
                                  double code_scale, double2* buf, cudaStream_t stream) {
