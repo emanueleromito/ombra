@@ -162,7 +162,10 @@ def test_openfhe(pytest_args: str = "") -> None:
 
 # memory: the T0.4 benchmark holds one block (about 1.2 GB at d = 1536) as OpenFHE ciphertexts plus
 # its flattened copy on the host at a time, so about 3 to 4 GB peak; 16 GiB leaves headroom.
-@app.function(gpu="A100", memory=16384, timeout=3600, volumes={DATA_DIR: volume})
+# T1.3 needs the 40 GB card (the plain "A100" sometimes lands on the 80 GB PCIe one) and more time:
+# 12 cases, each with 23 queries, plus encrypting two blocks per d. Host memory: block 0 flattened
+# (1.2 GB at d = 1536) plus its OpenFHE ciphertexts and the Python client; 16 GiB is enough.
+@app.function(gpu="A100-40GB", memory=16384, timeout=7200, volumes={DATA_DIR: volume})
 def bench(task: str = "all") -> None:
     """Build in Release and run benchmarks on an A100; results go to the volume."""
     _build("Release")

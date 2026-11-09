@@ -183,8 +183,14 @@ GpuCtOps& GpuSearch::level1() { return *impl_->ops1; }
 void GpuSearch::upload_block(std::size_t block, const std::vector<Ct>& columns) {
   Impl& s = *impl_;
   if (block >= s.blocks || columns.size() != s.dims) fail("bad block index or dimension count");
-  const FlatCiphertexts f = flatten_ciphertexts(columns);
   s.ops0->checked_words(columns[0], 2);  // level, tower count and moduli of the first column
+  upload_block_flat(block, flatten_ciphertexts(columns));
+}
+
+void GpuSearch::upload_block_flat(std::size_t block, const FlatCiphertexts& f) {
+  Impl& s = *impl_;
+  if (block >= s.blocks || f.count != s.dims) fail("bad block index or dimension count");
+  if (f.num_towers != s.nq0 || f.ring_dim != s.n) fail("block has a different level or ring dim");
   const CtMeta m{f.level, f.noise_scale_deg, f.scaling_factor};
   if (s.have_stored && !same_meta(m, s.stored_meta))
     fail("blocks differ in level, degree or scale");
@@ -201,6 +207,31 @@ void GpuSearch::upload_query(const std::vector<Ct>& columns) {
   s.query_meta = {f.level, f.noise_scale_deg, f.scaling_factor};
   s.have_query = true;
   s.search->upload_query(f.words.data(), f.words.size());
+}
+
+void GpuSearch::copy_block(std::size_t src, std::size_t dst) {
+  impl_->search->copy_block(src, dst);
+}
+
+double GpuSearch::last_upload_seconds() const { return impl_->search->last_upload_seconds(); }
+
+std::size_t GpuSearch::device_bytes() const {
+  const Impl& s = *impl_;
+  const ColumnSearchShape sh{s.dims, s.blocks, s.nq0, s.n};
+  return (sh.stored_words() + sh.query_words() + sh.out_words() +
+          s.blocks *
+              (s.words2_0() + 2 * s.words2_1() + s.words3_1() + s.words2_1() + s.words2_2())) *
+         sizeof(u64);
+}
+
+void GpuSearch::set_query_from_device(const std::vector<const u64*>& column_ptrs,
+                                      const CtMeta& meta) {
+  Impl& s = *impl_;
+  if (column_ptrs.size() != s.dims) fail("bad dimension count");
+  for (std::size_t j = 0; j < s.dims; ++j)
+    s.search->set_query_column_from_device(j, column_ptrs[j]);
+  s.query_meta = meta;
+  s.have_query = true;
 }
 
 void GpuSearch::upload_mask(std::size_t block, const Ct& mask) {
@@ -294,6 +325,28 @@ GpuSearchTiming GpuSearch::run() {
   lap(t.rescale2_s);
   t.total_s = seconds_since(t_start);
   return t;
+}
+
+std::vector<u64> GpuSearch::download_words(SearchStage stage, std::size_t block) {
+  Impl& s = *impl_;
+  if (block >= s.blocks) fail("bad block index");
+  const auto out = [&](const DeviceWords& buf, std::size_t comps, std::size_t towers) {
+    const std::size_t w = comps * towers * s.n;
+    return buf.download(block * w, w);
+  };
+  switch (stage) {
+    case SearchStage::kSum:
+      fail("download_words does not support the search sum");
+    case SearchStage::kRelin:
+      return out(*s.s1, 2, s.nq0);
+    case SearchStage::kRescaled:
+      return out(*s.s2, 2, s.nq1);
+    case SearchStage::kMasked:
+      return out(*s.m2, 2, s.nq1);
+    case SearchStage::kFinal:
+      return out(*s.s3, 2, s.nq1 - 1);
+  }
+  fail("bad stage");
 }
 
 GpuSearch::Ct GpuSearch::download(SearchStage stage, std::size_t block) {
