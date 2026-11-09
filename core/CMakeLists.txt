@@ -44,6 +44,12 @@ target_link_libraries(ombra_roundtrip PRIVATE ombra_core)
 add_executable(ombra_column_search src/ombra_column_search.cpp)
 target_link_libraries(ombra_column_search PRIVATE ombra_core)
 
+add_executable(ombra_column_search_batch src/ombra_column_search_batch.cpp)
+target_link_libraries(ombra_column_search_batch PRIVATE ombra_core)
+
+add_executable(ombra_bench_batch src/ombra_bench_batch.cpp)
+target_link_libraries(ombra_bench_batch PRIVATE ombra_core)
+
 add_executable(ombra_bench_column_search src/ombra_bench_column_search.cpp)
 target_link_libraries(ombra_bench_column_search PRIVATE ombra_core)
 
@@ -52,6 +58,9 @@ target_link_libraries(ombra_expand PRIVATE ombra_core)
 
 add_executable(ombra_expand_gpu src/ombra_expand_gpu.cpp)
 target_link_libraries(ombra_expand_gpu PRIVATE ombra_core)
+
+add_executable(ombra_expand_gpu_batch src/ombra_expand_gpu_batch.cpp)
+target_link_libraries(ombra_expand_gpu_batch PRIVATE ombra_core)
 
 add_executable(ombra_bench_expand src/ombra_bench_expand.cpp)
 target_link_libraries(ombra_bench_expand PRIVATE ombra_core)

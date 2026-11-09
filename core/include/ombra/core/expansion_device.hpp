@@ -85,6 +85,13 @@ class ExpansionDevice {
                                                          const std::vector<char>& want_odd);
   // Largest chunk of nodes per batch (default from a ~1 GiB scratch budget); tests lower it to
   // exercise chunking. The scratch grows to the largest chunk used and is never shrunk.
+  // Memory planning (T0.7). Bytes of one ciphertext on the device; bytes of scratch for a chunk of
+  // `nodes` nodes (what the scratch holds once it has grown to that chunk size).
+  std::size_t ct_bytes() const;
+  std::size_t scratch_bytes(std::size_t nodes) const;
+  // Frees the ciphertext buffers that dropped handles returned to the pool (the pool otherwise
+  // keeps the peak forever and reuses it). Waits for the device. Live handles are not affected.
+  void release_pool();
   void set_max_batch(std::size_t nodes);
   std::size_t max_batch() const;
 

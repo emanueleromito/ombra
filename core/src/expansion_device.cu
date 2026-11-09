@@ -433,6 +433,23 @@ void ExpansionDevice::synchronize() {
   go().throw_if_error();
 }
 
+void ExpansionDevice::release_pool() {
+  // Buffers of dropped handles sit in the free list; freeing them returns the memory to the driver.
+  // Handles still alive are untouched (they return to the now empty list when dropped).
+  const auto go = [this]() -> Status {
+    OMBRA_CUDA_CHECK(cudaDeviceSynchronize());  // pending kernels may still read freed handles
+    impl_->pool->free_list.clear();
+    return {};
+  };
+  go().throw_if_error();
+}
+
+std::size_t ExpansionDevice::ct_bytes() const { return impl_->ct_words() * sizeof(u64); }
+
+std::size_t ExpansionDevice::scratch_bytes(std::size_t nodes) const {
+  return (impl_->scratch_words_per_node() + 3) * nodes * sizeof(u64);
+}
+
 void ExpansionDevice::set_max_batch(std::size_t nodes) {
   require(nodes >= 1 && nodes <= kMaxBatchCeiling, "max batch out of range");
   impl_->max_batch = nodes;

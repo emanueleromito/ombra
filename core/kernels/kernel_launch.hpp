@@ -30,6 +30,21 @@ cudaError_t launch_column_search(const u64* stored, const u64* query, u64* out,
                                  const TowerConst* tc, const ColumnSearchDims& dims,
                                  cudaStream_t stream);
 
+// Batched search (T0.7): `num_queries` queries over the same stored blocks. queries are
+// [q][dim][comp][P], out is [q][block][comp 0..2][P]; see the comment in column_search.cu.
+cudaError_t launch_column_search_batched(const u64* stored, const u64* queries, u64* out,
+                                         const TowerConst* tc, const ColumnSearchDims& dims,
+                                         u64 num_queries, cudaStream_t stream);
+// Bytes requested from / written to global memory by one launch (from the kernel's loop structure).
+struct BatchSearchTraffic {
+  u64 stored_load_bytes = 0;
+  u64 query_load_bytes = 0;
+  u64 store_bytes = 0;
+  u64 compulsory_bytes = 0;  // every stored, query and output word touched exactly once
+  u64 load_bytes() const { return stored_load_bytes + query_load_bytes; }
+};
+BatchSearchTraffic column_search_batched_traffic(const ColumnSearchDims& dims, u64 num_queries);
+
 // One basis-conversion job (ApproxSwitchCRTBasis): word k of the output tower is
 //   sum_{i < src_count} src[src_off + i*N + k] * mat[mat_off + i]  mod q_dst.
 // The source words need not be reduced mod q_dst (they are below 2^60); mat_shoup =
