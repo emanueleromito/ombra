@@ -56,6 +56,7 @@ constexpr int kFlush = 64;  // lazy variant: dimensions between reductions
 struct ProfConst {
   TowerConst t;
   u64 qinv;  // q^-1 mod 2^64 (Montgomery)
+  u64 r2;    // 2^128 mod q
 };
 
 __device__ __forceinline__ u64 mont_mul(u64 a, u64 b, u64 q, u64 qinv) {
@@ -64,6 +65,14 @@ __device__ __forceinline__ u64 mont_mul(u64 a, u64 b, u64 q, u64 qinv) {
   const u64 hi = (u64)(t >> 64);
   const u64 mq = (u64)(((u128)m * q) >> 64);
   return hi >= mq ? hi - mq : hi + q - mq;  // a*b*2^-64 mod q, exact for a, b < q
+}
+
+// REDC of T < q * 2^64: (T - m q) / 2^64 with m = lo(T) * q^-1, exact; result T * 2^-64 mod q.
+__device__ __forceinline__ u64 redc(u128 T, u64 q, u64 qinv) {
+  const u64 m = (u64)T * qinv;
+  const u64 hi = (u64)(T >> 64);
+  const u64 mq = (u64)(((u128)m * q) >> 64);
+  return hi >= mq ? hi - mq : hi + q - mq;
 }
 
 __device__ __forceinline__ u64 reduce_lazy(u128 x, u64 r64, const TowerConst& c) {
@@ -99,7 +108,7 @@ __device__ __forceinline__ void keep(u64 (&v)[N]) {
 }
 
 // Launch: see the header comment. stored/query/out layouts as column_search.cu.
-template <int MODE, int W, bool LOAD>
+template <int MODE, int W, bool LOAD, int TILE = 4>
 __global__ void __launch_bounds__(kThreads)
     prof_kernel(const u64* __restrict__ stored, const u64* __restrict__ query,
                 u64* __restrict__ out, const ProfConst* __restrict__ pcs, u64 dims, u64 blocks,
@@ -108,25 +117,30 @@ __global__ void __launch_bounds__(kThreads)
   if (e >= P) return;
   const ProfConst pc = pcs[e / ring_dim];
   const TowerConst c = pc.t;
-  const u64 b0 = (u64)blockIdx.y * kTile;
-  const u64 nb = min((u64)kTile, blocks - b0);
+  const u64 b0 = (u64)blockIdx.y * TILE;
+  const u64 nb = min((u64)TILE, blocks - b0);
 
-  using Acc = std::conditional_t<MODE == 2, u128, u64>;
-  Acc a0[kTile][W], a1[kTile][W], a2[kTile][W];
+  using Acc = std::conditional_t<(MODE == 2 || MODE == 7), u128, u64>;
+  Acc a0[TILE][W], a1[TILE][W], a2[TILE][W];
 #pragma unroll
-  for (int k = 0; k < kTile; ++k)
+  for (int k = 0; k < TILE; ++k)
 #pragma unroll
     for (int w = 0; w < W; ++w) a0[k][w] = a1[k][w] = a2[k][w] = 0;
 
+  u64 r0[TILE][W], r1[TILE][W], r2[TILE][W];
+#pragma unroll
+  for (int k = 0; k < TILE; ++k)
+#pragma unroll
+    for (int w = 0; w < W; ++w) r0[k][w] = r1[k][w] = r2[k][w] = 0;
   u64 r64 = 0;
   if constexpr (MODE == 2) r64 = barrett_reduce((u128)1 << 64, c);
 
-  u64 rq0[W], rq1[W], rs0[kTile][W], rs1[kTile][W];
+  u64 rq0[W], rq1[W], rs0[TILE][W], rs1[TILE][W];
   if constexpr (!LOAD) {
     load_w<W>(&query[e], rq0);
     load_w<W>(&query[P + e], rq1);
 #pragma unroll
-    for (int k = 0; k < kTile; ++k) {
+    for (int k = 0; k < TILE; ++k) {
       const u64 base = (((b0 + k) * dims) * 2) * P + e;
       load_w<W>(&stored[base], rs0[k]);
       load_w<W>(&stored[base + P], rs1[k]);
@@ -148,7 +162,7 @@ __global__ void __launch_bounds__(kThreads)
       keep<W>(q1);
     }
 #pragma unroll
-    for (int k = 0; k < kTile; ++k) {
+    for (int k = 0; k < TILE; ++k) {
       if ((u64)k < nb) {
         u64 s0[W], s1[W];
         if constexpr (LOAD) {
@@ -181,6 +195,10 @@ __global__ void __launch_bounds__(kThreads)
             a0[k][w] += (u128)s0[w] * q0[w];
             a1[k][w] += (u128)s0[w] * q1[w] + (u128)s1[w] * q0[w];
             a2[k][w] += (u128)s1[w] * q1[w];
+          } else if constexpr (MODE == 7) {
+            a0[k][w] += (u128)s0[w] * q0[w];
+            a1[k][w] += (u128)s0[w] * q1[w] + (u128)s1[w] * q0[w];
+            a2[k][w] += (u128)s1[w] * q1[w];
           } else if constexpr (MODE == 3) {
             a0[k][w] ^= s0[w] ^ q0[w];
             a1[k][w] ^= s1[w] ^ q1[w];
@@ -199,10 +217,23 @@ __global__ void __launch_bounds__(kThreads)
         }
       }
     }
+    if constexpr (MODE == 7) {
+      if (((j + 1) % 8) == 0) {
+#pragma unroll
+        for (int k = 0; k < TILE; ++k)
+#pragma unroll
+          for (int w = 0; w < W; ++w) {
+            r0[k][w] = add_mod(r0[k][w], redc(a0[k][w], c.q, pc.qinv), c.q);
+            r1[k][w] = add_mod(r1[k][w], redc(a1[k][w], c.q, pc.qinv), c.q);
+            r2[k][w] = add_mod(r2[k][w], redc(a2[k][w], c.q, pc.qinv), c.q);
+            a0[k][w] = a1[k][w] = a2[k][w] = 0;
+          }
+      }
+    }
     if constexpr (MODE == 2) {
       if (((j + 1) % kFlush) == 0) {
 #pragma unroll
-        for (int k = 0; k < kTile; ++k)
+        for (int k = 0; k < TILE; ++k)
 #pragma unroll
           for (int w = 0; w < W; ++w) {
             a0[k][w] = reduce_lazy(a0[k][w], r64, c);
@@ -213,12 +244,21 @@ __global__ void __launch_bounds__(kThreads)
     }
   }
 #pragma unroll
-  for (int k = 0; k < kTile; ++k) {
+  for (int k = 0; k < TILE; ++k) {
     if ((u64)k < nb) {
       u64 v0[W], v1[W], v2[W];
 #pragma unroll
       for (int w = 0; w < W; ++w) {
-        if constexpr (MODE == 2) {
+        if constexpr (MODE == 7) {
+          // dims is a multiple of 8 in the benchmarks; running sums hold R^-1 * sum
+          const u64 R2 = pc.r2;
+          v0[w] = mont_mul(add_mod(r0[k][w], redc(a0[k][w], c.q, pc.qinv), c.q), R2, c.q,
+                           pc.qinv);
+          v1[w] = mont_mul(add_mod(r1[k][w], redc(a1[k][w], c.q, pc.qinv), c.q), R2, c.q,
+                           pc.qinv);
+          v2[w] = mont_mul(add_mod(r2[k][w], redc(a2[k][w], c.q, pc.qinv), c.q), R2, c.q,
+                           pc.qinv);
+        } else if constexpr (MODE == 2) {
           v0[w] = reduce_lazy(a0[k][w], r64, c);
           v1[w] = reduce_lazy(a1[k][w], r64, c);
           v2[w] = reduce_lazy(a2[k][w], r64, c);
@@ -334,7 +374,8 @@ std::vector<ProfConst> make_consts(u64 ring_dim, const std::vector<int>& bits) {
   for (const auto& t : tcs) {
     u64 inv = t.q;  // Newton: inverse mod 2^64
     for (int i = 0; i < 6; ++i) inv *= 2 - t.q * inv;
-    out.push_back({t, inv});
+    const u64 r1m = (u64)(((u128)1 << 64) % t.q);
+    out.push_back({t, inv, mulmod_host(r1m, r1m, t.q)});
   }
   return out;
 }
@@ -380,27 +421,27 @@ struct Shape {
   u64 d, blocks, ring_dim, towers, P;
 };
 
-template <int MODE, int W, bool LOAD>
+template <int MODE, int W, bool LOAD, int TILE = 4>
 void launch_prof(const Dev& dv, const Shape& s, const u64* query) {
   const dim3 grid((unsigned)((s.P / W + kThreads - 1) / kThreads),
-                  (unsigned)((s.blocks + kTile - 1) / kTile));
-  prof_kernel<MODE, W, LOAD>
+                  (unsigned)((s.blocks + TILE - 1) / TILE));
+  prof_kernel<MODE, W, LOAD, TILE>
       <<<grid, kThreads>>>(dv.stored, query, dv.out, dv.pc, s.d, s.blocks, s.ring_dim, s.P);
 }
 
-template <int MODE, int W, bool LOAD>
+template <int MODE, int W, bool LOAD, int TILE = 4>
 void report(const char* name, const Dev& dv, const Shape& s, int warmup, int iters,
             double mul_per_iter_per_k, double load_words_per_k) {
   const u64 words = s.P / W * W;
-  auto ms = time_runs([&] { launch_prof<MODE, W, LOAD>(dv, s, dv.query); }, warmup, iters);
+  auto ms = time_runs([&] { launch_prof<MODE, W, LOAD, TILE>(dv, s, dv.query); }, warmup, iters);
   const double t = median(ms) * 1e-3;
   // per thread-word, per dimension, per stored block: mul_per_iter_per_k operations
   const double ops = (double)words * s.blocks * s.d * mul_per_iter_per_k;
   const double stored_bytes = (double)words * s.blocks * s.d * 2 * 8;
   cudaFuncAttributes fa;
-  PCHECK(cudaFuncGetAttributes(&fa, prof_kernel<MODE, W, LOAD>));
+  PCHECK(cudaFuncGetAttributes(&fa, prof_kernel<MODE, W, LOAD, TILE>));
   int occ = 0;
-  PCHECK(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&occ, prof_kernel<MODE, W, LOAD>, kThreads,
+  PCHECK(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&occ, prof_kernel<MODE, W, LOAD, TILE>, kThreads,
                                                        0));
   std::printf(
       "RESULT d=%llu blocks=%llu variant=%s median_ms=%.3f min_ms=%.3f max_ms=%.3f "
@@ -422,9 +463,9 @@ bool verify(const Dev& dv, const Shape& s, const char* name, void (*run)(const D
   return ok;
 }
 
-template <int MODE, int W>
+template <int MODE, int W, int TILE = 4>
 void run_variant(const Dev& dv, const Shape& s) {
-  launch_prof<MODE, W, true>(dv, s, MODE == 1 ? dv.query_mont : dv.query);
+  launch_prof<MODE, W, true, TILE>(dv, s, MODE == 1 ? dv.query_mont : dv.query);
 }
 
 void rate_probe(int sms, int clock_khz) {
@@ -555,6 +596,10 @@ int main(int argc, char** argv) {
     ok &= verify(dv, s, "montgomery_w2", run_variant<1, 2>, ref);
     ok &= verify(dv, s, "lazy_w1", run_variant<2, 1>, ref);
     ok &= verify(dv, s, "lazy_w2", run_variant<2, 2>, ref);
+    ok &= verify(dv, s, "lazyredc_t4", run_variant<7, 1, 4>, ref);
+    ok &= verify(dv, s, "lazyredc_t2", run_variant<7, 1, 2>, ref);
+    ok &= verify(dv, s, "lazyredc_w2_t2", run_variant<7, 2, 2>, ref);
+    ok &= verify(dv, s, "lazyredc_t1", run_variant<7, 1, 1>, ref);
     PCHECK(cudaFree(dv.stored));
     PCHECK(cudaFree(dv.query));
     PCHECK(cudaFree(dv.query_mont));
@@ -607,6 +652,13 @@ int main(int argc, char** argv) {
       report<2, 1, true>("lazy_load_w1", dv, s, warmup, iters, 4, 1);
       report<2, 1, false>("lazy_regs_w1", dv, s, warmup, iters, 4, 0);
       report<2, 2, true>("lazy_load_w2", dv, s, warmup, iters, 4, 1);
+      report<7, 1, true, 4>("lazyredc_load_t4", dv, s, warmup, iters, 4, 1);
+      report<7, 1, true, 2>("lazyredc_load_t2", dv, s, warmup, iters, 4, 1);
+      report<7, 1, true, 1>("lazyredc_load_t1", dv, s, warmup, iters, 4, 1);
+      report<7, 2, true, 2>("lazyredc_load_w2_t2", dv, s, warmup, iters, 4, 1);
+      report<7, 1, false, 4>("lazyredc_regs_t4", dv, s, warmup, iters, 4, 0);
+      report<1, 1, true, 2>("montgomery_load_t2", dv, s, warmup, iters, 4, 1);
+      report<3, 1, true, 2>("memonly_t2", dv, s, warmup, iters, 4, 1);
       report<4, 1, false>("mulmod_only_barrett", dv, s, warmup, iters, 4, 0);
       report<6, 1, false>("mulmod_only_montgomery", dv, s, warmup, iters, 4, 0);
       report<5, 1, false>("addmod_only", dv, s, warmup, iters, 4, 0);
