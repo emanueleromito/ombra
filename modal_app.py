@@ -255,7 +255,7 @@ def profile_search(ncu: bool = True) -> None:
             "python",
             str(Path(REPO_DIR) / "core/bench/sass_mix.py"),
             exe,
-            "_Z18column_search_kernel",
+            "column_search_kernel",
             "prof_kernelILi0ELi1ELb1E",
             "prof_kernelILi1ELi1ELb1E",
             "prof_kernelILi2ELi1ELb1E",
