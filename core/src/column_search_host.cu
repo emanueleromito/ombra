@@ -143,6 +143,166 @@ void ColumnSearchDevice::download_result(std::vector<std::uint64_t>& out) {
     impl_->copy_out(out).throw_if_error();
 }
 
+struct BatchedColumnSearchDevice::Impl {
+    ColumnSearchShape shape;
+    std::vector<u64> moduli;
+    std::size_t max_queries = 0;
+    DeviceBuffer<u64> stored, queries, out;
+    DeviceBuffer<TowerConst> tc;
+    cudaEvent_t start = nullptr, stop = nullptr;
+
+    ~Impl() {
+        if (start != nullptr) (void)cudaEventDestroy(start);
+        if (stop != nullptr) (void)cudaEventDestroy(stop);
+    }
+
+    ColumnSearchDims dims() const {
+        return {shape.dims, shape.blocks, shape.num_towers, shape.ring_dim};
+    }
+
+    Status init(const std::vector<TowerConst>& consts) {
+        OMBRA_TRY(stored.allocate(shape.stored_words()));
+        OMBRA_TRY(queries.allocate(max_queries * shape.query_words()));
+        OMBRA_TRY(out.allocate(max_queries * shape.out_words()));
+        OMBRA_TRY(tc.allocate(consts.size()));
+        OMBRA_CUDA_CHECK(cudaMemcpy(tc.get(), consts.data(), consts.size() * sizeof(TowerConst),
+                                    cudaMemcpyHostToDevice));
+        OMBRA_CUDA_CHECK(cudaEventCreate(&start));
+        OMBRA_CUDA_CHECK(cudaEventCreate(&stop));
+        return {};
+    }
+
+    Status copy_in(u64* dst, const u64* src, std::size_t count) {
+        OMBRA_CUDA_CHECK(cudaMemcpy(dst, src, count * sizeof(u64), cudaMemcpyHostToDevice));
+        return {};
+    }
+
+    Status copy_dev(u64* dst, const u64* src, std::size_t count) {
+        OMBRA_CUDA_CHECK(cudaMemcpy(dst, src, count * sizeof(u64), cudaMemcpyDeviceToDevice));
+        return {};
+    }
+
+    // Default stream, like every other launch in core: the order of the calls is the order of
+    // copies and kernels.
+    Status run_kernel(std::size_t nq, double& seconds) {
+        OMBRA_CUDA_CHECK(cudaEventRecord(start, nullptr));
+        OMBRA_CUDA_CHECK(launch_column_search_batched(stored.get(), queries.get(), out.get(),
+                                                      tc.get(), dims(), nq, nullptr));
+        OMBRA_CUDA_CHECK(cudaEventRecord(stop, nullptr));
+        OMBRA_CUDA_CHECK(cudaEventSynchronize(stop));
+        OMBRA_CUDA_CHECK_LAUNCH();
+        float ms = 0;
+        OMBRA_CUDA_CHECK(cudaEventElapsedTime(&ms, start, stop));
+        seconds = ms / 1000.0;
+        return {};
+    }
+
+    Status copy_out(std::size_t nq, std::vector<u64>& host) {
+        host.assign(nq * shape.out_words(), 0);
+        OMBRA_CUDA_CHECK(cudaMemcpy(host.data(), out.get(), host.size() * sizeof(u64),
+                                    cudaMemcpyDeviceToHost));
+        return {};
+    }
+};
+
+BatchedColumnSearchDevice::BatchedColumnSearchDevice(const ColumnSearchShape& shape,
+                                                     const std::vector<std::uint64_t>& moduli,
+                                                     std::size_t max_queries)
+    : impl_(std::make_unique<Impl>()) {
+    validate_shape(shape, moduli);
+    if (max_queries == 0 || (max_queries + 3) / 4 > 65535) {
+        throw std::invalid_argument("column_search: bad query capacity");
+    }
+    impl_->shape = shape;
+    impl_->moduli = moduli;
+    impl_->max_queries = max_queries;
+    impl_->init(make_tower_consts(moduli)).throw_if_error();
+}
+
+BatchedColumnSearchDevice::~BatchedColumnSearchDevice() = default;
+
+void BatchedColumnSearchDevice::upload_block(std::size_t block, const std::uint64_t* words,
+                                             std::size_t count) {
+    const ColumnSearchShape& s = impl_->shape;
+    if (block >= s.blocks || count != s.block_words()) {
+        throw std::invalid_argument("column_search: bad block index or size");
+    }
+    check_reduced(words, count, s, impl_->moduli);
+    impl_->copy_in(impl_->stored.get() + block * s.block_words(), words, count).throw_if_error();
+}
+
+void BatchedColumnSearchDevice::copy_block(std::size_t src, std::size_t dst) {
+    const ColumnSearchShape& s = impl_->shape;
+    if (src >= s.blocks || dst >= s.blocks) {
+        throw std::invalid_argument("column_search: bad block index");
+    }
+    const std::size_t bw = s.block_words();
+    impl_->copy_dev(impl_->stored.get() + dst * bw, impl_->stored.get() + src * bw, bw)
+        .throw_if_error();
+}
+
+void BatchedColumnSearchDevice::upload_query(std::size_t q, const std::uint64_t* words,
+                                             std::size_t count) {
+    const ColumnSearchShape& s = impl_->shape;
+    if (q >= impl_->max_queries || count != s.query_words()) {
+        throw std::invalid_argument("column_search: bad query index or size");
+    }
+    check_reduced(words, count, s, impl_->moduli);
+    impl_->copy_in(impl_->queries.get() + q * s.query_words(), words, count).throw_if_error();
+}
+
+void BatchedColumnSearchDevice::copy_query(std::size_t src, std::size_t dst) {
+    const ColumnSearchShape& s = impl_->shape;
+    if (src >= impl_->max_queries || dst >= impl_->max_queries) {
+        throw std::invalid_argument("column_search: bad query index");
+    }
+    const std::size_t qw = s.query_words();
+    impl_->copy_dev(impl_->queries.get() + dst * qw, impl_->queries.get() + src * qw, qw)
+        .throw_if_error();
+}
+
+double BatchedColumnSearchDevice::run(std::size_t queries) {
+    if (queries == 0 || queries > impl_->max_queries) {
+        throw std::invalid_argument("column_search: bad query count");
+    }
+    double seconds = 0;
+    impl_->run_kernel(queries, seconds).throw_if_error();
+    return seconds;
+}
+
+SearchTraffic BatchedColumnSearchDevice::traffic(std::size_t queries) const {
+    const BatchSearchTraffic t = column_search_batched_traffic(impl_->dims(), queries);
+    return {t.stored_load_bytes, t.query_load_bytes, t.store_bytes, t.compulsory_bytes};
+}
+
+void BatchedColumnSearchDevice::download_result(std::size_t queries,
+                                                std::vector<std::uint64_t>& out) {
+    if (queries == 0 || queries > impl_->max_queries) {
+        throw std::invalid_argument("column_search: bad query count");
+    }
+    impl_->copy_out(queries, out).throw_if_error();
+}
+
+std::size_t BatchedColumnSearchDevice::max_queries() const { return impl_->max_queries; }
+
+std::size_t BatchedColumnSearchDevice::device_bytes(const ColumnSearchShape& shape,
+                                                    std::size_t max_queries) {
+    return (shape.stored_words() + max_queries * (shape.query_words() + shape.out_words())) *
+               sizeof(u64) +
+           shape.num_towers * sizeof(TowerConst);
+}
+
+DeviceMemory cuda_memory_info() {
+    DeviceMemory m;
+    const auto query = [&]() -> Status {
+        OMBRA_CUDA_CHECK(cudaFree(nullptr));  // make sure the context exists
+        OMBRA_CUDA_CHECK(cudaMemGetInfo(&m.free_bytes, &m.total_bytes));
+        return {};
+    };
+    query().throw_if_error();
+    return m;
+}
+
 std::string cuda_device_name() {
     int dev = 0;
     cudaDeviceProp prop{};

@@ -59,4 +59,11 @@ std::vector<lbcrypto::Ciphertext<lbcrypto::DCRTPoly>> gpu_eval_column_search(
     const std::vector<std::vector<lbcrypto::Ciphertext<lbcrypto::DCRTPoly>>>& stored_blocks,
     const std::vector<lbcrypto::Ciphertext<lbcrypto::DCRTPoly>>& query);
 
+// Batched column search (T0.7): several queries in one pass over the stored blocks. queries[q][j]
+// is dimension j of query q. Returns results[q][b], each what gpu_eval_column_search gives for
+// query q (same metadata rules).
+std::vector<std::vector<lbcrypto::Ciphertext<lbcrypto::DCRTPoly>>> gpu_eval_column_search_batched(
+    const std::vector<std::vector<lbcrypto::Ciphertext<lbcrypto::DCRTPoly>>>& stored_blocks,
+    const std::vector<std::vector<lbcrypto::Ciphertext<lbcrypto::DCRTPoly>>>& queries);
+
 }  // namespace ombra::core

@@ -79,7 +79,7 @@ T0.5b and T0.7 both touch the expansion code: run them one after the other, not 
 - Expansion: run the expansion trees of 1, 8, 32 and 128 queries together, batching their splits so the GPU stays busy. Latency per query may not drop, but throughput should.
 - Report the achieved memory bandwidth of the search kernel against the A100's peak, to show how much headroom is left.
 **Done when:** search throughput and expansion throughput (queries per second) per batch size, and the search kernel's achieved bandwidth, are recorded on A100, showing the speedup over one query at a time.
-**Status:** todo
+**Status:** done (batching gives little throughput; see the results file)
 
 ### T0.8 Accuracy
 

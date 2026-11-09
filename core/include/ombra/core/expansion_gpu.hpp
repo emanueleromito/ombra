@@ -47,6 +47,7 @@ class GpuExpansion {
   GpuCt upload(const Ct& ct);
   Ct download(const GpuCt& ct);
   void synchronize() { device_.synchronize(); }
+  void release_pool() { device_.release_pool(); }
 
   // The Ops interface of expand_tree.
   std::pair<GpuCt, GpuCt> split(const GpuCt& c, std::size_t level, std::uint32_t galois,

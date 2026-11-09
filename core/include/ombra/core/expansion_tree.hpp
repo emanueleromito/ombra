@@ -14,6 +14,7 @@
 // client pre-scales the query by 2^-L before encoding, so each leaf is the constant q_r.
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <stdexcept>
@@ -113,6 +114,127 @@ std::vector<Ct> expand_tree(const Ct& root, std::size_t d, std::size_t ring_dim,
     }
     if (level_nodes.size() != d) {
         throw std::logic_error("expansion: leaf count differs from d");
+    }
+    if (stats != nullptr) {
+        *stats = std::move(local);
+    }
+    return out;
+}
+
+// Nodes alive at the same time while expanding ONE tree level by level: a level's parents are
+// released only after the whole level is split, so the peak is the largest sum of two consecutive
+// levels. Level l has min(2^l, d) nodes (residue r exists iff r < d). Used to plan device memory.
+inline std::size_t expansion_peak_nodes(std::size_t d) {
+    const std::size_t depth = expansion_depth(d);
+    const auto count = [d](std::size_t l) { return std::min(std::size_t{1} << l, d); };
+    std::size_t peak = 0;
+    for (std::size_t l = 0; l < depth; ++l) {
+        peak = std::max(peak, count(l) + count(l + 1));
+    }
+    return peak;
+}
+
+// Expands the trees of several queries together (T0.7). The tree shape depends only on d, so node
+// k of every query is at the same level with the same residue: each level concatenates the nodes of
+// all queries (query-major) into one split_level call, which the GPU runs in batched launches with
+// the one Galois key and monomial of that level. Result: leaves[query][index], each exactly what
+// expand_tree gives for that query's root. Every query's parents are released after its level is
+// split. Ops should provide split_level; without it split is called per node. `stats` (optional)
+// counts the splits and nodes of all queries together. expand_tree itself is unchanged.
+template <class Ct, class Ops>
+std::vector<std::vector<Ct>> expand_trees(const std::vector<Ct>& roots, std::size_t d,
+                                          std::size_t ring_dim, Ops& ops,
+                                          ExpansionStats* stats = nullptr) {
+    if (d == 0 || d > ring_dim / 2) {
+        throw std::invalid_argument("expansion: d must be in [1, N/2]");
+    }
+    if (roots.empty()) {
+        throw std::invalid_argument("expansion: no queries");
+    }
+    const std::size_t queries = roots.size();
+    const std::size_t depth = expansion_depth(d);
+    ExpansionStats local;
+    local.depth = depth;
+    local.nodes = queries;
+    local.nodes_per_level.push_back(queries);
+
+    std::vector<std::size_t> residues{0};  // the same for every query
+    std::vector<std::vector<Ct>> cts(queries);
+    for (std::size_t q = 0; q < queries; ++q) {
+        cts[q].push_back(roots[q]);
+    }
+    for (std::size_t l = 0; l < depth; ++l) {
+        const std::size_t step = std::size_t{1} << l;
+        const auto galois = static_cast<std::uint32_t>(ring_dim / step + 1);
+        const std::size_t width = residues.size();
+        std::vector<char> odd_one(width);
+        for (std::size_t k = 0; k < width; ++k) {
+            odd_one[k] = (residues[k] + step) < d ? 1 : 0;
+        }
+        std::vector<std::size_t> next_residues;
+        for (std::size_t k = 0; k < width; ++k) {
+            next_residues.push_back(residues[k]);
+            if (odd_one[k]) {
+                next_residues.push_back(residues[k] + step);
+            }
+        }
+        std::vector<std::vector<Ct>> next(queries);
+        if constexpr (requires(Ops& o, const std::vector<Ct>& v, const std::vector<char>& w) {
+                          o.split_level(v, l, galois, step, w);
+                      }) {
+            std::vector<Ct> nodes;
+            std::vector<char> odd;
+            nodes.reserve(queries * width);
+            odd.reserve(queries * width);
+            for (std::size_t q = 0; q < queries; ++q) {
+                for (std::size_t k = 0; k < width; ++k) {
+                    nodes.push_back(std::move(cts[q][k]));
+                    odd.push_back(odd_one[k]);
+                }
+                cts[q].clear();
+            }
+            auto children = ops.split_level(nodes, l, galois, step, odd);
+            nodes.clear();  // release the parents' handles before the next level
+            for (std::size_t q = 0; q < queries; ++q) {
+                next[q].reserve(next_residues.size());
+                for (std::size_t k = 0; k < width; ++k) {
+                    auto& ch = children[q * width + k];
+                    ++local.splits;
+                    ++local.automorphisms;
+                    next[q].push_back(std::move(ch.first));
+                    if (odd_one[k]) {
+                        next[q].push_back(std::move(ch.second));
+                    }
+                }
+            }
+        } else {
+            for (std::size_t q = 0; q < queries; ++q) {
+                for (std::size_t k = 0; k < width; ++k) {
+                    auto ch = ops.split(cts[q][k], l, galois, step, odd_one[k] != 0);
+                    ++local.splits;
+                    ++local.automorphisms;
+                    next[q].push_back(std::move(ch.first));
+                    if (odd_one[k]) {
+                        next[q].push_back(std::move(ch.second));
+                    }
+                }
+                cts[q].clear();
+            }
+        }
+        cts = std::move(next);
+        residues = std::move(next_residues);
+        local.nodes += residues.size() * queries;
+        local.nodes_per_level.push_back(residues.size() * queries);
+    }
+
+    if (residues.size() != d) {
+        throw std::logic_error("expansion: leaf count differs from d");
+    }
+    std::vector<std::vector<Ct>> out(queries, std::vector<Ct>(d));
+    for (std::size_t q = 0; q < queries; ++q) {
+        for (std::size_t k = 0; k < d; ++k) {
+            out[q].at(residues[k]) = std::move(cts[q][k]);
+        }
     }
     if (stats != nullptr) {
         *stats = std::move(local);
