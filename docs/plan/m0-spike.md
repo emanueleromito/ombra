@@ -103,7 +103,7 @@ T0.5b and T0.7 both touch the expansion code: run them one after the other, not 
 **Depends on:** T0.5
 **Steps:** run all splits of the same tree level in one batched launch (nodes at a level are independent); fuse the automorphism with the key switch where possible; profile one split to find the bottleneck (NTT, key-switch inner product, ModDown). Keep the CPU tree as the exact RNS-level oracle.
 **Done when:** the oracle still matches exactly, and expansion time on A100 is recorded for d = 384, 768, 1536, with a target under 100 ms at d = 1536. If the target is missed, the results file says why and what limits it.
-**Status:** todo
+**Status:** done
 
 ### T0.11 Compact configurations
 
