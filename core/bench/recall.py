@@ -69,6 +69,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import recall_check  # noqa: E402
 
 PRESET = "m0_depth2"
+FLUSH = 1e-9
 K = 10
 RERANK_MULT = 3
 SEED = 20260108
@@ -126,7 +127,7 @@ DATASETS: dict[str, dict[str, Any]] = {
     "wiki-simple-ada002-1536": {
         "kind": "ndjson_gz",
         "url": f"{HF}{SUPABASE}/resolve/main/wiki_openai.ndjson.gz",
-        "key": "openai",
+        "key": "text-embedding-ada-002",
         "source_url": HF + SUPABASE,
         "model": "OpenAI text-embedding-ada-002",
         "dimension": 1536,
@@ -146,7 +147,7 @@ DATASETS: dict[str, dict[str, Any]] = {
     "wiki-simple-gte-small-384": {
         "kind": "ndjson_gz",
         "url": f"{HF}{SUPABASE}/resolve/main/wiki_gte.ndjson.gz",
-        "key": "gte-small",
+        "key": "embedding",
         "source_url": HF + SUPABASE,
         "model": "thenlper/gte-small",
         "dimension": 384,
@@ -261,6 +262,19 @@ def load_dataset(
 ) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
     """Normalized float64 (db, queries, metadata): a seeded disjoint split of the pool."""
     pool, meta = load_pool(name, datasets_dir, rows=2 * (n + queries), small=small)
+    # Drop unusable rows: non-finite or (near) zero vectors cannot be normalized, and exact
+    # duplicates would make top-10 ties that plaintext and encrypted search may break differently.
+    norms = np.linalg.norm(pool, axis=1)
+    keep = np.isfinite(norms) & (norms > 1e-6)
+    seen: set[bytes] = set()
+    for i in np.flatnonzero(keep):
+        key = pool[i].tobytes()
+        if key in seen:
+            keep[i] = False
+        seen.add(key)
+    if not keep.all():
+        print(f"{name}: dropped {int((~keep).sum())} of {len(keep)} rows (zero or duplicate)")
+        pool = pool[keep]
     if pool.shape[0] < n + queries:
         raise SystemExit(f"{name}: only {pool.shape[0]} vectors for {n} + {queries} requested")
     perm = np.random.default_rng(SEED).permutation(pool.shape[0])
@@ -268,6 +282,13 @@ def load_dataset(
     qs = pool[perm[n : n + queries]].astype(np.float64)
     db /= np.linalg.norm(db, axis=1, keepdims=True)
     qs /= np.linalg.norm(qs, axis=1, keepdims=True)
+    # Some embeddings have a dimension that is zero up to rounding (about 1e-32 in every row for
+    # all-MiniLM-L6-v2 here); OpenFHE refuses to encode such a column ("Scaling factor too
+    # small"). Entries below 1e-9 move a unit-vector score by under 1e-9, far below CKKS noise.
+    meta["entries_flushed_to_zero"] = int((np.abs(db) < FLUSH).sum() + (np.abs(qs) < FLUSH).sum())
+    db[np.abs(db) < FLUSH] = 0.0
+    qs[np.abs(qs) < FLUSH] = 0.0
+    print(f"{name}: {meta['entries_flushed_to_zero']} tiny entries flushed to zero")
     return db, qs, meta
 
 
@@ -292,6 +313,7 @@ def kmeans(db: np.ndarray, nlist: int) -> tuple[np.ndarray, np.ndarray]:
     _, assign = km.index.search(x, 1)
     centers = km.centroids.astype(np.float64)
     centers /= np.linalg.norm(centers, axis=1, keepdims=True)
+    centers[np.abs(centers) < FLUSH] = 0.0  # see load_dataset
     return centers, assign[:, 0]
 
 
@@ -406,7 +428,14 @@ def encrypted_scan(
     t0 = time.time()
     for b, block in enumerate(all_blocks):
         for j in range(d):
-            col = cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(block[:, j].tolist()))
+            try:
+                col = cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(block[:, j].tolist()))
+            except RuntimeError as e:  # aggregates of the failing column only, never its values
+                v = block[:, j]
+                raise RuntimeError(
+                    f"{e} (block {b}, column {j}: finite={bool(np.isfinite(v).all())}, "
+                    f"max_abs={float(np.nanmax(np.abs(v))):.3e}, nonzero={int((v != 0).sum())})"
+                ) from None
             assert ofhe.SerializeToFile(str(in_dir / f"stored_{b}_{j}.bin"), col, ofhe.BINARY)
         print(f"encrypted block {b + 1}/{len(all_blocks)}", flush=True)
     log["encrypt_database_seconds"] = time.time() - t0
@@ -668,7 +697,8 @@ def main() -> None:
         checks[name] = check
         margins[name] = result["max_abs_score_error_scan"]
         print(f"wrote {path}")
-        print(recall_check.format_report({name: check}, {"verdict": check["verdict"]}, margins))
+        one = recall_check.check_overall({name: check}, min_datasets=1)
+        print(recall_check.format_report({name: check}, one, margins))
         del db, qs, result
 
     overall = recall_check.check_overall(checks, args.min_datasets)
