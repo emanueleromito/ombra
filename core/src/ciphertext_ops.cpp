@@ -177,8 +177,9 @@ Ciphertext<DCRTPoly> make_ciphertext_like(const Ciphertext<DCRTPoly>& like, std:
         throw std::invalid_argument("make_ciphertext_like: word count does not match the shape");
     }
     write_back(elements, shape, words.data());
-    result->SetLevel(level);
+    // Degree before level: SetLevel checks the tower count against the current degree.
     result->SetNoiseScaleDeg(noise_scale_deg);
+    result->SetLevel(level);
     result->SetScalingFactor(scaling_factor);
     return result;
 }
