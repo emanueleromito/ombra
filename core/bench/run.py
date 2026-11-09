@@ -101,12 +101,13 @@ def run_t04(
     warmup: int,
     iters: int,
     out_name: str,
+    preset: str = PRESET,
 ) -> Path:
     import openfhe as ofhe
     from ombra import params as ombra_params
 
     binary = find_binary("ombra_bench_column_search")
-    _, cc = ombra_params.make_context(PRESET)
+    _, cc = ombra_params.make_context(preset)
     keys = cc.KeyGen()
 
     results = []
@@ -144,7 +145,7 @@ def run_t04(
     record = {
         "task": "t0.4",
         "format_version": 1,
-        "preset": PRESET,
+        "preset": preset,
         "openfhe_version": openfhe_version(),
         "gpu_name": gpu_name,
         "note": (
@@ -168,13 +169,14 @@ def run_t05(
     iters: int,
     out_name: str,
     profile: bool = False,
+    preset: str = PRESET,
 ) -> Path:
     import openfhe as ofhe
     from ombra import params as ombra_params
     from ombra import query as oq
 
     binary = find_binary("ombra_bench_expand")
-    _, cc = ombra_params.make_context(PRESET)
+    _, cc = ombra_params.make_context(preset)
     keys = cc.KeyGen()
     ring = cc.GetRingDimension()
 
@@ -224,7 +226,7 @@ def run_t05(
     record = {
         "task": "t0.5",
         "format_version": 1,
-        "preset": PRESET,
+        "preset": preset,
         "openfhe_version": openfhe_version(),
         "gpu_name": gpu_name,
         "note": (
@@ -417,7 +419,7 @@ def main() -> None:
     args = parser.parse_args()
 
     task = args.task.lower()
-    if task not in ("all", "t0.4", "t0.5", "t0.7", "t0.11", "t1.3"):
+    if task not in ("all", "t0.4", "t0.5", "t0.7", "t0.11", "t1.3", "t1.5"):
         raise SystemExit(f"unknown task {args.task!r}")
     dims = tuple(int(x) for x in args.dims.split(","))
     if task in ("all", "t0.4"):
@@ -436,6 +438,10 @@ def main() -> None:
             args.iters,
             args.name_t07,
         )
+    if task == "t1.5":
+        from t15 import run_t15
+
+        run_t15(args.out, dims, args.warmup, args.iters, run_t04, run_t05, openfhe_version())
     if task == "t1.3":
         from e2e import run_t13
 
