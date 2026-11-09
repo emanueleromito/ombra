@@ -30,6 +30,14 @@ cudaError_t launch_column_search(const u64* stored, const u64* query, u64* out,
                                  const TowerConst* tc, const ColumnSearchDims& dims,
                                  cudaStream_t stream);
 
+// column_search32.cu (T1.5): the same search with 32-bit stored and query words (moduli < 2^31),
+// 64-bit output words. min_blocks is the __launch_bounds__ minimum blocks per SM (4, 6 or 8).
+cudaError_t launch_column_search32(const u32* stored, const u32* query, u64* out,
+                                   const TowerConst32* tc, const ColumnSearchDims& dims,
+                                   int min_blocks, cudaStream_t stream);
+// dst[i] = (u32)src[i], i < count (words known to be below 2^32).
+cudaError_t launch_narrow_u64_to_u32(const u64* src, u32* dst, u64 count, cudaStream_t stream);
+
 // Batched search (T0.7): `num_queries` queries over the same stored blocks. queries are
 // [q][dim][comp][P], out is [q][block][comp 0..2][P]; see the comment in column_search.cu.
 cudaError_t launch_column_search_batched(const u64* stored, const u64* queries, u64* out,

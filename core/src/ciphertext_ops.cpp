@@ -74,8 +74,12 @@ void write_back(std::vector<DCRTPoly>& polys, const Flat& shape_src, const std::
 
 void require_fixedmanual(const CiphertextImpl<DCRTPoly>& ct) {
     const auto params = std::dynamic_pointer_cast<CryptoParametersCKKSRNS>(ct.GetCryptoParameters());
-    if (!params || params->GetScalingTechnique() != FIXEDMANUAL) {
-        throw std::invalid_argument("only CKKS with FIXEDMANUAL scaling is supported");
+    // FIXEDMANUAL (the M0 presets) and COMPOSITESCALINGMANUAL (T1.5): both keep the metadata
+    // explicit, and the operations below do not rescale. Any other technique is refused.
+    if (!params || (params->GetScalingTechnique() != FIXEDMANUAL &&
+                    params->GetScalingTechnique() != COMPOSITESCALINGMANUAL)) {
+        throw std::invalid_argument(
+            "only CKKS with FIXEDMANUAL or COMPOSITESCALINGMANUAL scaling is supported");
     }
 }
 
