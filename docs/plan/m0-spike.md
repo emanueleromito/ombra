@@ -68,7 +68,7 @@ T0.5b and T0.7 both touch the expansion code: run them one after the other, not 
 **Depends on:** T0.4
 **Steps:** multiply search scores by an encrypted 0/1 mask; check the result still decrypts correctly at depth 2.
 **Done when:** masked scores match plaintext expectations within tolerance, with no parameter change from T0.2.
-**Status:** todo
+**Status:** done
 
 ### T0.7 Query batching
 
