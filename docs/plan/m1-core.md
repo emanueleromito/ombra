@@ -41,7 +41,7 @@ T1.1, T1.2, T1.4 and T1.6 can start in parallel. T1.2 and T1.4 both touch the se
 **Depends on:** T1.2
 **Steps:** time one query on the A100 through every step: client encode and encrypt, upload size, expansion, stage 1 (cluster centers), stage 2 (chosen clusters, with mask), relinearize and rescale, download size, client decrypt and top-k. Use 100k and 1M vectors at d = 384, 768, 1536, with the cluster settings from T0.8 (about 5% and 20% of the collection searched). Exclude network time but report the bytes sent each way. Report queries per second per A100 for a single query stream.
 **Done when:** a results file has a per-step latency breakdown and total latency for each size and dimension, with the share of time per step.
-**Status:** todo
+**Status:** done
 
 ### T1.4 Profile the search kernel
 
