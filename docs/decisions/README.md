@@ -19,5 +19,6 @@ One short file per design decision, so the reasoning survives. New decisions cop
 | [0013](0013-compact-preset-as-fast.md) | Propose `m0_compact_n8192` as the "fast" product preset | proposed |
 | [0014](0014-composite-scaling-preset.md) | Composite scaling preset with 32-bit limbs: not adopted, keep `m0_depth2`, code removed | rejected |
 | [0015](0015-gpu-encoder-tolerance.md) | GPU encoder: tolerance only for the FFT and rounding, integer steps exact | proposed |
+| [0016](0016-ciphertext-file-envelope.md) | Ciphertext and key file envelope (magic, version, kind, preset, OpenFHE version); drivers keep raw files | proposed |
 
 Smaller decisions (key management, threat model, accuracy, deletes, migrations, key rotation, parameter presets, format versioning, storage, API, client packaging) are recorded directly in [product-requirements.md](../product-requirements.md) and [architecture.md](../architecture.md).

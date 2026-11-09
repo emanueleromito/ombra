@@ -33,6 +33,7 @@ docs/plan/results/raw/
 *.ctxt
 *.ombra
 *.bin
+!tests/fixtures/envelope_v1_ciphertext.bin
 
 # ---------------------------------------------------------------
 # C++ / CUDA / CMake

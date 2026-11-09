@@ -5,6 +5,13 @@ add_executable(ombra_security_floor_test src/security_floor_test.cpp)
 target_include_directories(ombra_security_floor_test PRIVATE include)
 add_test(NAME security_floor COMMAND ombra_security_floor_test)
 
+# T1.16: file envelope unit test (header only, no OpenFHE, builds on CPU). Reads the fixture the
+# Python writer produced, to check both languages agree byte for byte.
+add_executable(ombra_file_envelope_test src/file_envelope_test.cpp)
+target_include_directories(ombra_file_envelope_test PRIVATE include)
+add_test(NAME file_envelope COMMAND ombra_file_envelope_test
+         ${CMAKE_CURRENT_SOURCE_DIR}/../tests/fixtures/envelope_v1_ciphertext.bin)
+
 if(NOT OMBRA_ENABLE_CUDA)
   return()
 endif()

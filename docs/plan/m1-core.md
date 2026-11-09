@@ -151,7 +151,7 @@ One task per high or medium finding in `results/m1-crypto-review.md`. T1.10 shou
 **Depends on:** none
 **Steps:** define an envelope (magic, format version, preset, OpenFHE version), or write a decision on what counts as compliant for temporary spike files.
 **Done when:** the format or the decision is merged, and readers refuse an unknown version, before M2 storage starts.
-**Status:** todo
+**Status:** done (envelope and decision 0016 committed; merge pending)
 
 ### T1.17 Decision on decryption noise (F9, medium)
 
