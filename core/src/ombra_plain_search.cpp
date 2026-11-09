@@ -10,11 +10,12 @@
 //                   the DECODED values, so the OpenFHE oracle sees what the GPU decodes)
 //   codes.bin       the raw stored codes, [dims][slots], in <format> (f64: same as values.bin)
 // Checks (each prints PASS/FAIL, never values; exit 0 only if all pass):
-//   1. Encoding. For every column, the GPU encoder's coefficient-form polynomial is compared with
-//      OpenFHE's MakeCKKSPackedPlaintext (same doubles) tower by tower: the centered difference of
-//      every coefficient must be at most <coef_tolerance> units (1 unit = 1 / scale of the value).
-//      The evaluation-form words are compared too; if every coefficient is identical they must be
-//      identical word for word (the NTT is exact).
+//   1. Encoding, in three checks (decision 0015): (a) FFT and rounding: the centered difference of
+//      every GPU coefficient from OpenFHE's MakeCKKSPackedPlaintext is at most <coef_tolerance>
+//      units (1 unit = 1 / scale of the value); (b) tower reduction and NTT of OpenFHE's own
+//      integer coefficients equal OpenFHE's words EXACTLY; (c) the GPU evaluation form equals
+//      OpenFHE's NTT of the GPU's own coefficients EXACTLY, always. An optional last argument
+//      (none|reduction|ntt) injects a fault, for tests of the oracle only.
 //   2. Search with OpenFHE-encoded plaintexts: the GPU result equals OpenFHE
 //      sum_j EvalMult(query_j, plaintext_j) (EvalAdd accumulation) EXACTLY (every RNS word and the
 //      metadata).
@@ -117,10 +118,10 @@ ombra::core::PlainFormat parse_format(const std::string& s) {
 }  // namespace
 
 int main(int argc, char** argv) {
-  if (argc != 7) {
+  if (argc != 7 && argc != 8) {
     std::fprintf(stderr,
                  "usage: ombra_plain_search <context> <dir> <dims> <f64|fp16|int8> "
-                 "<code_scale> <coef_tolerance>\n");
+                 "<code_scale> <coef_tolerance> [none|reduction|ntt]\n");
     return 2;
   }
   try {
@@ -170,9 +171,32 @@ int main(int argc, char** argv) {
     bool ok = true;
     ombra::core::PlainEncoder enc(tables, scaling_factor);
 
-    // 1. Encoding.
-    const auto gpu_coef = enc.encode_host(fmt, cbytes.data(), dims, code_scale, true);
-    const auto gpu_eval = enc.encode_host(fmt, cbytes.data(), dims, code_scale, false);
+    // 1. Encoding, in separate checks (T1.9, decision 0015). The FFT and rounding are floating
+    //    point and get a tolerance; every integer step after them is compared exactly.
+    auto gpu_coef = enc.encode_host(fmt, cbytes.data(), dims, code_scale, true);
+    auto gpu_eval = enc.encode_host(fmt, cbytes.data(), dims, code_scale, false);
+
+    // Test-only fault injection (argv[7]): a one-unit coefficient difference that is consistent in
+    // every tower (so the GPU evaluation form is a correct NTT of it), plus one wrong word in the
+    // reduction ("reduction") or in the NTT ("ntt"). It lets the tests show that the checks below
+    // fail on such a defect; it is not a product feature and changes no kernel.
+    const std::string inject = argc == 8 ? argv[7] : "none";
+    if (inject != "none" && inject != "reduction" && inject != "ntt") {
+      throw std::invalid_argument("inject must be none, reduction or ntt");
+    }
+    const auto bump = [](u64& w, u64 q) { w = (w + 1) % q; };
+    if (inject != "none") {
+      for (std::size_t t = 0; t < nt; ++t) bump(gpu_coef[t * n], tables.moduli[t]);
+      std::vector<std::int64_t> ints(dims * n);
+      for (std::size_t c = 0; c < dims; ++c) {
+        for (std::size_t i = 0; i < n; ++i) {
+          ints[c * n + i] = center(gpu_coef[c * poly + i], tables.moduli[0]);
+        }
+      }
+      gpu_eval = enc.reduce_ntt_host(ints.data(), dims, true);
+    }
+
+    // 1a. FFT and rounding: centered coefficient difference within the tolerance.
     std::int64_t max_diff = 0;
     std::size_t exact_coeffs = 0, total_coeffs = 0;
     for (std::size_t c = 0; c < dims; ++c) {
@@ -188,15 +212,60 @@ int main(int argc, char** argv) {
         }
       }
     }
+    const bool fft_ok = max_diff <= tol;
+    std::printf(
+        "encoding FFT and rounding: max coefficient difference %lld units (tolerance %lld); "
+        "%zu of %zu coefficient words identical: %s\n",
+        static_cast<long long>(max_diff), static_cast<long long>(tol), exact_coeffs, total_coeffs,
+        fft_ok ? "PASS" : "FAIL");
+    ok = ok && fft_ok;
+
+    // 1b. Tower reduction and NTT of OpenFHE's own integer coefficients: exact. The integers are
+    //     OpenFHE's coefficients centered with the largest modulus; the exact comparison also
+    //     proves they reduce to OpenFHE's words in every other tower.
+    std::vector<std::int64_t> ofhe_ints(dims * n);
+    for (std::size_t c = 0; c < dims; ++c) {
+      for (std::size_t i = 0; i < n; ++i) {
+        ofhe_ints[c * n + i] = center(cpu_coef[c * poly + i], tables.moduli[0]);
+      }
+    }
+    auto red = enc.reduce_ntt_host(ofhe_ints.data(), dims, false);
+    auto ntt = enc.reduce_ntt_host(ofhe_ints.data(), dims, true);
+    if (inject == "reduction") bump(red[5], tables.moduli[0]);
+    if (inject == "ntt") bump(ntt[7], tables.moduli[0]);
+    const bool red_ok = red == cpu_coef;
+    const bool ntt_ok = ntt == cpu_eval;
+    std::printf("encoding tower reduction of OpenFHE's integer coefficients, exact words: %s\n",
+                red_ok ? "PASS" : "FAIL");
+    std::printf("encoding NTT of OpenFHE's integer coefficients, exact words: %s\n",
+                ntt_ok ? "PASS" : "FAIL");
+    ok = ok && red_ok && ntt_ok;
+
+    // 1c. The GPU evaluation form against OpenFHE's NTT of the GPU's own coefficients: exact, and
+    //     never skipped, whatever the coefficient differences are.
+    std::vector<u64> own_eval;
+    for (std::size_t c = 0; c < dims; ++c) {
+      DCRTPoly own = pts[0]->GetElement<DCRTPoly>();
+      own.SetFormat(Format::COEFFICIENT);
+      for (std::size_t t = 0; t < nt; ++t) {
+        NativePoly tp = own.GetElementAtIndex(t);
+        for (std::size_t i = 0; i < n; ++i) {
+          tp[i] = NativeInteger(gpu_coef[c * poly + t * n + i]);
+        }
+        own.SetElementAtIndex(t, tp);
+      }
+      const auto w = poly_words(own, Format::EVALUATION);
+      own_eval.insert(own_eval.end(), w.begin(), w.end());
+    }
+    if (inject == "ntt") bump(gpu_eval[9], tables.moduli[0]);
+    const bool eval_ok = gpu_eval == own_eval;
+    std::printf("encoding GPU evaluation form vs OpenFHE NTT of the GPU coefficients, exact: %s\n",
+                eval_ok ? "PASS" : "FAIL");
+    ok = ok && eval_ok;
     std::size_t exact_eval = 0;
     for (std::size_t k = 0; k < gpu_eval.size(); ++k) exact_eval += gpu_eval[k] == cpu_eval[k];
-    const bool enc_ok = max_diff <= tol && (max_diff != 0 || exact_eval == gpu_eval.size());
-    std::printf(
-        "encoding: max coefficient difference %lld units (tolerance %lld); %zu of %zu "
-        "coefficient words and %zu of %zu evaluation words identical: %s\n",
-        static_cast<long long>(max_diff), static_cast<long long>(tol), exact_coeffs, total_coeffs,
-        exact_eval, gpu_eval.size(), enc_ok ? "PASS" : "FAIL");
-    ok = ok && enc_ok;
+    std::printf("info: %zu of %zu evaluation words identical to OpenFHE's plaintext\n", exact_eval,
+                gpu_eval.size());
     std::vector<std::int64_t> gc(dims * n), cc_(dims * n);
     for (std::size_t c = 0; c < dims; ++c) {
       for (std::size_t i = 0; i < n; ++i) {  // tower 0 holds the largest modulus

@@ -161,6 +161,10 @@ cudaError_t launch_ks_inner_product(const u64* digits, const u64* key, const u64
 // encode.cu (T0.11): GPU CKKS encoding of plaintext columns, see the comment above the kernels.
 enum class CodeFormat : int { kDouble = 0, kFp16 = 1, kInt8 = 2 };
 // buf[col][k] = (decode(codes[col][k]), 0) for k < slots; int8 decodes as code / code_scale.
+// Test aid: reduces int64 coefficients [col][ring_dim] into every tower, [col][tower][ring_dim].
+cudaError_t launch_reduce_ints(const long long* in, u64 cols, u64 ring_dim, const TowerConst* tc,
+                               u64 num_towers, u64* out, cudaStream_t stream);
+
 cudaError_t launch_encode_decode(CodeFormat fmt, const void* codes, u64 cols, u64 slots,
                                  double code_scale, double2* buf, cudaStream_t stream);
 // One stage (butterfly span `len`, len = slots .. 2) of the inverse special FFT on every column.

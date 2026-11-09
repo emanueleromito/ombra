@@ -95,7 +95,7 @@ One task per high or medium finding in `results/m1-crypto-review.md`. T1.10 shou
 **Depends on:** none
 **Steps:** test tower reduction and NTT exactly on OpenFHE's rounded integer coefficients; keep a tolerance only for the FFT and rounding; always compare the GPU evaluation form with OpenFHE's NTT of the GPU's own coefficients; record the tolerance as a decision.
 **Done when:** `ombra_plain_search` fails on any wrong reduction or NTT word even when coefficients differ by one unit, for both presets and all three formats, and the decision record exists.
-**Status:** todo
+**Status:** done
 
 ### T1.10 Multi-block oracle for relinearize, rescale and mask (F2, medium)
 

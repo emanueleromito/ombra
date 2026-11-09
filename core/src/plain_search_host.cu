@@ -227,6 +227,36 @@ std::vector<std::uint64_t> PlainEncoder::encode_host(PlainFormat fmt, const void
   return out;
 }
 
+std::vector<std::uint64_t> PlainEncoder::reduce_ntt_host(const std::int64_t* coeffs,
+                                                         std::size_t cols, bool ntt) {
+  const std::size_t n = impl_->n, poly = impl_->nt * n;
+  DeviceBuffer<long long> d_in;
+  DeviceBuffer<u64> d_out;
+  std::vector<std::uint64_t> out(cols * poly);
+  const auto run = [&]() -> Status {
+    OMBRA_TRY(d_in.allocate(cols * n));
+    OMBRA_TRY(d_out.allocate(out.size()));
+    OMBRA_CUDA_CHECK(cudaMemcpy(d_in.get(), coeffs, cols * n * sizeof(long long),
+                                cudaMemcpyHostToDevice));
+    OMBRA_CUDA_CHECK(
+        launch_reduce_ints(d_in.get(), cols, n, impl_->tc.get(), impl_->nt, d_out.get(), nullptr));
+    if (ntt) {
+      NttBatch batch;
+      batch.count = static_cast<u32>(cols);
+      batch.stride = poly;
+      OMBRA_CUDA_CHECK(launch_ntt_forward(d_out.get(), impl_->rows.get(),
+                                          static_cast<u32>(impl_->nt), impl_->ntt(), nullptr,
+                                          batch));
+    }
+    OMBRA_CUDA_CHECK_LAUNCH();
+    OMBRA_CUDA_CHECK(
+        cudaMemcpy(out.data(), d_out.get(), out.size() * sizeof(u64), cudaMemcpyDeviceToHost));
+    return {};
+  };
+  run().throw_if_error();
+  return out;
+}
+
 // ---------------------------------------------------------------------------------------------
 // PlainSearchDevice
 

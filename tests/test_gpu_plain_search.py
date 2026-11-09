@@ -4,9 +4,11 @@ Python generates keys and seeded synthetic normalized vectors, stores them as fp
 exact doubles), encrypts the pre-expanded query (query value j in every slot) and writes only
 public material and synthetic data to disk. The C++ driver `ombra_plain_search` (see its header)
 checks, against OpenFHE on the same doubles:
-  * the GPU encoder's polynomial against MakeCKKSPackedPlaintext: coefficients within
-    COEF_TOLERANCE units (1 unit = 1/scale in slot space), exact evaluation-form words when the
-    coefficients are identical;
+  * the GPU encoder against MakeCKKSPackedPlaintext (decision 0015): FFT and rounding within
+    COEF_TOLERANCE units (1 unit = 1/scale in slot space); tower reduction and NTT of OpenFHE's own
+    integer coefficients exactly; the GPU evaluation form exactly against OpenFHE's NTT of the GPU's
+    own coefficients (never skipped). test_gpu_encoder_oracle_detects_faults injects one wrong
+    reduction or NTT word beside a one-unit difference and needs the driver to fail;
   * the ct x pt search with OpenFHE-encoded plaintexts against EvalMult + EvalAdd, EXACTLY;
   * the fused encode-and-search path against encode-all then search.
 This test then (a) decodes the GPU polynomial with numpy's canonical embedding and compares the
@@ -79,9 +81,8 @@ def quantize(stored: np.ndarray, fmt: str) -> tuple[np.ndarray, np.ndarray, floa
     return codes, codes.astype(np.float64) / scale, scale
 
 
-@pytest.mark.parametrize("fmt", ["f64", "fp16", "int8"])
-@pytest.mark.parametrize("preset", PRESETS)
-def test_gpu_plain_search_matches_openfhe(tmp_path: Path, preset: str, fmt: str) -> None:
+def _run_driver(tmp_path: Path, preset: str, fmt: str, inject: str | None = None):
+    """Write the inputs and run the driver; return (proc, context, keys, state for the checks)."""
     import openfhe as ofhe
 
     params, cc = ombra_params.make_context(preset)
@@ -103,20 +104,48 @@ def test_gpu_plain_search_matches_openfhe(tmp_path: Path, preset: str, fmt: str)
     (tmp_path / "values.bin").write_bytes(columns.tobytes())
     (tmp_path / "codes.bin").write_bytes(np.ascontiguousarray(codes.T).tobytes())
 
-    proc = subprocess.run(  # noqa: S603
-        [
-            str(_driver()),
-            str(tmp_path / "context.bin"),
-            str(tmp_path),
-            str(D),
-            fmt,
-            repr(code_scale),
-            str(COEF_TOLERANCE),
-        ],
-        capture_output=True,
-        text=True,
-        timeout=900,
-    )
+    cmd = [
+        str(_driver()),
+        str(tmp_path / "context.bin"),
+        str(tmp_path),
+        str(D),
+        fmt,
+        repr(code_scale),
+        str(COEF_TOLERANCE),
+    ]
+    if inject:
+        cmd.append(inject)
+    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=900)  # noqa: S603
+    return proc, cc, keys, (ring, slots, scale, stored, q, decoded, columns)
+
+
+@pytest.mark.parametrize("inject", ["reduction", "ntt"])
+@pytest.mark.parametrize("preset", PRESETS)
+def test_gpu_encoder_oracle_detects_faults(tmp_path: Path, preset: str, inject: str) -> None:
+    """One wrong reduction or NTT word is caught although every coefficient is within one unit."""
+    proc, *_ = _run_driver(tmp_path, preset, "int8", inject)
+    print(proc.stdout)
+    assert proc.returncode == 1, f"driver did not fail (exit {proc.returncode}): {proc.stdout}"
+    assert "encoding FFT and rounding" in proc.stdout
+    fft_line = next(x for x in proc.stdout.splitlines() if x.startswith("encoding FFT"))
+    assert fft_line.endswith("PASS"), fft_line  # the one-unit difference alone is tolerated
+    wanted = {
+        "reduction": "tower reduction of OpenFHE's integer coefficients, exact words: FAIL",
+        "ntt": "NTT of OpenFHE's integer coefficients, exact words: FAIL",
+    }[inject]
+    assert wanted in proc.stdout
+    if inject == "ntt":
+        assert "OpenFHE NTT of the GPU coefficients, exact: FAIL" in proc.stdout
+    assert "plain search oracle: FAIL" in proc.stdout
+
+
+@pytest.mark.parametrize("fmt", ["f64", "fp16", "int8"])
+@pytest.mark.parametrize("preset", PRESETS)
+def test_gpu_plain_search_matches_openfhe(tmp_path: Path, preset: str, fmt: str) -> None:
+    import openfhe as ofhe
+
+    proc, cc, keys, state = _run_driver(tmp_path, preset, fmt)
+    ring, slots, scale, stored, q, decoded, columns = state
     print(proc.stdout)
     msg = f"driver failed (exit {proc.returncode}): {proc.stdout}{proc.stderr}"
     assert proc.returncode == 0, msg
