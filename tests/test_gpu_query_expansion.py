@@ -33,6 +33,14 @@ SEED = 20260109
 TOLERANCE = 1e-6
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_DIMS = [13, 16]
+LARGE_DIMS = [384, 768, 1536]  # `--expansion-large`: every tree depth the benchmark uses
+
+
+def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
+    if "d" in metafunc.fixturenames:
+        large = metafunc.config.getoption("--expansion-large")
+        metafunc.parametrize("d", DEFAULT_DIMS + (LARGE_DIMS if large else []))
 
 
 def _driver() -> Path:
@@ -47,7 +55,6 @@ def _driver() -> Path:
     pytest.fail("ombra_expand_gpu not found; build with `make build` or run `make test-gpu`")
 
 
-@pytest.mark.parametrize("d", [13, 16])
 def test_gpu_expansion_matches_openfhe(tmp_path: Path, d: int) -> None:
     import openfhe as ofhe
 
