@@ -28,7 +28,7 @@ T2.1, T2.2 and T2.3 can start in parallel. T2.5 can start once T2.4 has fixed th
 **Depends on:** none
 **Steps:** profile `decrypt` and top-k on 25 blocks; decrypt blocks across cores (processes or threads, whichever openfhe-python allows without the GIL); merge per-block top-k; keep the results identical to the serial path; record the host CPU model and core count.
 **Done when:** on 25 blocks the decrypt and top-k step is at least 4x faster than the serial path on the same host (number and CPU recorded in `results/`), and a test shows identical top-k to the serial path.
-**Status:** todo
+**Status:** done (persistent pool: 6x at 8 workers, 10x to 20x at 16 to 32; see `results/2026-11-09-t2.1-parallel-decrypt.md`)
 
 ### T2.2 End-to-end latency of `m0_compact_n8192`
 
@@ -36,7 +36,7 @@ T2.1, T2.2 and T2.3 can start in parallel. T2.5 can start once T2.4 has fixed th
 **Depends on:** none
 **Steps:** run the T1.3 end-to-end harness for `m0_compact_n8192` on the A100 at d = 384, 768, 1536, with host CPU model and core count; compare with `m0_depth2` from the same run; apply the decision-0012 recall rule if the data are available.
 **Done when:** the numbers are in `results/`, and decision 0013 is marked **accepted** or **rejected** with the figures that decided it.
-**Status:** todo
+**Status:** done (compact end-to-end latency 0.52x to 0.65x of `m0_depth2`, recall rule passes; decision 0013 accepted; `results/2026-11-09-t2.2-compact-latency.md`)
 
 ### T2.3 Filter evaluation design within depth 2
 

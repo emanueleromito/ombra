@@ -166,13 +166,26 @@ def test_openfhe(pytest_args: str = "") -> None:
     volume.commit()
 
 
+# T2.1: CPU only. 25 level-2 blocks of the m0_depth2 preset are small (a few MB each, local disk).
+@app.function(cpu=16.0, memory=16384, timeout=3600, volumes={DATA_DIR: volume})
+def bench_topk(blocks: int = 25, runs: int = 5, preset: str = "m0_depth2") -> None:
+    """Serial vs parallel client decrypt + top-k (T2.1), CPU only."""
+    out_dir = Path(DATA_DIR) / "results"
+    script = str(Path(REPO_DIR) / "core" / "bench" / "topk_parallel.py")
+    _run(
+        ["python", script, "--out", str(out_dir)]
+        + ["--blocks", str(blocks), "--runs", str(runs), "--preset", preset]
+    )
+    volume.commit()
+
+
 # memory: the T0.4 benchmark holds one block (about 1.2 GB at d = 1536) as OpenFHE ciphertexts plus
 # its flattened copy on the host at a time, so about 3 to 4 GB peak; 16 GiB leaves headroom.
 # T1.3 needs the 40 GB card (the plain "A100" sometimes lands on the 80 GB PCIe one) and more time:
 # 12 cases, each with 23 queries, plus encrypting two blocks per d. Host memory: block 0 flattened
 # (1.2 GB at d = 1536) plus its OpenFHE ciphertexts and the Python client; 16 GiB is enough.
-@app.function(gpu="A100-40GB", memory=16384, timeout=7200, volumes={DATA_DIR: volume})
-def bench(task: str = "all") -> None:
+@app.function(gpu="A100-40GB", memory=16384, timeout=14400, volumes={DATA_DIR: volume})
+def bench(task: str = "all", extra: str = "") -> None:
     """Build in Release and run benchmarks on an A100; results go to the volume."""
     _build("Release")
     out_dir = Path(DATA_DIR) / "results"
@@ -181,7 +194,8 @@ def bench(task: str = "all") -> None:
     if not bench_script.exists():
         print("No benchmarks yet (core/bench/run.py is missing). Nothing to run.")
         return
-    _run(["python", str(bench_script), "--task", task, "--out", str(out_dir)])
+    # `extra` carries run.py options, e.g. --extra "--presets-t13 m0_depth2,m0_compact_n8192"
+    _run(["python", str(bench_script), "--task", task, "--out", str(out_dir), *extra.split()])
     volume.commit()
 
 
