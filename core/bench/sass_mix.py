@@ -37,7 +37,7 @@ def hist(ins: list[tuple[int, str, str]]) -> str:
 
 def main() -> None:
     text = subprocess.run(  # noqa: S603, S607
-        ["cuobjdump", "-sass", "-arch", "sm_80", sys.argv[1]],
+        ["cuobjdump", "-sass", "-arch", "sm_80", sys.argv[1]],  # noqa: S607
         check=True,
         capture_output=True,
         text=True,
