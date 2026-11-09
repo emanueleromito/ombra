@@ -33,7 +33,7 @@ T1.1, T1.2, T1.4 and T1.6 can start in parallel. T1.2 and T1.4 both touch the se
 **Depends on:** none
 **Steps:** GPU kernels for relinearization (reusing the key-switching code from T0.5b), rescale, and ciphertext x ciphertext multiply for the filter mask. Relinearize and rescale lazily, once per output ciphertext after the d-term sum. Each kernel gets an exact OpenFHE oracle test at RNS level, including level, noise-scale degree and scaling factor.
 **Done when:** all three kernels match OpenFHE exactly for d = 384, 768, 1536 on the A10, and a full search (multiply-and-add, relinearize, rescale, mask, rescale) runs on the GPU only, with its score error recorded against the T0.6 results.
-**Status:** todo
+**Status:** done
 
 ### T1.3 End-to-end query latency
 
