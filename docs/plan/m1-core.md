@@ -183,7 +183,7 @@ One task per high or medium finding in `results/m1-crypto-review.md`. T1.10 shou
 **Depends on:** none
 **Steps:** replace the ignore list in `modal_app.py` with an allowlist of needed folders; add a test that the secret patterns in `.gitignore` are excluded.
 **Done when:** the test passes and `make test-gpu` still builds.
-**Status:** todo
+**Status:** done
 
 ---
 
