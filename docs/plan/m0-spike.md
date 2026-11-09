@@ -122,4 +122,4 @@ T0.5b and T0.7 both touch the expansion code: run them one after the other, not 
 **Depends on:** T0.1–T0.9, T0.5b, T0.11
 **Steps:** summarize all results; compare with the blocked-packing fallback if expansion is slow; recommend the product presets based on T0.11; list any design changes.
 **Done when:** `results/spike-report.md` exists with the numbers, a go / change decision for each architecture choice, and any new decision records added to `docs/decisions/`.
-**Status:** todo
+**Status:** done

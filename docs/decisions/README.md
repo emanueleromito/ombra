@@ -14,5 +14,6 @@ One short file per design decision, so the reasoning survives. New decisions cop
 | [0008](0008-ampere-first.md) | Target NVIDIA Ampere only for the first version | accepted |
 | [0009](0009-m0-ckks-parameters.md) | CKKS parameter preset for the M0 spike: ring dimension 16384, depth 2 | accepted |
 | [0010](0010-query-expansion-via-automorphisms.md) | Query expansion via automorphisms, using no multiplication level | accepted |
+| [0011](0011-batching-is-not-the-main-lever.md) | Batching is not the main throughput lever | proposed |
 
 Smaller decisions (key management, threat model, accuracy, deletes, migrations, key rotation, parameter presets, format versioning, storage, API, client packaging) are recorded directly in [product-requirements.md](../product-requirements.md) and [architecture.md](../architecture.md).
