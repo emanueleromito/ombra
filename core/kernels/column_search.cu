@@ -49,7 +49,7 @@ constexpr int kBlockTile = 4;
 // Launch shape: grid.x = ceil(P / kBlockThreads) (one thread per output word of a polynomial),
 // grid.y = ceil(blocks / kBlockTile) (<= 65535), block = kBlockThreads threads, no shared memory.
 // Each thread keeps 3 * kBlockTile accumulators in registers and loops over the d dimensions.
-// Per dimension and block it does 4 modular multiplications (Barrett) and 3 modular additions.
+// Per dimension and block it does 4 modular multiplications (Montgomery) and 3 modular additions.
 __global__ void __launch_bounds__(kBlockThreads, 4) column_search_kernel(const u64* __restrict__ stored, const u64* __restrict__ query,
                                      u64* __restrict__ out, const TowerConst* __restrict__ tc,
                                      u64 dims, u64 blocks, u64 ring_dim, u64 poly_words) {
