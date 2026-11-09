@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <vector>
 
+#include "ombra/core/column_search.hpp"
 #include "ombra/core/rns_basic.hpp"
 
 namespace ombra::core {
@@ -57,15 +58,14 @@ Flat flatten(const std::vector<DCRTPoly>& polys) {
     return f;
 }
 
-void write_back(std::vector<DCRTPoly>& polys, const Flat& shape_src,
-                const std::vector<std::uint64_t>& words) {
+void write_back(std::vector<DCRTPoly>& polys, const Flat& shape_src, const std::uint64_t* words) {
     const RnsShape& s = shape_src.shape;
     for (std::size_t p = 0; p < s.num_polys; ++p) {
         auto& towers = polys[p].GetAllElements();
         for (std::size_t t = 0; t < s.num_towers; ++t) {
             const NativeInteger modulus(shape_src.moduli[t]);
             NativeVector v(s.ring_dim, modulus);
-            const std::uint64_t* src = words.data() + (p * s.num_towers + t) * s.ring_dim;
+            const std::uint64_t* src = words + (p * s.num_towers + t) * s.ring_dim;
             for (std::size_t i = 0; i < s.ring_dim; ++i) v[i] = NativeInteger(src[i]);
             towers[t].SetValues(std::move(v), Format::EVALUATION);
         }
@@ -97,7 +97,7 @@ Ciphertext<DCRTPoly> gpu_eval_add(ConstCiphertext<DCRTPoly>& a, ConstCiphertext<
     rns_add(fa.words, fb.words, out, fa.shape, fa.moduli);
 
     Ciphertext<DCRTPoly> result = a->Clone();  // carries context, key tag, encoding, slots
-    write_back(result->GetElements(), fa, out);
+    write_back(result->GetElements(), fa, out.data());
     result->SetLevel(a->GetLevel());
     result->SetNoiseScaleDeg(a->GetNoiseScaleDeg());
     result->SetScalingFactor(a->GetScalingFactor());
@@ -121,11 +121,91 @@ Ciphertext<DCRTPoly> gpu_eval_mult_plain(ConstCiphertext<DCRTPoly>& ct, ConstPla
     rns_mul_by_poly(fc.words, fp.words, out, fc.shape, fc.moduli);
 
     Ciphertext<DCRTPoly> result = ct->Clone();
-    write_back(result->GetElements(), fc, out);
+    write_back(result->GetElements(), fc, out.data());
     result->SetLevel(ct->GetLevel());
     result->SetNoiseScaleDeg(ct->GetNoiseScaleDeg() + pt->GetNoiseScaleDeg());
     result->SetScalingFactor(ct->GetScalingFactor() * pt->GetScalingFactor());
     return result;
+}
+
+FlatCiphertexts flatten_ciphertexts(const std::vector<Ciphertext<DCRTPoly>>& cts) {
+    if (cts.empty()) throw std::invalid_argument("no ciphertexts to flatten");
+    FlatCiphertexts out;
+    out.count = cts.size();
+    out.level = cts[0]->GetLevel();
+    out.noise_scale_deg = cts[0]->GetNoiseScaleDeg();
+    out.scaling_factor = cts[0]->GetScalingFactor();
+    for (std::size_t i = 0; i < cts.size(); ++i) {
+        const auto& ct = cts[i];
+        require_fixedmanual(*ct);
+        if (ct->GetElements().size() != 2) {
+            throw std::invalid_argument("only 2-component ciphertexts are supported");
+        }
+        if (ct->GetLevel() != out.level || ct->GetNoiseScaleDeg() != out.noise_scale_deg ||
+            ct->GetScalingFactor() != out.scaling_factor) {
+            throw std::invalid_argument("ciphertexts differ in level, noise degree or scale");
+        }
+        Flat f = flatten(ct->GetElements());
+        if (i == 0) {
+            out.num_towers = f.shape.num_towers;
+            out.ring_dim = f.shape.ring_dim;
+            out.moduli = f.moduli;
+            out.words.reserve(cts.size() * f.words.size());
+        } else if (f.shape.num_towers != out.num_towers || f.shape.ring_dim != out.ring_dim ||
+                   f.moduli != out.moduli) {
+            throw std::invalid_argument("ciphertexts differ in shape or moduli");
+        }
+        out.words.insert(out.words.end(), f.words.begin(), f.words.end());
+    }
+    return out;
+}
+
+std::vector<Ciphertext<DCRTPoly>> gpu_eval_column_search(
+    const std::vector<std::vector<Ciphertext<DCRTPoly>>>& stored_blocks,
+    const std::vector<Ciphertext<DCRTPoly>>& query) {
+    if (stored_blocks.empty() || query.empty()) {
+        throw std::invalid_argument("column search: no stored blocks or empty query");
+    }
+    const FlatCiphertexts fq = flatten_ciphertexts(query);
+    const ColumnSearchShape shape{query.size(), stored_blocks.size(), fq.num_towers, fq.ring_dim};
+
+    std::vector<std::uint64_t> stored;
+    stored.reserve(shape.stored_words());
+    std::size_t noise_deg = 0;
+    double scale = 0;
+    for (const auto& block : stored_blocks) {
+        if (block.size() != query.size()) {
+            throw std::invalid_argument("column search: block and query differ in dimensions");
+        }
+        const FlatCiphertexts fb = flatten_ciphertexts(block);
+        if (fb.level != fq.level || fb.scaling_factor != fq.scaling_factor ||
+            fb.noise_scale_deg != fq.noise_scale_deg || fb.num_towers != fq.num_towers ||
+            fb.ring_dim != fq.ring_dim || fb.moduli != fq.moduli) {
+            throw std::invalid_argument(
+                "column search: stored and query differ in level, noise degree, scale or moduli");
+        }
+        stored.insert(stored.end(), fb.words.begin(), fb.words.end());
+    }
+    noise_deg = fq.noise_scale_deg * 2;  // equal degrees on both sides: sum of the degrees
+    scale = fq.scaling_factor * fq.scaling_factor;
+
+    std::vector<std::uint64_t> out;
+    column_search(stored, fq.words, out, shape, fq.moduli);
+
+    Flat meta;
+    meta.shape = RnsShape{3, shape.num_towers, shape.ring_dim};
+    meta.moduli = fq.moduli;
+    std::vector<Ciphertext<DCRTPoly>> results;
+    for (std::size_t b = 0; b < stored_blocks.size(); ++b) {
+        Ciphertext<DCRTPoly> r = stored_blocks[b][0]->Clone();  // context, key tag, encoding, slots
+        r->GetElements().push_back(r->GetElements()[0]);        // third component (same shape)
+        write_back(r->GetElements(), meta, out.data() + b * 3 * shape.poly_words());
+        r->SetLevel(fq.level);
+        r->SetNoiseScaleDeg(noise_deg);
+        r->SetScalingFactor(scale);
+        results.push_back(std::move(r));
+    }
+    return results;
 }
 
 }  // namespace ombra::core

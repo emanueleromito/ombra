@@ -11,9 +11,30 @@
 // Operand mismatches that OpenFHE would repair by rescaling or level adjustment are rejected.
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+#include <vector>
+
 #include "openfhe.h"
 
 namespace ombra::core {
+
+// A list of ciphertexts with identical shape, moduli and metadata, flattened to RNS words laid out
+// [ciphertext][component][tower][coeff] (the layout the search kernel reads).
+struct FlatCiphertexts {
+    std::size_t count = 0;
+    std::size_t num_towers = 0;
+    std::size_t ring_dim = 0;
+    std::vector<std::uint64_t> words;
+    std::vector<std::uint64_t> moduli;  // one per tower, from the ciphertexts
+    std::size_t level = 0;
+    std::size_t noise_scale_deg = 0;
+    double scaling_factor = 0;
+};
+
+// Flattens 2-component, evaluation-form CKKS FIXEDMANUAL ciphertexts. Throws
+// std::invalid_argument if they differ in level, noise degree, scale, shape or moduli.
+FlatCiphertexts flatten_ciphertexts(const std::vector<lbcrypto::Ciphertext<lbcrypto::DCRTPoly>>& cts);
 
 lbcrypto::Ciphertext<lbcrypto::DCRTPoly> gpu_eval_add(
     lbcrypto::ConstCiphertext<lbcrypto::DCRTPoly>& a,
@@ -21,5 +42,15 @@ lbcrypto::Ciphertext<lbcrypto::DCRTPoly> gpu_eval_add(
 
 lbcrypto::Ciphertext<lbcrypto::DCRTPoly> gpu_eval_mult_plain(
     lbcrypto::ConstCiphertext<lbcrypto::DCRTPoly>& ct, lbcrypto::ConstPlaintext& pt);
+
+// Column-packed search (kernel: core/kernels/column_search.cu). stored_blocks[b][j] is dimension j
+// of block b; query[j] holds query value j in every slot. Returns one 3-component ciphertext per
+// block holding sum_j stored[b][j] * query[j] (no relinearization, no rescale). Metadata, derived
+// as in LeveledSHEBase::EvalMultCore (base-leveledshe.cpp:621): level unchanged, noise-scale degree
+// = sum of the degrees, scaling factor = product of the factors. Stored and query ciphertexts must
+// agree in level, degree, scale and moduli. Public material only: no keys.
+std::vector<lbcrypto::Ciphertext<lbcrypto::DCRTPoly>> gpu_eval_column_search(
+    const std::vector<std::vector<lbcrypto::Ciphertext<lbcrypto::DCRTPoly>>>& stored_blocks,
+    const std::vector<lbcrypto::Ciphertext<lbcrypto::DCRTPoly>>& query);
 
 }  // namespace ombra::core
