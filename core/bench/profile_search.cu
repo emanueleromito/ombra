@@ -638,6 +638,46 @@ int main(int argc, char** argv) {
           mm / t, (double)P * blocks * d * 16 / t / 1e9);
       std::fflush(stdout);
     }
+    // the other two search kernels, kernel-only (T1.4 before/after): batched Q = 4 (one query
+    // tile; the query buffer holds 4 copies of the query) and ciphertext x plaintext
+    {
+      const u64 nq = 4;
+      u64 *bq = nullptr, *bout = nullptr, *plain_out = nullptr;
+      PCHECK(cudaMalloc(&bq, nq * qw * 8));
+      for (u64 q = 0; q < nq; ++q)
+        PCHECK(cudaMemcpy(bq + q * qw, dv.query, qw * 8, cudaMemcpyDeviceToDevice));
+      PCHECK(cudaMalloc(&bout, nq * blocks * 3 * P * 8));
+      PCHECK(cudaMalloc(&plain_out, blocks * 2 * P * 8));
+      ColumnSearchDims cd{d, blocks, towers, ring_dim};
+      auto mb = time_runs(
+          [&] {
+            PCHECK(launch_column_search_batched(dv.stored, bq, bout, dv.tc, cd, nq, 0));
+          },
+          warmup, iters);
+      const double tb = median(mb) * 1e-3;
+      std::printf(
+          "RESULT d=%llu blocks=%llu variant=BATCHED_Q4_kernel median_ms=%.3f min_ms=%.3f "
+          "max_ms=%.3f ops_per_s=%.3e\n",
+          (unsigned long long)d, (unsigned long long)blocks, tb * 1e3, mb.front(), mb.back(),
+          (double)P * blocks * d * 4 * nq / tb);
+      // plain: [block][dim][P] words, the first half of the stored buffer is big enough
+      auto mp = time_runs(
+          [&] {
+            PCHECK(launch_plain_search(dv.stored, dv.query, plain_out, dv.tc, d, blocks, towers,
+                                       ring_dim, 0));
+          },
+          warmup, iters);
+      const double tp = median(mp) * 1e-3;
+      std::printf(
+          "RESULT d=%llu blocks=%llu variant=PLAIN_kernel median_ms=%.3f min_ms=%.3f "
+          "max_ms=%.3f ops_per_s=%.3e\n",
+          (unsigned long long)d, (unsigned long long)blocks, tp * 1e3, mp.front(), mp.back(),
+          (double)P * blocks * d * 2 / tp);
+      std::fflush(stdout);
+      PCHECK(cudaFree(bq));
+      PCHECK(cudaFree(bout));
+      PCHECK(cudaFree(plain_out));
+    }
     if (!ref_only) {
       // ops: mul_mod count per (word, dim, block): search bodies 4; MODE 4/6: 4; MODE 5: 4 add_mod
       report<0, 1, true>("barrett_load_w1", dv, s, warmup, iters, 4, 1);
