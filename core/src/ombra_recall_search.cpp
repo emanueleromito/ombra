@@ -143,6 +143,9 @@ int main(int argc, char** argv) {
       const Ct q = load_ct(data_dir + "/query_" + std::to_string(i) + ".bin");
 
       t0 = Clock::now();
+      // upload() refuses a query whose key, level, degree, scale or shape differ from the first
+      // query's; the stored columns must be under the same key as well.
+      ombra::core::require_same_key(q, like, "recall search");
       const ombra::core::GpuCt root = gx.upload(q);
       std::vector<ombra::core::GpuCt> leaves = ombra::core::expand_tree(root, d, ring, gx);
       gx.synchronize();

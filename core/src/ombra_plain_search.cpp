@@ -16,10 +16,11 @@
 //      integer coefficients equal OpenFHE's words EXACTLY; (c) the GPU evaluation form equals
 //      OpenFHE's NTT of the GPU's own coefficients EXACTLY, always; (d) the GPU's coefficient
 //      words are one integer reduced into every tower, EXACTLY. An optional last argument
-//      (none|reduction|ntt|tower) injects a fault, for tests of the oracle only.
+//      (none|reduction|ntt|tower|meta_level|meta_degree|meta_scale) injects a fault, for tests of the oracle only.
 //   2. Search with OpenFHE-encoded plaintexts: the GPU result equals OpenFHE
 //      sum_j EvalMult(query_j, plaintext_j) (EvalAdd accumulation) EXACTLY (every RNS word and the
-//      metadata).
+//      metadata, derived by gpu_eval_plain_search from the query and plaintexts, not copied
+//      from the OpenFHE result).
 //   3. Search with GPU-encoded plaintexts (compact path), and with a separate encode-all then
 //      search-encoded pass: both must be identical to each other.
 // Writes gpu_coef.bin / cpu_coef.bin (int64 [dims][N], coefficients centered with the first
@@ -38,6 +39,7 @@
 #include "ciphertext-ser.h"
 #include "cryptocontext-ser.h"
 #include "ombra/core/ciphertext_ops.hpp"
+#include "ombra/core/oracle_compare.hpp"
 #include "ombra/core/expansion_gpu.hpp"
 #include "ombra/core/plain_search.hpp"
 #include "ombra/core/security_floor_context.hpp"
@@ -96,18 +98,7 @@ std::vector<u64> poly_words(const DCRTPoly& poly, Format fmt) {
 }
 
 bool identical(const Ct& x, const Ct& y) {
-  if (x->GetLevel() != y->GetLevel() || x->GetNoiseScaleDeg() != y->GetNoiseScaleDeg() ||
-      x->GetScalingFactor() != y->GetScalingFactor() ||
-      x->GetElements().size() != y->GetElements().size()) {
-    return false;
-  }
-  for (std::size_t c = 0; c < x->GetElements().size(); ++c) {
-    if (poly_words(x->GetElements()[c], Format::EVALUATION) !=
-        poly_words(y->GetElements()[c], Format::EVALUATION)) {
-      return false;
-    }
-  }
-  return true;
+  return ombra::core::identical_ciphertexts(x, y);  // shared oracle comparator
 }
 
 ombra::core::PlainFormat parse_format(const std::string& s) {
@@ -184,11 +175,14 @@ int main(int argc, char** argv) {
     // reduction ("reduction") or in the NTT ("ntt"). It lets the tests show that the checks below
     // fail on such a defect; it is not a product feature and changes no kernel.
     const std::string inject = argc == 8 ? argv[7] : "none";
-    if (inject != "none" && inject != "reduction" && inject != "ntt" && inject != "tower") {
-      throw std::invalid_argument("inject must be none, reduction, ntt or tower");
+    if (inject != "none" && inject != "reduction" && inject != "ntt" && inject != "tower" &&
+        inject.rfind("meta_", 0) != 0) {
+      throw std::invalid_argument(
+          "inject must be none, reduction, ntt, tower, meta_level, meta_degree or meta_scale");
     }
+    const bool meta_fault = inject.rfind("meta_", 0) == 0;
     const auto bump = [](u64& w, u64 q) { w = (w + 1) % q; };
-    if (inject != "none") {
+    if (inject != "none" && !meta_fault) {
       for (std::size_t t = 0; t < nt; ++t) bump(gpu_coef[t * n], tables.moduli[t]);
       std::vector<std::int64_t> ints(dims * n);
       for (std::size_t c = 0; c < dims; ++c) {
@@ -309,7 +303,16 @@ int main(int argc, char** argv) {
     dev.upload_encoded(0, cpu_eval.data(), cpu_eval.size());
     dev.run_encoded();
     dev.download_result(words);
-    const Ct gpu_ofhe_pt = ombra::core::unflatten_ciphertext(cpu, words);
+    // The result's metadata comes from the wrapper (query and plaintexts), never from `cpu`.
+    // Test-only metadata fault: corrupt what the wrapper derived before the comparison.
+    const auto derive = [&](const std::vector<u64>& w) {
+      Ct r = ombra::core::gpu_eval_plain_search(query, pts, w);
+      if (inject == "meta_level") r->SetLevel(r->GetLevel() + 1);
+      if (inject == "meta_degree") r->SetNoiseScaleDeg(r->GetNoiseScaleDeg() + 1);
+      if (inject == "meta_scale") r->SetScalingFactor(r->GetScalingFactor() * 2);
+      return r;
+    };
+    const Ct gpu_ofhe_pt = derive(words);
     const bool s1 = identical(gpu_ofhe_pt, cpu);
     std::printf("search with OpenFHE-encoded plaintexts, exact RNS match with EvalMult: %s\n",
                 s1 ? "PASS" : "FAIL");
@@ -320,11 +323,11 @@ int main(int argc, char** argv) {
     dev.upload_codes(0, cbytes.data());
     dev.run_compact(nullptr, nullptr);
     dev.download_result(words);
-    const Ct gpu_compact = ombra::core::unflatten_ciphertext(cpu, words);
+    const Ct gpu_compact = derive(words);
     dev.encode_all();
     dev.run_encoded();
     dev.download_result(words);
-    const Ct gpu_split = ombra::core::unflatten_ciphertext(cpu, words);
+    const Ct gpu_split = derive(words);
     const bool s2 = identical(gpu_compact, gpu_split);
     std::printf("search with GPU-encoded plaintexts, fused and two-pass identical: %s\n",
                 s2 ? "PASS" : "FAIL");

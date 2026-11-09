@@ -81,7 +81,7 @@ T1.1, T1.2, T1.4 and T1.6 can start in parallel. T1.2 and T1.4 both touch the se
 **Depends on:** T1.1 to T1.7
 **Steps:** summarize the review findings and their status, the end-to-end latency, the speedups, and the preset results; recommend "fast", "balanced" and "precise".
 **Done when:** `results/m1-report.md` exists with the numbers and a recommendation for each preset and each proposed decision.
-**Status:** todo
+**Status:** done
 
 ---
 
@@ -103,7 +103,7 @@ One task per high or medium finding in `results/m1-crypto-review.md`. T1.10 shou
 **Depends on:** none
 **Steps:** run `ombra_search_gpu` with several blocks of different data, a ragged block count and `set_max_batch(3)`; compare every block at every stage with OpenFHE.
 **Done when:** the driver reports exact matches for every block on both presets on the A10.
-**Status:** todo
+**Status:** done
 
 ### T1.11 Real metadata for ciphertext x plaintext search (F3, medium)
 
@@ -111,7 +111,7 @@ One task per high or medium finding in `results/m1-crypto-review.md`. T1.10 shou
 **Depends on:** none
 **Steps:** add a `ciphertext_ops` wrapper that derives level, degree and scale from the query and plaintext; compare its output with OpenFHE without using an OpenFHE result as the template.
 **Done when:** the oracle fails if the wrapper's metadata rule is wrong (shown by a negative test) and passes on both presets.
-**Status:** todo
+**Status:** done
 
 ### T1.12 Validate metadata on expansion upload (F4, medium)
 
@@ -119,7 +119,7 @@ One task per high or medium finding in `results/m1-crypto-review.md`. T1.10 shou
 **Depends on:** none
 **Steps:** reject uploads whose level, degree or scale differ from the sample; check every query in `ombra_recall_search`; add negative tests.
 **Done when:** a root with a different degree or scale is refused, covered by a test.
-**Status:** todo
+**Status:** done
 
 ### T1.13 Key, context and encoding checks on GPU operations (F5, medium)
 
@@ -127,7 +127,7 @@ One task per high or medium finding in `results/m1-crypto-review.md`. T1.10 shou
 **Depends on:** T1.12
 **Steps:** record key tag and encoding type when flattening and reject mixes; check evaluation-key tags; share one oracle comparator that includes these fields; add negative tests with two key pairs.
 **Done when:** every GPU entry point refuses mixed keys and the tests pass on the A10.
-**Status:** todo
+**Status:** done
 
 ### T1.14 Shape check in batched search (F6, medium)
 
@@ -135,7 +135,7 @@ One task per high or medium finding in `results/m1-crypto-review.md`. T1.10 shou
 **Depends on:** T1.13
 **Steps:** compare ring dimension and tower count across queries; check the buffer size before upload; add a negative test.
 **Done when:** a mismatched query is refused, covered by a test.
-**Status:** todo
+**Status:** done
 
 ### T1.15 Enforce the 128-bit floor in C++ (F7, medium)
 
@@ -151,7 +151,7 @@ One task per high or medium finding in `results/m1-crypto-review.md`. T1.10 shou
 **Depends on:** none
 **Steps:** define an envelope (magic, format version, preset, OpenFHE version), or write a decision on what counts as compliant for temporary spike files.
 **Done when:** the format or the decision is merged, and readers refuse an unknown version, before M2 storage starts.
-**Status:** todo
+**Status:** done (envelope and decision 0016 committed; merge pending)
 
 ### T1.17 Decision on decryption noise (F9, medium)
 
@@ -159,7 +159,7 @@ One task per high or medium finding in `results/m1-crypto-review.md`. T1.10 shou
 **Depends on:** none
 **Steps:** write a decision on the IND-CPA-D position; pin the CKKS data type and decryption mode in the presets; add a test that two decryptions of one ciphertext differ.
 **Done when:** the decision is **proposed**, the presets pin both settings and the test passes.
-**Status:** todo
+**Status:** in progress: decision 0017 proposed; the pins and the test wait for it to be accepted
 
 ### T1.18 Decision on plaintext-DB disclosure (F10, medium)
 
@@ -167,7 +167,7 @@ One task per high or medium finding in `results/m1-crypto-review.md`. T1.10 shou
 **Depends on:** none
 **Steps:** write a decision on who this mode protects; update the threat model.
 **Done when:** the decision is **proposed** and `docs/product-requirements.md` states the limit.
-**Status:** todo
+**Status:** in progress: decision 0018 proposed; the requirements change waits for it to be accepted
 
 ### T1.19 Required check for the oracles (F11, medium)
 

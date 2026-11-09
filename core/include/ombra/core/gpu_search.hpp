@@ -68,6 +68,7 @@ class GpuCtOps {
   lbcrypto::CryptoContext<lbcrypto::DCRTPoly> cc_;
   ExpansionTables tables_;
   ExpansionDevice device_;
+  std::string key_tag_;  // key of the sample; every ciphertext passed in must match
   double mod_reduce_factor_ = 0;
   std::size_t composite_degree_ = 1;
 };

@@ -187,3 +187,16 @@ def test_gpu_plain_search_matches_openfhe(tmp_path: Path, preset: str, fmt: str)
     assert err_gpu_pt < DECRYPT_TOLERANCE
     if fmt == "f64":
         assert err_quant < DECRYPT_TOLERANCE
+
+
+@pytest.mark.parametrize("inject", ["meta_level", "meta_degree", "meta_scale"])
+@pytest.mark.parametrize("preset", PRESETS)
+def test_gpu_plain_search_oracle_detects_wrong_metadata(
+    tmp_path: Path, preset: str, inject: str
+) -> None:
+    """A wrong level, degree or scale in gpu_eval_plain_search is caught by the exact check."""
+    proc, *_ = _run_driver(tmp_path, preset, "f64", inject)
+    print(proc.stdout)
+    assert proc.returncode == 1, f"driver did not fail (exit {proc.returncode}): {proc.stdout}"
+    assert "exact RNS match with EvalMult: FAIL" in proc.stdout
+    assert "plain search oracle: FAIL" in proc.stdout

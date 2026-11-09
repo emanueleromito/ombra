@@ -199,9 +199,22 @@ std::vector<u64> extract_monomial_words(const DCRTPoly& like, std::size_t shift)
   return words;
 }
 
+namespace {
+// Refuses keys of another secret key before any table or device buffer is built.
+const Ciphertext<DCRTPoly>& checked_sample(const Ciphertext<DCRTPoly>& sample,
+                                           const GpuExpansion::KeyMap& keys) {
+  for (const auto& entry : keys) {
+    require_eval_key_matches(entry.second, sample, "expansion automorphism key");
+  }
+  return sample;
+}
+}  // namespace
+
 GpuExpansion::GpuExpansion(const CryptoContext<DCRTPoly>& cc, const Ct& sample, const KeyMap& keys,
                            std::size_t d)
-    : tables_(extract_expansion_tables(cc, sample)), device_(tables_), sample_(sample) {
+    : tables_(extract_expansion_tables(cc, checked_sample(sample, keys))),
+      device_(tables_),
+      sample_(sample) {
   const auto t0 = std::chrono::steady_clock::now();
   const auto cp = rns_params(cc);
   const std::size_t full_q = cp->GetElementParams()->GetParams().size();
@@ -224,7 +237,17 @@ GpuExpansion::GpuExpansion(const CryptoContext<DCRTPoly>& cc, const Ct& sample, 
 }
 
 GpuCt GpuExpansion::upload(const Ct& ct) {
+  require_same_key(ct, sample_, "expansion upload");
   const FlatCiphertexts f = flatten_ciphertexts({ct});
+  if (f.level != sample_->GetLevel() || f.noise_scale_deg != sample_->GetNoiseScaleDeg() ||
+      f.scaling_factor != sample_->GetScalingFactor()) {
+    throw std::invalid_argument(
+        "expansion: ciphertext level, noise degree or scale differ from the sample");
+  }
+  if (f.ring_dim != tables_.ring_dim || f.num_towers != tables_.num_q) {
+    throw std::invalid_argument(
+        "expansion: ciphertext ring dimension or tower count differ from the tables");
+  }
   if (f.moduli !=
       std::vector<u64>(tables_.moduli.begin(), tables_.moduli.begin() + tables_.num_q)) {
     throw std::invalid_argument("expansion: ciphertext moduli differ from the tables");

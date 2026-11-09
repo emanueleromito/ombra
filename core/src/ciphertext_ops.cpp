@@ -83,8 +83,27 @@ void require_fixedmanual(const CiphertextImpl<DCRTPoly>& ct) {
 
 }  // namespace
 
+void require_same_key(ConstCiphertext<DCRTPoly> a, ConstCiphertext<DCRTPoly> b,
+                      const std::string& what) {
+    if (a->GetKeyTag() != b->GetKeyTag()) {
+        throw std::invalid_argument(what + ": ciphertexts are encrypted under different keys");
+    }
+    if (a->GetEncodingType() != b->GetEncodingType()) {
+        throw std::invalid_argument(what + ": ciphertexts differ in encoding type");
+    }
+}
+
+void require_eval_key_matches(const EvalKey<DCRTPoly>& key, ConstCiphertext<DCRTPoly> ct,
+                              const std::string& what) {
+    if (!key || key->GetKeyTag() != ct->GetKeyTag()) {
+        throw std::invalid_argument(what + ": evaluation key belongs to a different key");
+    }
+}
+
 Ciphertext<DCRTPoly> gpu_eval_add(ConstCiphertext<DCRTPoly>& a, ConstCiphertext<DCRTPoly>& b) {
     require_fixedmanual(*a);
+    require_fixedmanual(*b);
+    require_same_key(a, b, "add");
     if (a->GetLevel() != b->GetLevel() || a->GetNoiseScaleDeg() != b->GetNoiseScaleDeg() ||
         a->GetScalingFactor() != b->GetScalingFactor()) {
         throw std::invalid_argument("add: operands differ in level, noise degree or scale");
@@ -108,6 +127,9 @@ Ciphertext<DCRTPoly> gpu_eval_add(ConstCiphertext<DCRTPoly>& a, ConstCiphertext<
 
 Ciphertext<DCRTPoly> gpu_eval_mult_plain(ConstCiphertext<DCRTPoly>& ct, ConstPlaintext& pt) {
     require_fixedmanual(*ct);
+    if (ct->GetEncodingType() != pt->GetEncodingType()) {
+        throw std::invalid_argument("mult: ciphertext and plaintext differ in encoding type");
+    }
     if (ct->GetLevel() != pt->GetLevel()) {
         throw std::invalid_argument("mult: ciphertext and plaintext differ in level");
     }
@@ -141,6 +163,37 @@ Ciphertext<DCRTPoly> unflatten_ciphertext(const Ciphertext<DCRTPoly>& like,
     return result;
 }
 
+Ciphertext<DCRTPoly> gpu_eval_plain_search(const std::vector<Ciphertext<DCRTPoly>>& query,
+                                           const std::vector<Plaintext>& plaintexts,
+                                           const std::vector<std::uint64_t>& words) {
+    if (query.empty() || query.size() != plaintexts.size()) {
+        throw std::invalid_argument("plain search: query and plaintexts differ in count or empty");
+    }
+    const auto& q0 = query[0];
+    require_fixedmanual(*q0);
+    for (std::size_t j = 0; j < query.size(); ++j) {
+        require_fixedmanual(*query[j]);
+        require_same_key(query[j], q0, "plain search");
+        if (plaintexts[j]->GetEncodingType() != q0->GetEncodingType()) {
+            throw std::invalid_argument(
+                "plain search: query and plaintext differ in encoding type");
+        }
+        if (query[j]->GetLevel() != q0->GetLevel() ||
+            query[j]->GetNoiseScaleDeg() != q0->GetNoiseScaleDeg() ||
+            query[j]->GetScalingFactor() != q0->GetScalingFactor() ||
+            plaintexts[j]->GetLevel() != q0->GetLevel() ||
+            plaintexts[j]->GetNoiseScaleDeg() != plaintexts[0]->GetNoiseScaleDeg() ||
+            plaintexts[j]->GetScalingFactor() != plaintexts[0]->GetScalingFactor()) {
+            throw std::invalid_argument("plain search: operands differ in level, degree or scale");
+        }
+    }
+    Ciphertext<DCRTPoly> result = unflatten_ciphertext(q0, words);  // context and shape only
+    result->SetLevel(q0->GetLevel());
+    result->SetNoiseScaleDeg(q0->GetNoiseScaleDeg() + plaintexts[0]->GetNoiseScaleDeg());
+    result->SetScalingFactor(q0->GetScalingFactor() * plaintexts[0]->GetScalingFactor());
+    return result;
+}
+
 FlatOne flatten_one(const Ciphertext<DCRTPoly>& ct) {
     require_fixedmanual(*ct);
     Flat f = flatten(ct->GetElements());
@@ -153,6 +206,8 @@ FlatOne flatten_one(const Ciphertext<DCRTPoly>& ct) {
     out.level = ct->GetLevel();
     out.noise_scale_deg = ct->GetNoiseScaleDeg();
     out.scaling_factor = ct->GetScalingFactor();
+    out.key_tag = ct->GetKeyTag();
+    out.encoding = ct->GetEncodingType();
     return out;
 }
 
@@ -193,9 +248,12 @@ FlatCiphertexts flatten_ciphertexts(const std::vector<Ciphertext<DCRTPoly>>& cts
     out.level = cts[0]->GetLevel();
     out.noise_scale_deg = cts[0]->GetNoiseScaleDeg();
     out.scaling_factor = cts[0]->GetScalingFactor();
+    out.key_tag = cts[0]->GetKeyTag();
+    out.encoding = cts[0]->GetEncodingType();
     for (std::size_t i = 0; i < cts.size(); ++i) {
         const auto& ct = cts[i];
         require_fixedmanual(*ct);
+        require_same_key(ct, cts[0], "flatten");
         if (ct->GetElements().size() != 2) {
             throw std::invalid_argument("only 2-component ciphertexts are supported");
         }
@@ -236,6 +294,10 @@ std::vector<Ciphertext<DCRTPoly>> gpu_eval_column_search(
             throw std::invalid_argument("column search: block and query differ in dimensions");
         }
         const FlatCiphertexts fb = flatten_ciphertexts(block);
+        if (fb.key_tag != fq.key_tag || fb.encoding != fq.encoding) {
+            throw std::invalid_argument(
+                "column search: stored and query are encrypted under different keys");
+        }
         if (fb.level != fq.level || fb.scaling_factor != fq.scaling_factor ||
             fb.noise_scale_deg != fq.noise_scale_deg || fb.num_towers != fq.num_towers ||
             fb.ring_dim != fq.ring_dim || fb.moduli != fq.moduli) {
@@ -283,9 +345,24 @@ std::vector<std::vector<Ciphertext<DCRTPoly>>> gpu_eval_column_search_batched(
         if (q == 0) {
             qwords.reserve(queries.size() * fq.words.size());
             fq0 = fq;
-        } else if (fq.level != fq0.level || fq.scaling_factor != fq0.scaling_factor ||
-                   fq.noise_scale_deg != fq0.noise_scale_deg || fq.moduli != fq0.moduli) {
-            throw std::invalid_argument("column search: queries differ in level, degree or scale");
+        } else {
+            // Ring dimension and tower count first: they size the buffers read below.
+            if (fq.ring_dim != fq0.ring_dim || fq.num_towers != fq0.num_towers) {
+                throw std::invalid_argument(
+                    "column search: queries differ in ring dimension or tower count");
+            }
+            if (fq.key_tag != fq0.key_tag || fq.encoding != fq0.encoding) {
+                throw std::invalid_argument(
+                    "column search: queries are encrypted under different keys");
+            }
+            if (fq.level != fq0.level || fq.scaling_factor != fq0.scaling_factor ||
+                fq.noise_scale_deg != fq0.noise_scale_deg || fq.moduli != fq0.moduli) {
+                throw std::invalid_argument(
+                    "column search: queries differ in level, degree or scale");
+            }
+        }
+        if (fq.words.size() != fq.count * 2 * fq.num_towers * fq.ring_dim) {
+            throw std::invalid_argument("column search: query buffer has an unexpected size");
         }
         qwords.insert(qwords.end(), fq.words.begin(), fq.words.end());
     }
@@ -297,6 +374,10 @@ std::vector<std::vector<Ciphertext<DCRTPoly>>> gpu_eval_column_search_batched(
             throw std::invalid_argument("column search: block and query differ in dimensions");
         }
         const FlatCiphertexts fb = flatten_ciphertexts(stored_blocks[b]);
+        if (fb.key_tag != fq0.key_tag || fb.encoding != fq0.encoding) {
+            throw std::invalid_argument(
+                "column search: stored and query are encrypted under different keys");
+        }
         if (fb.level != fq0.level || fb.scaling_factor != fq0.scaling_factor ||
             fb.noise_scale_deg != fq0.noise_scale_deg || fb.num_towers != fq0.num_towers ||
             fb.ring_dim != fq0.ring_dim || fb.moduli != fq0.moduli) {
@@ -304,6 +385,9 @@ std::vector<std::vector<Ciphertext<DCRTPoly>>> gpu_eval_column_search_batched(
                 "column search: stored and query differ in level, noise degree, scale or moduli");
         }
         dev.upload_block(b, fb.words.data(), fb.words.size());
+    }
+    if (qwords.size() != queries.size() * shape.query_words()) {
+        throw std::invalid_argument("column search: query buffer has an unexpected size");
     }
     for (std::size_t q = 0; q < queries.size(); ++q) {
         dev.upload_query(q, qwords.data() + q * shape.query_words(), shape.query_words());

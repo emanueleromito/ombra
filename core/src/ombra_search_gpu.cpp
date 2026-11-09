@@ -2,6 +2,7 @@
 // for the GPU-only search pipeline (T1.2).
 //
 // Usage: ombra_search_gpu <context.bin> <evalmultkey.bin> <in_dir> <out_dir> <dims> <mask> [mask..]
+//                         [blocks=B] [inject=block]
 //
 // Inputs (OpenFHE BINARY serializations written by the Python test; public material only, no
 // secret key): the CryptoContext, the public EvalMult key, and in <in_dir> stored_0_<j>.bin
@@ -18,6 +19,11 @@
 // OpenFHE call between the first and the last device step) against the OpenFHE chain
 // EvalMultNoRelin/EvalAdd -> Relinearize -> Rescale -> EvalMult(mask) -> Rescale, exact at every
 // stage. Writes gpu_final_<mask>.bin and cpu_final_<mask>.bin to <out_dir>.
+// Stage C (T1.10, only with the argument blocks=B): B stored blocks of different data (files
+// stored_<b>_<j>.bin) and a different mask per block (mask_blk_<b>.bin), run with
+// set_max_batch(3) so a ragged B chunks unevenly. Every block is compared at every stage (sum,
+// relinearize, rescale, mask, final rescale) with its own OpenFHE chain. The argument
+// inject=block (test-only) compares the last block with the chain of block 0 and must FAIL.
 // Prints PASS/FAIL lines, indices and timings only, never data values.
 // Exit code: 0 all exact, 1 mismatch, 2 error.
 
@@ -69,6 +75,9 @@ void check(const std::string& stage, const Ct& gpu, const Ct& cpu) {
       a.moduli != b.moduli) {
     std::printf("%s: FAIL (shape or moduli differ)\n", stage.c_str());
     ok = false;
+  } else if (a.key_tag != b.key_tag || a.encoding != b.encoding) {
+    std::printf("%s: FAIL (key tag or encoding type differs)\n", stage.c_str());
+    ok = false;
   } else if (a.level != b.level || a.noise_scale_deg != b.noise_scale_deg ||
              a.scaling_factor != b.scaling_factor) {
     std::printf("%s: FAIL (level %zu/%zu, noise degree %zu/%zu, scaling factor %s)\n",
@@ -110,7 +119,19 @@ int main(int argc, char** argv) {
     const std::string in_dir = argv[3], out_dir = argv[4];
     const std::size_t d = std::stoul(argv[5]);
     std::vector<std::string> mask_names;
-    for (int i = 6; i < argc; ++i) mask_names.push_back(argv[i]);
+    std::size_t num_blocks = 0;
+    bool inject_block = false;
+    for (int i = 6; i < argc; ++i) {
+      const std::string a = argv[i];
+      if (a.rfind("blocks=", 0) == 0) {
+        num_blocks = std::stoul(a.substr(7));
+      } else if (a == "inject=block") {
+        inject_block = true;
+      } else {
+        mask_names.push_back(a);
+      }
+    }
+    if (mask_names.empty()) throw std::runtime_error("need at least one mask");
 
     CryptoContext<DCRTPoly> cc;
     if (!Serial::DeserializeFromFile(argv[1], cc, SerType::BINARY)) {
@@ -197,6 +218,46 @@ int main(int argc, char** argv) {
           d, name.c_str(), t.search_s, t.relin_s, t.rescale1_s, t.mask_s, t.rescale2_s, t.total_s);
       save_ct(out_dir + "/gpu_final_" + name + ".bin", gpu_final);
       save_ct(out_dir + "/cpu_final_" + name + ".bin", ref_final);
+    }
+
+    if (num_blocks > 0) {
+      const std::size_t nb = num_blocks;
+      std::vector<std::vector<Ct>> blk(nb);
+      std::vector<Ct> bmask(nb);
+      for (std::size_t b = 0; b < nb; ++b) {
+        for (std::size_t j = 0; j < d; ++j) {
+          blk[b].push_back(load_ct(in_dir + "/stored_" + std::to_string(b) + "_" +
+                                   std::to_string(j) + ".bin"));
+        }
+        bmask[b] = load_ct(in_dir + "/mask_blk_" + std::to_string(b) + ".bin");
+      }
+      GpuSearch mb(cc, blk[0][0], bmask[0], key_vec[0], d, nb);
+      mb.level0().device().set_max_batch(3);
+      mb.level1().device().set_max_batch(3);
+      for (std::size_t b = 0; b < nb; ++b) {
+        mb.upload_block(b, blk[b]);
+        mb.upload_mask(b, bmask[b]);
+      }
+      mb.upload_query(query);
+      mb.run();
+      for (std::size_t b = 0; b < nb; ++b) {
+        // The reference chain; with inject=block the last block is judged against block 0's.
+        const std::size_t rb = (inject_block && b + 1 == nb) ? 0 : b;
+        Ct sum_b = cc->EvalMultNoRelin(blk[rb][0], query[0]);
+        for (std::size_t j = 1; j < d; ++j) {
+          cc->EvalAddInPlace(sum_b, cc->EvalMultNoRelin(blk[rb][j], query[j]));
+        }
+        const Ct rel_b = cc->Relinearize(sum_b);
+        const Ct res_b = cc->Rescale(rel_b);
+        const Ct masked_b = cc->EvalMult(res_b, bmask[rb]);
+        const Ct final_b = cc->Rescale(masked_b);
+        const std::string tag = " (block " + std::to_string(b) + " of " + std::to_string(nb) + ")";
+        check("multiblock search sum" + tag, mb.download(SearchStage::kSum, b), sum_b);
+        check("multiblock relinearize" + tag, mb.download(SearchStage::kRelin, b), rel_b);
+        check("multiblock rescale" + tag, mb.download(SearchStage::kRescaled, b), res_b);
+        check("multiblock mask" + tag, mb.download(SearchStage::kMasked, b), masked_b);
+        check("multiblock final rescale" + tag, mb.download(SearchStage::kFinal, b), final_b);
+      }
     }
 
     if (g_failures != 0) {
