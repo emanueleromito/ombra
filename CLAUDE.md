@@ -12,7 +12,7 @@ Background, in this order:
 3. `docs/decisions/`: one file per decision, with the reasoning
 4. `docs/plan/`: milestones and the current tasks
 
-**Current stage:** milestone M0, the technical spike (`docs/plan/m0-spike.md`). We are proving the GPU core works and measuring it. Do not build the server, storage, API or packaging yet unless a task says so.
+**Current stage:** milestone M1, the core library (`docs/plan/m1-core.md`). M0 is done; its findings are in `docs/plan/results/spike-report.md`. Do not build the server, storage, API or packaging yet unless a task says so.
 
 ## Layout
 

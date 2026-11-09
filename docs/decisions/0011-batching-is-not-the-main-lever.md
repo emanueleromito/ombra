@@ -1,6 +1,6 @@
 # 0011. Batching is not the main throughput lever
 
-- **Status:** proposed; would amend the premise of 0007
+- **Status:** accepted (2026-11-09); amends the premise of 0007
 - **Date:** 2026-11-09
 
 ## Context
@@ -20,3 +20,7 @@ B. Batch within one query where it fills the GPU, as T0.5b does. Do not count on
 ## Consequences
 
 The search kernel's modular multiplication becomes the first thing to speed up. The scheduler in M1 can be simpler and is sized by memory rather than by a hoped-for speedup. The result covers one A100 at this preset; it should be re-measured if the kernels or hardware change.
+
+## Acceptance note (2026-11-09)
+
+Accepted. If the search kernel's modular multiplication gets much cheaper (M1 tasks T1.4 and T1.5), memory bandwidth may become the limit again and batching across queries may start to pay. T1.8 re-measures and revisits this decision if so.

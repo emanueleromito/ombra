@@ -4,8 +4,8 @@ Milestones, in order. Each milestone has its own file with small tasks; every ta
 
 | Milestone | Goal | Status |
 | --- | --- | --- |
-| [M0: Technical spike](m0-spike.md) | Prove the GPU core works on Ampere and measure it | in progress |
-| M1: Core library | Turn the spike into a tested `core/` library: expansion, search, masks, batching | not started |
+| [M0: Technical spike](m0-spike.md) | Prove the GPU core works on Ampere and measure it | done ([report](results/spike-report.md)) |
+| [M1: Core library](m1-core.md) | Reviewed `core/` library running a full encrypted query on the GPU; end-to-end latency, speedups and product presets | in progress |
 | M2: Minimal server | Single-node gRPC server with storage and clustered search | not started |
 | M3: Client and LangChain | Python client (sync + async), key file, top-k, re-ranking, LangChain adapter | not started |
 | M4: First release | Docker images, compose file, docs, licensing page | not started |
