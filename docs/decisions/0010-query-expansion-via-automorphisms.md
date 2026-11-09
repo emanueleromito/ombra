@@ -21,13 +21,13 @@ A, with a symmetric real query. In OpenFHE's default REAL mode the encoded polyn
 
 The server expands with a tree of substitutions X -> X^(N/2^k + 1) plus key switching, of depth L = ceil(log2(2d)), pruned to the d leaves for j = 0..d-1, using automorphism keys from OpenFHE's `EvalAutomorphismKeyGen`. Each leaf is a constant polynomial, so q_j lands in every slot. L needs 2^L >= 2d, one level more than an unsymmetric query, because the tree must separate j from N-j.
 
-The tree multiplies each value by 2^l. That factor is handled by adjusting the ciphertext scale, not by dividing the query on the client.
+The tree multiplies each value by 2^L. The client removes that factor by multiplying q by 2^-L before encoding; the reasoning and the level budget are in decision 0009 (addendum).
 
 ## Consequences
 
 Expansion costs no multiplication level. It needs one automorphism key per tree level, one more level than an unsymmetric query, and adds key-switching noise, which the spike must measure.
 
-Expanded ciphertexts carry a scale that differs from the stored ciphertexts by 2^l, so the search path must accept that difference; the T0.4 kernel wrapper currently rejects it.
+Expanded ciphertexts have the same scale, level and degree as a fresh query, so the T0.4 search path takes them unchanged.
 
 When relinearization is added, relinearize and rescale lazily, once per output ciphertext after the d-term sum.
 

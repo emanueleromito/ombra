@@ -54,7 +54,7 @@ T0.1 -> T0.2 -> T0.3 -> T0.4 + T0.5 (in parallel)
 
 **Why:** the main open risk of decision 0003.
 **Depends on:** T0.3
-**Steps:** per decision 0010: encode the query as the symmetric real polynomial q_0 + sum_{j>=1} q_j (X^j + X^-j) on the client through OpenFHE; run the expansion tree of substitutions X -> X^(N/2^k + 1) and key switching, depth L = ceil(log2(2d)), pruned to the d leaves for j = 0..d-1, first on CPU with OpenFHE and then on the GPU, using keys from `EvalAutomorphismKeyGen`; adjust the ciphertext scale for the 2^L factor; time it and measure the automorphism-key count and size and the decrypted error.
+**Steps:** per decision 0010: encode the query as the symmetric real polynomial q_0 + sum_{j>=1} q_j (X^j + X^-j) on the client through OpenFHE; run the expansion tree of substitutions X -> X^(N/2^k + 1) and key switching, depth L = ceil(log2(2d)), pruned to the d leaves for j = 0..d-1, first on CPU with OpenFHE and then on the GPU, using keys from `EvalAutomorphismKeyGen`; the client multiplies q by 2^-L before encoding, to cancel the tree's 2^L factor (decision 0009, addendum); time it and measure the automorphism-key count and size and the decrypted error.
 **Done when:** expansion matches OpenFHE CPU, and expansion time and rotation-key size are recorded for d = 384, 768, 1536 on A100.
 **Status:** todo
 
