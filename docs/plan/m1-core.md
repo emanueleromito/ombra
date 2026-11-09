@@ -73,7 +73,7 @@ T1.1, T1.2, T1.4 and T1.6 can start in parallel. T1.2 and T1.4 both touch the se
 **Depends on:** T1.6
 **Steps:** run the T1.6 recall check on `m0_compact_n8192` for d = 384, 768, 1536.
 **Done when:** results are recorded, and if the preset passes, a decision record proposes it as the "fast" product preset.
-**Status:** todo
+**Status:** done
 
 ### T1.8 M1 report
 
