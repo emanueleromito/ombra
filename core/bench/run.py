@@ -133,7 +133,14 @@ def run_t04(
     return out_path
 
 
-def run_t05(out_dir: Path, dims: tuple[int, ...], warmup: int, iters: int, out_name: str) -> Path:
+def run_t05(
+    out_dir: Path,
+    dims: tuple[int, ...],
+    warmup: int,
+    iters: int,
+    out_name: str,
+    profile: bool = False,
+) -> Path:
     import openfhe as ofhe
     from ombra import params as ombra_params
     from ombra import query as oq
@@ -170,12 +177,15 @@ def run_t05(out_dir: Path, dims: tuple[int, ...], warmup: int, iters: int, out_n
                 str(warmup),
                 str(iters),
                 str(part),
+                *(["profile"] if profile else []),
             ]
             print("$", " ".join(cmd), flush=True)
             subprocess.run(cmd, check=True)  # noqa: S603
             entry = json.loads(part.read_text())
             gpu_name = entry.pop("gpu_name")
             results.append(entry)
+            if profile:
+                print("profile", json.dumps(entry.get("profile")), flush=True)
             print(
                 f"d={d} L={entry['L']} automorphisms={entry['automorphisms']} "
                 f"keys={entry['keys']} key_bytes={entry['key_bytes']} "
@@ -214,6 +224,9 @@ def main() -> None:
     parser.add_argument("--iters", type=int, default=DEFAULT_ITERS)
     parser.add_argument("--name", default=DEFAULT_OUT_NAME, help="output file name for t0.4")
     parser.add_argument("--name-t05", default=T05_OUT_NAME, help="output file name for t0.5")
+    parser.add_argument(
+        "--profile", action="store_true", help="t0.5: also time the stages of one split"
+    )
     args = parser.parse_args()
 
     task = args.task.lower()
@@ -223,7 +236,7 @@ def main() -> None:
     if task in ("all", "t0.4"):
         run_t04(args.out, dims, args.blocks, args.warmup, args.iters, args.name)
     if task in ("all", "t0.5"):
-        run_t05(args.out, dims, args.warmup, args.iters, args.name_t05)
+        run_t05(args.out, dims, args.warmup, args.iters, args.name_t05, args.profile)
 
 
 if __name__ == "__main__":

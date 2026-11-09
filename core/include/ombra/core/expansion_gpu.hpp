@@ -21,9 +21,9 @@ ExpansionTables extract_expansion_tables(const lbcrypto::CryptoContext<lbcrypto:
                                          const lbcrypto::Ciphertext<lbcrypto::DCRTPoly>& sample);
 
 // Key words [digit][b, a][QP tower][N] of one automorphism key, in the device layout.
-std::vector<std::uint64_t> extract_key_words(
-    const lbcrypto::EvalKey<lbcrypto::DCRTPoly>& key, const ExpansionTables& tables,
-    std::size_t full_q_towers);
+std::vector<std::uint64_t> extract_key_words(const lbcrypto::EvalKey<lbcrypto::DCRTPoly>& key,
+                                             const ExpansionTables& tables,
+                                             std::size_t full_q_towers);
 
 // Evaluation form of X^-shift in the Q towers of `like`, computed with OpenFHE's own NTT.
 std::vector<std::uint64_t> extract_monomial_words(const lbcrypto::DCRTPoly& like,
@@ -51,6 +51,12 @@ class GpuExpansion {
   // The Ops interface of expand_tree.
   std::pair<GpuCt, GpuCt> split(const GpuCt& c, std::size_t level, std::uint32_t galois,
                                 std::size_t shift, bool want_odd);
+
+  // Optional level-at-once operation of expand_tree: all splits of a level in batched launches.
+  std::vector<std::pair<GpuCt, GpuCt>> split_level(const std::vector<GpuCt>& nodes,
+                                                   std::size_t level, std::uint32_t galois,
+                                                   std::size_t shift,
+                                                   const std::vector<char>& want_odd);
 
   ExpansionDevice& device() { return device_; }
   const ExpansionTables& tables() const { return tables_; }

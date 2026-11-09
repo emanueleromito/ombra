@@ -9,8 +9,9 @@
 //   2. key-switch digits vs EvalFastRotationPrecompute; inner product + c0*P + automorphism
 //      permutation vs EvalFastKeySwitchCoreExt + AutomorphismTransform; ModDown vs ApproxModDown
 //   3. one full key-switched automorphism per Galois element vs EvalAutomorphism
-//   4. the whole expansion tree (expand_tree with the CPU and the GPU Ops): every leaf's RNS words,
-//      moduli, level, noise-scale degree and scaling factor
+//   4. the whole expansion tree (expand_tree with the CPU and the GPU Ops, the GPU one batched per
+//      level, in 3-node chunks, and node by node): every leaf's RNS words, moduli, level,
+//      noise-scale degree and scaling factor
 // Stage 1 and 2 use synthetic pseudo-random words for the special-prime towers. Prints stage
 // verdicts, indices of mismatches and timings only: never data values. If out_dir is given, writes
 // cpu_<j>.bin and gpu_<j>.bin for the leaves. Exit code: 0 all exact, 1 mismatch, 2 error.
@@ -106,9 +107,10 @@ void stage1(GpuExpansion& gx, const Ct& query, const DCRTPoly& c1) {
   check("stage 1a forward NTT, Q towers of c1", d.test_ntt(true, coef_w, q_towers), eval_w, n);
 
   // (b) all towers of the extended basis Q * P on pseudo-random words (synthetic, seeded).
-  const auto params_qp = c1.GetExtendedCRTBasis(
-      std::dynamic_pointer_cast<CryptoParametersRNS>(query->GetCryptoContext()->GetCryptoParameters())
-          ->GetParamsP());
+  const auto params_qp =
+      c1.GetExtendedCRTBasis(std::dynamic_pointer_cast<CryptoParametersRNS>(
+                                 query->GetCryptoContext()->GetCryptoParameters())
+                                 ->GetParamsP());
   DCRTPoly ext(params_qp, Format::COEFFICIENT, true);
   u64 state = 0x9E3779B97F4A7C15ull;
   for (std::size_t x = 0; x < qp; ++x) {
@@ -156,8 +158,8 @@ void stage2and3(GpuExpansion& gx, const CryptoContext<DCRTPoly>& cc, const Ct& q
     std::vector<std::uint32_t> map(n);
     PrecomputeAutoMap(static_cast<std::uint32_t>(n), galois, &map);
 
-    auto ba = cc->GetScheme()->EvalFastKeySwitchCoreExt(cpu_digits, keys.at(galois),
-                                                        cv0.GetParams());
+    auto ba =
+        cc->GetScheme()->EvalFastKeySwitchCoreExt(cpu_digits, keys.at(galois), cv0.GetParams());
     for (std::size_t i = 0; i < nq; ++i) {
       ba[0].GetAllElements()[i].MultAccEqNoCheck(cv0.GetAllElements()[i], cp->GetPModq()[i]);
     }
@@ -165,16 +167,16 @@ void stage2and3(GpuExpansion& gx, const CryptoContext<DCRTPoly>& cc, const Ct& q
     ba[1] = ba[1].AutomorphismTransform(galois, map);
     std::vector<u64> cpu_ext = poly_words(ba[0]);
     append(cpu_ext, poly_words(ba[1]));
-    check("stage 2 inner product + c0*P + permutation" + tag,
-          gx.device().test_ext(query_w, galois), cpu_ext, n);
+    check("stage 2 inner product + c0*P + permutation" + tag, gx.device().test_ext(query_w, galois),
+          cpu_ext, n);
 
     std::vector<u64> cpu_down;
     for (int r = 0; r < 2; ++r) {
-      const DCRTPoly down = ba[r].ApproxModDown(
-          cv0.GetParams(), cp->GetParamsP(), cp->GetPInvModq(), cp->GetPInvModqPrecon(),
-          cp->GetPHatInvModp(), cp->GetPHatInvModpPrecon(), cp->GetPHatModq(),
-          cp->GetModqBarrettMu(), cp->GettInvModp(), cp->GettInvModpPrecon(), tt,
-          cp->GettModqPrecon());
+      const DCRTPoly down =
+          ba[r].ApproxModDown(cv0.GetParams(), cp->GetParamsP(), cp->GetPInvModq(),
+                              cp->GetPInvModqPrecon(), cp->GetPHatInvModp(),
+                              cp->GetPHatInvModpPrecon(), cp->GetPHatModq(), cp->GetModqBarrettMu(),
+                              cp->GettInvModp(), cp->GettInvModpPrecon(), tt, cp->GettModqPrecon());
       append(cpu_down, poly_words(down));
     }
     check("stage 2 ModDown" + tag, gx.device().test_mod_down(cpu_ext), cpu_down, n);
@@ -205,8 +207,8 @@ bool leaf_equal(const Ct& cpu, const Ct& gpu, std::size_t j) {
       if (a.words[i] != b.words[i] && bad++ == 0) first = i;
     }
     std::printf("leaf %zu: %zu words differ (first at component %zu, tower %zu, index %zu)\n", j,
-                bad, first / (a.num_towers * a.ring_dim),
-                (first / a.ring_dim) % a.num_towers, first % a.ring_dim);
+                bad, first / (a.num_towers * a.ring_dim), (first / a.ring_dim) % a.num_towers,
+                first % a.ring_dim);
     ok = false;
   }
   return ok;
@@ -266,10 +268,35 @@ int main(int argc, char** argv) {
     gx.synchronize();
     const double gpu_seconds = seconds_since(t0);
 
+    // The same tree again with a tiny chunk size (3 nodes per batch, so most levels are split into
+    // several chunks and the last chunk is ragged) and with the per-node path (split of one node at
+    // a time): all must give the very same words as the batched run and as OpenFHE.
+    const std::size_t default_batch = gx.device().max_batch();
+    gx.device().set_max_batch(3);
+    std::vector<GpuCt> gpu_chunked = ombra::core::expand_tree(root, d, ring, gx);
+    gx.device().set_max_batch(default_batch);
+    struct PerNode {  // hides split_level so expand_tree takes the per-node path
+      GpuExpansion& g;
+      std::pair<GpuCt, GpuCt> split(const GpuCt& c, std::size_t level, std::uint32_t galois,
+                                    std::size_t shift, bool odd) {
+        return g.split(c, level, galois, shift, odd);
+      }
+    } per_node{gx};
+    std::vector<GpuCt> gpu_single = ombra::core::expand_tree(root, d, ring, per_node);
+    gx.synchronize();
+
     std::size_t bad_leaves = 0;
     for (std::size_t j = 0; j < d; ++j) {
       const Ct gpu = gx.download(gpu_dev[j]);
       if (!leaf_equal(cpu_leaves[j], gpu, j)) ++bad_leaves;
+      if (!leaf_equal(cpu_leaves[j], gx.download(gpu_chunked[j]), j)) {
+        std::printf("leaf %zu: chunked batches differ from OpenFHE\n", j);
+        ++bad_leaves;
+      }
+      if (!leaf_equal(cpu_leaves[j], gx.download(gpu_single[j]), j)) {
+        std::printf("leaf %zu: per-node splits differ from OpenFHE\n", j);
+        ++bad_leaves;
+      }
       if (!out_dir.empty()) {
         if (!Serial::SerializeToFile(out_dir + "/cpu_" + std::to_string(j) + ".bin", cpu_leaves[j],
                                      SerType::BINARY) ||
@@ -286,10 +313,11 @@ int main(int argc, char** argv) {
       std::printf("stage 4 expansion tree: PASS (%zu leaves)\n", d);
     }
 
-    std::printf("d=%zu depth=%zu leaves=%zu nodes=%zu automorphisms=%zu cpu_seconds=%.3f "
-                "gpu_seconds=%.4f h2d_seconds=%.4f\n",
-                d, stats.depth, gpu_dev.size(), stats.nodes, stats.automorphisms, cpu_seconds,
-                gpu_seconds, h2d_seconds);
+    std::printf(
+        "d=%zu depth=%zu leaves=%zu nodes=%zu automorphisms=%zu cpu_seconds=%.3f "
+        "gpu_seconds=%.4f h2d_seconds=%.4f\n",
+        d, stats.depth, gpu_dev.size(), stats.nodes, stats.automorphisms, cpu_seconds, gpu_seconds,
+        h2d_seconds);
     if (g_failures != 0) {
       std::printf("GPU expansion exact RNS match with OpenFHE: FAIL (%d stages)\n", g_failures);
       return 1;
