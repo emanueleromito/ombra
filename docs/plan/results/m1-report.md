@@ -15,7 +15,7 @@ All numbers are on the A100 with `m0_depth2` unless stated. Sources are in `docs
 | # | Decision | Status | Recommendation |
 | --- | --- | --- | --- |
 | 0012 | Recall-based preset acceptance | accepted | Accepted 2026-11-09 |
-| 0013 | `m0_compact_n8192` as "fast" | proposed | Accept, after its end-to-end latency is measured |
+| 0013 | `m0_compact_n8192` as "fast" | accepted (T2.2) | Latency measured at 0.52x to 0.65x of `m0_depth2` |
 | 0014 | Composite scaling preset | rejected | Done; code removed |
 | 0015 | Encoder tolerance only for FFT and rounding | accepted | Accepted 2026-11-09 |
 | 0016 | File envelope; driver fixtures stay raw until M2 | accepted | Accepted 2026-11-09 |
