@@ -23,7 +23,7 @@ np = pytest.importorskip("numpy")
 
 pytestmark = pytest.mark.gpu
 
-PRESET = "m0_depth2"
+PRESETS = ["m0_depth2", "m0_compact_n8192"]  # T0.11: every test runs on both
 SEED = 20260104
 
 # Max error of the decrypted scores against numpy dot products, and between GPU and OpenFHE CPU.
@@ -54,12 +54,15 @@ def _normalized_rows(rng: np.random.Generator, rows: int, cols: int) -> np.ndarr
 # (dims, blocks): the required d = 16 single fully packed block, plus 5 blocks of d = 4 so the
 # kernel's partially filled block tile (blocks not a multiple of 4) is exercised too.
 @pytest.mark.parametrize(("dims", "blocks"), [(16, 1), (4, 5)])
-def test_gpu_column_search_matches_openfhe(tmp_path: Path, dims: int, blocks: int) -> None:
+@pytest.mark.parametrize("preset", PRESETS)
+def test_gpu_column_search_matches_openfhe(
+    tmp_path: Path, dims: int, blocks: int, preset: str
+) -> None:
     import openfhe as ofhe
 
-    _, cc = ombra_params.make_context(PRESET)
+    _, cc = ombra_params.make_context(preset)
     keys = cc.KeyGen()
-    slots = ombra_params.get_preset(PRESET)["batch_size"]  # fully packed block
+    slots = ombra_params.get_preset(preset)["batch_size"]  # fully packed block
 
     rng = np.random.default_rng(SEED)
     stored = [_normalized_rows(rng, slots, dims) for _ in range(blocks)]  # [block][vector, dim]

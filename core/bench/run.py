@@ -17,6 +17,9 @@ gpu_seconds and iterations per d.
 
     python core/bench/run.py --task t0.5 --out <dir>
 
+T0.11: compact configurations (ring dimension 8192 preset, fp16/int8 plaintext storage), see
+core/bench/t011.py. Only runs when asked for: `--task t0.11` (not part of `all`).
+
 T0.7: query batching (`ombra_bench_batch`, one run per d): search and expansion throughput for
 Q = 1, 8, 32, 128 queries per pass over the same stored blocks, the batched search kernel's
 achieved memory bandwidth, and the per-(d, Q) memory plan (queries per pass, passes, peak device
@@ -400,10 +403,14 @@ def main() -> None:
     parser.add_argument(
         "--profile", action="store_true", help="t0.5: also time the stages of one split"
     )
+    parser.add_argument("--presets-t011", default="m0_depth2,m0_compact_n8192", help="t0.11")
+    parser.add_argument(
+        "--error-presets-t011", default="m0_compact_n8192", help="t0.11: presets with the e2e error"
+    )
     args = parser.parse_args()
 
     task = args.task.lower()
-    if task not in ("all", "t0.4", "t0.5", "t0.7"):
+    if task not in ("all", "t0.4", "t0.5", "t0.7", "t0.11"):
         raise SystemExit(f"unknown task {args.task!r}")
     dims = tuple(int(x) for x in args.dims.split(","))
     if task in ("all", "t0.4"):
@@ -421,6 +428,19 @@ def main() -> None:
             args.warmup,
             args.iters,
             args.name_t07,
+        )
+    if task == "t0.11":
+        from t011 import run_t011
+
+        run_t011(
+            args.out,
+            dims,
+            tuple(args.presets_t011.split(",")),
+            tuple(x for x in args.error_presets_t011.split(",") if x),
+            args.warmup,
+            args.iters,
+            find_binary,
+            openfhe_version(),
         )
 
 

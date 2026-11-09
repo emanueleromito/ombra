@@ -25,7 +25,7 @@ np = pytest.importorskip("numpy")
 
 pytestmark = pytest.mark.gpu
 
-PRESET = "m0_depth2"
+PRESETS = ["m0_depth2", "m0_compact_n8192"]  # T0.11: every test runs on both
 SEED = 20260110
 
 # Max |decrypted slot - (stored @ q) * mask|. Same agreed bound as T0.2 to T0.5; do not loosen.
@@ -37,6 +37,8 @@ LARGE_DIMS = [384, 768, 1536]
 
 
 def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
+    if "preset" in metafunc.fixturenames:
+        metafunc.parametrize("preset", PRESETS)
     if "d" in metafunc.fixturenames:
         large = metafunc.config.getoption("--expansion-large")
         metafunc.parametrize("d", DEFAULT_DIMS + (LARGE_DIMS if large else []))
@@ -62,13 +64,13 @@ def _run(args: list[str], timeout: int) -> str:
     return proc.stdout
 
 
-def test_gpu_scores_with_encrypted_filter_mask(tmp_path: Path, d: int) -> None:
+def test_gpu_scores_with_encrypted_filter_mask(tmp_path: Path, d: int, preset: str) -> None:
     import openfhe as ofhe
 
-    _, cc = ombra_params.make_context(PRESET)
+    _, cc = ombra_params.make_context(preset)
     keys = cc.KeyGen()
     cc.EvalMultKeyGen(keys.secretKey)
-    slots = ombra_params.get_preset(PRESET)["batch_size"]
+    slots = ombra_params.get_preset(preset)["batch_size"]
 
     indices = oq.automorphism_indices(cc.GetRingDimension(), d)
     cc.ClearEvalAutomorphismKeys()  # the key store is static: hold exactly this d's indices
@@ -148,7 +150,8 @@ def test_gpu_scores_with_encrypted_filter_mask(tmp_path: Path, d: int) -> None:
         err_gpu = float(np.max(np.abs(mask_and_decrypt("gpu_0.bin", mask_ct) - want)))
         err_cpu = float(np.max(np.abs(mask_and_decrypt("cpu_0.bin", mask_ct) - want)))
         print(
-            f"d={d} mask={kind} levels_used=2 max_err_gpu={err_gpu:.3e} max_err_cpu={err_cpu:.3e}"
+            f"preset={preset} d={d} mask={kind} levels_used=2 "
+            f"max_err_gpu={err_gpu:.3e} max_err_cpu={err_cpu:.3e}"
         )
         errs[kind] = (err_gpu, err_cpu)
 
