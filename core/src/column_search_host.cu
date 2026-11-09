@@ -143,6 +143,8 @@ void ColumnSearchDevice::download_result(std::vector<std::uint64_t>& out) {
     impl_->copy_out(out).throw_if_error();
 }
 
+const std::uint64_t* ColumnSearchDevice::result_device() const { return impl_->out.get(); }
+
 struct BatchedColumnSearchDevice::Impl {
     ColumnSearchShape shape;
     std::vector<u64> moduli;

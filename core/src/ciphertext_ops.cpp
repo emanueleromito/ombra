@@ -139,6 +139,51 @@ Ciphertext<DCRTPoly> unflatten_ciphertext(const Ciphertext<DCRTPoly>& like,
     return result;
 }
 
+FlatOne flatten_one(const Ciphertext<DCRTPoly>& ct) {
+    require_fixedmanual(*ct);
+    Flat f = flatten(ct->GetElements());
+    FlatOne out;
+    out.components = f.shape.num_polys;
+    out.num_towers = f.shape.num_towers;
+    out.ring_dim = f.shape.ring_dim;
+    out.words = std::move(f.words);
+    out.moduli = std::move(f.moduli);
+    out.level = ct->GetLevel();
+    out.noise_scale_deg = ct->GetNoiseScaleDeg();
+    out.scaling_factor = ct->GetScalingFactor();
+    return out;
+}
+
+Ciphertext<DCRTPoly> make_ciphertext_like(const Ciphertext<DCRTPoly>& like, std::size_t components,
+                                          std::size_t towers,
+                                          const std::vector<std::uint64_t>& words,
+                                          std::size_t level, std::size_t noise_scale_deg,
+                                          double scaling_factor) {
+    const std::size_t like_towers = like->GetElements()[0].GetNumOfElements();
+    if (components < 2 || towers == 0 || towers > like_towers) {
+        throw std::invalid_argument("make_ciphertext_like: bad component or tower count");
+    }
+    Ciphertext<DCRTPoly> result = like->Clone();
+    auto& elements = result->GetElements();
+    const DCRTPoly first = elements[0];
+    while (elements.size() < components) elements.push_back(first);
+    elements.resize(components);
+    for (auto& e : elements) {
+        e.SetFormat(Format::EVALUATION);
+        if (towers < like_towers) e.DropLastElements(like_towers - towers);
+    }
+    Flat shape = flatten(elements);
+    if (words.size() != shape.shape.total_words()) {
+        throw std::invalid_argument("make_ciphertext_like: word count does not match the shape");
+    }
+    write_back(elements, shape, words.data());
+    // Degree before level: SetLevel checks the tower count against the current degree.
+    result->SetNoiseScaleDeg(noise_scale_deg);
+    result->SetLevel(level);
+    result->SetScalingFactor(scaling_factor);
+    return result;
+}
+
 FlatCiphertexts flatten_ciphertexts(const std::vector<Ciphertext<DCRTPoly>>& cts) {
     if (cts.empty()) throw std::invalid_argument("no ciphertexts to flatten");
     FlatCiphertexts out;

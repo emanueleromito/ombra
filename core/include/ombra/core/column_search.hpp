@@ -46,6 +46,9 @@ class ColumnSearchDevice {
     double run();
     // Copy the result (shape.out_words() words) to the host.
     void download_result(std::vector<std::uint64_t>& out);
+    // Device pointer to the result [block][component 0..2][tower][coeff] (T1.2: the GPU-only
+    // search feeds it to relinearization without a host round trip). Valid for the object's life.
+    const std::uint64_t* result_device() const;
 
   private:
     struct Impl;
