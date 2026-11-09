@@ -9,16 +9,15 @@
 //   - EvalAdd / EvalSub,
 //   - an exact multiplication by X^(-k) done on the coefficients of every RNS tower (no level,
 //     no scale change),
-// then removes the factor 2^L the tree put on every value by multiplying each output by the exact
-// constant 2^-L on the server (EvalMult by a double: scale degree +1, no rescale). Adjusting the
-// ciphertext scaling factor instead does nothing under FIXEDMANUAL, whose decode ignores it
-// (ckkspackedencoding.cpp:315-363), so the leaves would decrypt to 2^L * q_j.
+// The tree puts a factor 2^L on every value; the client has already multiplied the query by 2^-L
+// before encoding (client/ombra/query.py), so the leaves are q_j with no server-side EvalMult, no
+// scale change and no level used. The driver checks that: every leaf must have NoiseScaleDeg 1 and
+// Level 0, else it exits 2.
 // Writes expanded_<j>.bin for j in [0, d) to <out_dir>. Never takes a secret key and prints no
 // data values: only depth, node counts and timing.
 // Exit code: 0 ok, 2 error.
 
 #include <chrono>
-#include <cmath>
 #include <cstdio>
 #include <exception>
 #include <fstream>
@@ -121,9 +120,10 @@ int main(int argc, char** argv) {
         std::vector<Ct> out = ombra::core::expand_tree(query, d, cc->GetRingDimension(), ops, &stats);
         const auto t1 = std::chrono::steady_clock::now();
 
-        const double factor = std::ldexp(1.0, static_cast<int>(stats.depth));
         for (std::size_t j = 0; j < out.size(); ++j) {
-            out[j] = cc->EvalMult(out[j], 1.0 / factor);
+            if (out[j]->GetNoiseScaleDeg() != 1 || out[j]->GetLevel() != 0) {
+                throw std::runtime_error("expansion leaf is not at NoiseScaleDeg 1 and Level 0");
+            }
             const std::string path = out_dir + "/expanded_" + std::to_string(j) + ".bin";
             if (!Serial::SerializeToFile(path, out[j], SerType::BINARY)) {
                 throw std::runtime_error("cannot write " + path);

@@ -10,7 +10,8 @@
 //     child r + 2^l      = (c - tau_t(c)) * X^(-2^l)
 // After L levels the node with residue r < d is the constant polynomial 2^L * q_r. Branches whose
 // smallest leaf index is >= d are never created, so exactly d outputs come out, all at depth L.
-// The factor 2^L is NOT removed here; the caller adjusts the scaling factor.
+// The factor 2^L is NOT removed here and no multiplication or scale change is done anywhere: the
+// client pre-scales the query by 2^-L before encoding, so each leaf is the constant q_r.
 #pragma once
 
 #include <cstddef>

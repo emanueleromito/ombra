@@ -13,6 +13,11 @@ z_k = m(zeta^(5^k mod 2N)) with zeta = exp(2*pi*i / 2N)
 :70-72 positive-angle roots). Because p is
 symmetric (p(X) = p(X^-1) as a function on roots of unity), its slots are real and do not depend on
 the sign convention of the root.
+
+Pre-scaling: the server's expansion tree multiplies every value by 2^L, L = expansion_depth(d), and
+does no EvalMult and no scale change to undo it (decision 0010). The client therefore encodes
+q * 2^-L (exact: a power of two only changes the exponent), so each expanded leaf decrypts to q_j.
+The norm check is done on the unscaled q.
 """
 
 from __future__ import annotations
@@ -88,17 +93,26 @@ def symmetric_slots(query: np.ndarray, ring_dim: int) -> np.ndarray:
     return np.ascontiguousarray(z.real)
 
 
+def prescale_query(query: np.ndarray) -> np.ndarray:
+    """Return query * 2^-L, L = expansion_depth(len(query)), exactly (np.ldexp, no rounding)."""
+    q = np.asarray(query, dtype=np.float64)
+    if q.ndim != 1 or q.size == 0:
+        raise ValueError("query must be a non-empty one-dimensional vector")
+    return np.ldexp(q, -expansion_depth(q.size))
+
+
 def encode_query(cc: Any, public_key: Any, query: np.ndarray) -> Any:
     """Encrypt the symmetric coefficient-packed query with OpenFHE and return the ciphertext.
 
-    `query` must be a normalized vector of d values. The plaintext polynomial has q_j in
-    coefficient j and -q_j in coefficient N - j.
+    `query` must be a normalized vector of d values. It is pre-scaled by 2^-L (`prescale_query`)
+    before encoding, so the plaintext polynomial has q_j * 2^-L in coefficient j and
+    -q_j * 2^-L in coefficient N - j, and the server's tree restores q_j.
     """
     q = np.asarray(query, dtype=np.float64)
     if q.ndim != 1 or q.size == 0:
         raise ValueError("query must be a non-empty one-dimensional vector")
     if abs(float(np.linalg.norm(q)) - 1.0) > NORM_TOLERANCE:
         raise ValueError("query must be normalized to unit length before encryption")
-    slots = symmetric_slots(q, cc.GetRingDimension())
+    slots = symmetric_slots(prescale_query(q), cc.GetRingDimension())
     pt = cc.MakeCKKSPackedPlaintext(slots.tolist())  # real overload: no CKKSDataType change
     return cc.Encrypt(public_key, pt)

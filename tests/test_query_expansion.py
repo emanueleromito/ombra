@@ -7,6 +7,11 @@ only public material (context, query ciphertext, automorphism keys) to disk. The
 key stays in this process and is used only to decrypt the outputs. Prints one summary line per d,
 never values or key material.
 
+The query is pre-scaled by 2^-L on the client, so the server does no multiplication on expansion.
+Two measurements per d, both against 1e-6: (a) max error of every expanded leaf against the
+unscaled q_j, and (b) max error of a full pipeline (column-packed score, then a ciphertext 0/1
+mask) against numpy, which must use exactly 2 levels.
+
 Default d = 13, 16; `--expansion-large` adds d = 384, 768, 1536 (CPU minutes).
 """
 
@@ -58,15 +63,25 @@ def _binary(name: str) -> Path:
 def context():
     _, cc = ombra_params.make_context(PRESET)
     keys = cc.KeyGen()
+    cc.EvalMultKeyGen(keys.secretKey)
     return cc, keys
 
 
-def test_expansion_matches_query(context, tmp_path: Path, d: int) -> None:
+@pytest.fixture(scope="module")
+def expansion_cache(tmp_path_factory: pytest.TempPathFactory) -> dict:
+    """d -> result of the single expansion run for that d, shared by both tests."""
+    return {}
+
+
+def _expanded(context, cache: dict, factory: pytest.TempPathFactory, d: int) -> dict:
+    """Run the C++ expansion once per d (public material on disk) and return its description."""
+    if d in cache:
+        return cache[d]
     import openfhe as ofhe
 
     cc, keys = context
+    tmp_path = factory.mktemp(f"expand_d{d}")
     ring = cc.GetRingDimension()
-    slots = ring // 2
     depth = oq.expansion_depth(d)
     indices = oq.automorphism_indices(ring, d)
     assert len(indices) == depth
@@ -110,6 +125,26 @@ def test_expansion_matches_query(context, tmp_path: Path, d: int) -> None:
     assert int(drv_depth) == depth
     assert int(outputs) == d
     assert len(sorted(out_dir.glob("expanded_*.bin"))) == d
+    cache[d] = {
+        "out_dir": out_dir,
+        "q": q,
+        "depth": depth,
+        "nodes": nodes,
+        "autos": autos,
+        "seconds": seconds,
+        "key_bytes": key_bytes,
+        "n_keys": len(indices),
+    }
+    return cache[d]
+
+
+def test_expansion_matches_query(context, expansion_cache, tmp_path_factory, d: int) -> None:
+    import openfhe as ofhe
+
+    cc, keys = context
+    r = _expanded(context, expansion_cache, tmp_path_factory, d)
+    out_dir, q = r["out_dir"], r["q"]
+    slots = cc.GetRingDimension() // 2
 
     worst = 0.0
     for j in range(d):
@@ -121,7 +156,51 @@ def test_expansion_matches_query(context, tmp_path: Path, d: int) -> None:
         assert got.size == slots
         worst = max(worst, float(np.max(np.abs(got - q[j]))))
     print(
-        f"d={d} L={depth} nodes={nodes} automorphisms={autos} keys={len(indices)} "
-        f"key_bytes={key_bytes} cpu_seconds={seconds} max_err={worst:.3e}"
+        f"d={d} L={r['depth']} nodes={r['nodes']} automorphisms={r['autos']} keys={r['n_keys']} "
+        f"key_bytes={r['key_bytes']} cpu_seconds={r['seconds']} max_err={worst:.3e}"
     )
+    assert worst < EXPANSION_TOLERANCE
+
+
+def test_expansion_end_to_end_score_with_mask(
+    context, expansion_cache, tmp_path_factory, d: int
+) -> None:
+    """Expanded query -> column-packed score (1 level) -> ciphertext 0/1 mask (1 level)."""
+    import openfhe as ofhe
+
+    cc, keys = context
+    r = _expanded(context, expansion_cache, tmp_path_factory, d)
+    out_dir, q = r["out_dir"], r["q"]
+    slots = ombra_params.get_preset(PRESET)["batch_size"]
+
+    rng = np.random.default_rng(SEED + 7 * d + 1)
+    stored = rng.standard_normal((slots, d))  # one stored vector per row, one slot per vector
+    stored /= np.linalg.norm(stored, axis=1, keepdims=True)
+    mask = rng.integers(0, 2, size=slots).astype(np.float64)
+    mask[0], mask[1] = 0.0, 1.0  # both values present whatever the draw
+    mask_ct = cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(mask.tolist(), 1, 1))
+
+    # Column j of the stored vectors is encrypted at level 0, multiplied with leaf j and summed.
+    # Encrypting column by column (instead of holding all d ciphertexts) keeps memory bounded;
+    # the ciphertexts are the same as T0.4's stored_j.
+    score = None
+    for j in range(d):
+        col = cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(stored[:, j].tolist()))
+        leaf, ok = ofhe.DeserializeCiphertext(str(out_dir / f"expanded_{j}.bin"), ofhe.BINARY)
+        assert ok
+        term = cc.EvalMultNoRelin(col, leaf)
+        score = term if score is None else cc.EvalAdd(score, term)
+    score = cc.Rescale(cc.Relinearize(score))  # query x stored: 1 level
+    masked = cc.Rescale(cc.EvalMult(score, mask_ct))  # mask: 1 level
+
+    assert masked.GetLevel() == 2
+    if hasattr(masked, "GetNoiseScaleDeg"):
+        assert masked.GetNoiseScaleDeg() == 1
+
+    dec = cc.Decrypt(masked, keys.secretKey)
+    dec.SetLength(slots)
+    got = np.array(dec.GetRealPackedValue())
+    assert got.size == slots
+    worst = float(np.max(np.abs(got - (stored @ q) * mask)))
+    print(f"d={d} L={r['depth']} levels_used=2 max_err_final={worst:.3e}")
     assert worst < EXPANSION_TOLERANCE

@@ -140,7 +140,10 @@ def test_gpu(pytest_args: str = "") -> None:
     )
 
 
-@app.function(cpu=4.0, memory=8192, timeout=3600, volumes={DATA_DIR: volume})
+# memory: with --expansion-large the C++ expansion driver holds all d = 1536 expanded ciphertexts
+# (about 1.2 GB) plus its tree levels and automorphism keys, while the pytest process keeps its keys
+# and one score accumulator; 16 GiB leaves headroom over that estimate of about 5 to 6 GB.
+@app.function(cpu=4.0, memory=16384, timeout=3600, volumes={DATA_DIR: volume})
 def test_openfhe(pytest_args: str = "") -> None:
     """Run tests marked `openfhe` on CPU. Zero collected tests (exit code 5) is a failure.
 

@@ -112,6 +112,29 @@ def test_plain_polynomial_tree_gives_constants(d: int) -> None:
         assert float(np.max(np.abs(c - want))) < SLOT_TOLERANCE
 
 
+@pytest.mark.parametrize("d", [1, 13, 16, 17, 384, 768, 1536])
+def test_prescale_is_exact_power_of_two(d: int) -> None:
+    q = np.random.default_rng(SEED + d).standard_normal(d)
+    q /= np.linalg.norm(q)
+    scaled = oq.prescale_query(q)
+    depth = oq.expansion_depth(d)
+    assert np.array_equal(scaled * float(1 << depth), q)  # exact: only the exponent changed
+    assert np.array_equal(scaled, np.ldexp(q, -depth))
+    assert abs(float(np.linalg.norm(q)) - 1.0) < oq.NORM_TOLERANCE  # input is left unscaled
+
+
+def test_encode_checks_norm_on_unscaled_query() -> None:
+    class Ctx:
+        @staticmethod
+        def GetRingDimension() -> int:  # noqa: N802
+            return 16
+
+    # Unit length is required of the input q; a vector of norm 2^-L would be unit after the
+    # pre-scaling of a norm-1 input, but is not itself a valid query.
+    with pytest.raises(ValueError):
+        oq.encode_query(Ctx(), None, np.array([0.5, 0.0]))
+
+
 def test_encode_rejects_unnormalized() -> None:
     class Ctx:
         @staticmethod
@@ -156,9 +179,10 @@ def test_encoded_coefficients_are_symmetric_query(tmp_path: Path, d: int) -> Non
     ring = cc.GetRingDimension()
     q = np.random.default_rng(SEED + d).standard_normal(d)
     q /= np.linalg.norm(q)
+    scaled = oq.prescale_query(q)  # what encode_query encodes: q_j * 2^-L
     assert ofhe.SerializeToFile(str(tmp_path / "context.bin"), cc, ofhe.BINARY)
-    (tmp_path / "slots.bin").write_bytes(oq.symmetric_slots(q, ring).astype("<f8").tobytes())
-    (tmp_path / "q.bin").write_bytes(q.astype("<f8").tobytes())
+    (tmp_path / "slots.bin").write_bytes(oq.symmetric_slots(scaled, ring).astype("<f8").tobytes())
+    (tmp_path / "q.bin").write_bytes(scaled.astype("<f8").tobytes())
     proc = subprocess.run(  # noqa: S603
         [
             str(_binary("ombra_encoding_check")),
