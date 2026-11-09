@@ -39,31 +39,11 @@ GpuCtOps::GpuCtOps(const CryptoContext<DCRTPoly>& cc, const Ct& sample,
                    const EvalKey<DCRTPoly>& relin_key)
     : cc_(cc), tables_(extract_expansion_tables(cc, sample)), device_(tables_) {
   const auto cp = std::dynamic_pointer_cast<CryptoParametersCKKSRNS>(cc->GetCryptoParameters());
-  if (!cp || (cp->GetScalingTechnique() != FIXEDMANUAL &&
-              cp->GetScalingTechnique() != COMPOSITESCALINGMANUAL)) {
-    fail("only CKKS with FIXEDMANUAL or COMPOSITESCALINGMANUAL scaling is supported");
+  if (!cp || cp->GetScalingTechnique() != FIXEDMANUAL) {
+    fail("only CKKS with FIXEDMANUAL scaling is supported");
   }
   composite_degree_ = cp->GetCompositeDegree();
-  if (composite_degree_ < 1 ||
-      (composite_degree_ > 1 && cp->GetScalingTechnique() != COMPOSITESCALINGMANUAL)) {
-    fail("composite degree does not match the scaling technique");
-  }
-  // ModReduceInternalInPlace (ckksrns-leveledshe.cpp:188): step i divides the scaling factor by
-  // GetModReduceFactor(sizeQl - 1 - i).
-  if (tables_.num_q > composite_degree_) {
-    for (std::size_t i = 0; i < composite_degree_; ++i) {
-      mod_reduce_factors_.push_back(cp->GetModReduceFactor(tables_.num_q - 1 - i));
-    }
-  }
-  // Composite rescale: steps 1.. need the tables of the shorter ciphertexts. Their Q towers are a
-  // prefix of this level's, so a sample with the last towers dropped gives them.
-  for (std::size_t step = 1; step < composite_degree_ && tables_.num_q > composite_degree_;
-       ++step) {
-    Ct lower = sample->Clone();
-    for (auto& e : lower->GetElements()) e.DropLastElements(step);
-    rescale_chain_.push_back(
-        std::make_unique<ExpansionDevice>(extract_expansion_tables(cc, lower)));
-  }
+  if (tables_.num_q >= 2) mod_reduce_factor_ = cp->GetModReduceFactor(tables_.num_q - 1);
   const std::size_t full_q = cp->GetElementParams()->GetParams().size();
   device_.set_relin_key(extract_key_words(relin_key, tables_, full_q));
 }
@@ -82,13 +62,11 @@ std::vector<u64> GpuCtOps::checked_words(const Ct& ct, std::size_t components) c
 }
 
 CtMeta GpuCtOps::rescaled(const CtMeta& m) const {
-  // ModReduceInternalInPlace with levels = compositeDegree: degree - levels / compositeDegree = 1,
-  // level + compositeDegree, scaling factor divided by GetModReduceFactor(sizeQl - 1 - i) for each
-  // dropped tower i in turn (a single division under FIXEDMANUAL).
-  if (mod_reduce_factors_.empty()) fail("nothing to drop");
-  double sf = m.scaling_factor;
-  for (double f : mod_reduce_factors_) sf /= f;
-  return {m.level + composite_degree_, m.noise_scale_deg - 1, sf};
+  // ModReduceInternalInPlace with levels = 1: degree - 1 / compositeDegree, level + 1, scaling
+  // factor / GetModReduceFactor(sizeQl - 1).
+  if (tables_.num_q < 2) fail("nothing to drop");
+  return {m.level + 1, m.noise_scale_deg - 1 / composite_degree_,
+          m.scaling_factor / mod_reduce_factor_};
 }
 
 CtMeta GpuCtOps::multiplied(const CtMeta& a, const CtMeta& b) {
@@ -108,45 +86,15 @@ GpuCtOps::Ct GpuCtOps::relinearize(const Ct& ct3) {
                               f.scaling_factor);
 }
 
-void GpuCtOps::rescale_raw(const std::vector<const u64*>& in, const std::vector<u64*>& out) {
-  if (in.size() != out.size()) fail("rescale: pointer counts differ");
-  if (composite_degree_ == 1) {  // the FIXEDMANUAL path, unchanged
-    device_.rescale(in, out);
-    return;
-  }
-  const std::size_t nodes = in.size(), n = tables_.ring_dim;
-  std::size_t nq = tables_.num_q;
-  // Intermediate results of steps 0 .. degree - 2, [2][nq - s - 1][N] per node, kept between calls.
-  while (rescale_tmp_.size() + 1 < composite_degree_) rescale_tmp_.push_back(nullptr);
-  std::vector<const u64*> cur = in;
-  for (std::size_t step = 0; step < composite_degree_; ++step, --nq) {
-    std::vector<u64*> next;
-    if (step + 1 == composite_degree_) {
-      next = out;
-    } else {
-      const std::size_t words = 2 * (nq - 1) * n;
-      auto& buf = rescale_tmp_[step];
-      if (!buf || buf->size() < nodes * words) buf = std::make_unique<DeviceWords>(nodes * words);
-      for (std::size_t k = 0; k < nodes; ++k) next.push_back(buf->data() + k * words);
-    }
-    ExpansionDevice& dev = step == 0 ? device_ : *rescale_chain_[step - 1];
-    dev.rescale(cur, next);
-    cur.assign(next.begin(), next.end());
-  }
-  // Every step runs on the default stream, in order; the caller synchronizes as it does for the
-  // single-device path.
-}
-
 GpuCtOps::Ct GpuCtOps::rescale(const Ct& ct2) {
   const std::size_t nq = tables_.num_q, n = tables_.ring_dim;
-  const std::size_t out_q = nq - composite_degree_;
   const std::vector<u64> words = checked_words(ct2, 2);
-  DeviceWords in(words.size()), out(2 * out_q * n);
+  DeviceWords in(words.size()), out(2 * (nq - 1) * n);
   in.upload(words);
-  rescale_raw({in.data()}, {out.data()});
+  device_.rescale({in.data()}, {out.data()});
   device_.synchronize();
   const CtMeta m = rescaled(meta_of(flatten_one(ct2)));
-  return make_ciphertext_like(ct2, 2, out_q, out.download(0, out.size()), m.level,
+  return make_ciphertext_like(ct2, 2, nq - 1, out.download(0, out.size()), m.level,
                               m.noise_scale_deg, m.scaling_factor);
 }
 
@@ -193,7 +141,7 @@ struct GpuSearch::Impl {
   std::size_t words2_0() const { return 2 * nq0 * n; }
   std::size_t words2_1() const { return 2 * nq1 * n; }
   std::size_t words3_1() const { return 3 * nq1 * n; }
-  std::size_t words2_2() const { return 2 * (nq1 - ops1->composite_degree()) * n; }
+  std::size_t words2_2() const { return 2 * (nq1 - 1) * n; }
 };
 
 GpuSearch::GpuSearch(const CryptoContext<DCRTPoly>& cc, const Ct& stored_sample,
@@ -210,8 +158,7 @@ GpuSearch::GpuSearch(const CryptoContext<DCRTPoly>& cc, const Ct& stored_sample,
   s.n = s.ops0->ring_dim();
   s.nq0 = s.ops0->num_towers();
   s.nq1 = s.ops1->num_towers();
-  const std::size_t cd = s.ops0->composite_degree();
-  if (s.nq1 + cd != s.nq0 || s.nq1 <= cd) {
+  if (s.nq1 + 1 != s.nq0 || s.nq1 < 2) {
     fail("the mask must be one level above the stored columns, with a level left to rescale");
   }
   s.stored_template = stored_sample;
@@ -271,12 +218,10 @@ double GpuSearch::last_upload_seconds() const { return impl_->search->last_uploa
 std::size_t GpuSearch::device_bytes() const {
   const Impl& s = *impl_;
   const ColumnSearchShape sh{s.dims, s.blocks, s.nq0, s.n};
-  const std::size_t in_word_bytes =
-      s.search->uses_32bit_words() ? sizeof(std::uint32_t) : sizeof(u64);
-  return (sh.stored_words() + sh.query_words()) * in_word_bytes +
-         (sh.out_words() + s.blocks * (s.words2_0() + 2 * s.words2_1() + s.words3_1() +
-                                       s.words2_1() + s.words2_2())) *
-             sizeof(u64);
+  return (sh.stored_words() + sh.query_words() + sh.out_words() +
+          s.blocks *
+              (s.words2_0() + 2 * s.words2_1() + s.words3_1() + s.words2_1() + s.words2_2())) *
+         sizeof(u64);
 }
 
 void GpuSearch::set_query_from_device(const std::vector<const u64*>& column_ptrs,
@@ -326,9 +271,7 @@ GpuSearchTiming GpuSearch::run() {
   }
   if (!same_meta(s.stored_meta, s.query_meta))
     fail("stored and query differ in level, degree or scale");
-  if (s.mask_meta.level != s.stored_meta.level + s.ops0->composite_degree()) {
-    fail("mask must be one level above the scores");
-  }
+  if (s.mask_meta.level != s.stored_meta.level + 1) fail("mask must be one level above the scores");
 
   // Metadata, derived exactly as OpenFHE derives it at each step.
   s.sum_meta = GpuCtOps::multiplied(s.stored_meta, s.query_meta);
@@ -363,7 +306,8 @@ GpuSearchTiming GpuSearch::run() {
   s.ops0->device().synchronize();
   lap(t.relin_s);
 
-  s.ops0->rescale_raw(ptrs_in(s.s1->data(), s.words2_0()), ptrs_out(s.s2->data(), s.words2_1()));
+  s.ops0->device().rescale(ptrs_in(s.s1->data(), s.words2_0()),
+                           ptrs_out(s.s2->data(), s.words2_1()));
   s.ops0->device().synchronize();
   lap(t.rescale1_s);
 
@@ -375,7 +319,8 @@ GpuSearchTiming GpuSearch::run() {
   s.ops1->device().synchronize();
   lap(t.mask_s);
 
-  s.ops1->rescale_raw(ptrs_in(s.m2->data(), s.words2_1()), ptrs_out(s.s3->data(), s.words2_2()));
+  s.ops1->device().rescale(ptrs_in(s.m2->data(), s.words2_1()),
+                           ptrs_out(s.s3->data(), s.words2_2()));
   s.ops1->device().synchronize();
   lap(t.rescale2_s);
   t.total_s = seconds_since(t_start);
@@ -399,7 +344,7 @@ std::vector<u64> GpuSearch::download_words(SearchStage stage, std::size_t block)
     case SearchStage::kMasked:
       return out(*s.m2, 2, s.nq1);
     case SearchStage::kFinal:
-      return out(*s.s3, 2, s.nq1 - s.ops1->composite_degree());
+      return out(*s.s3, 2, s.nq1 - 1);
   }
   fail("bad stage");
 }
@@ -430,7 +375,7 @@ GpuSearch::Ct GpuSearch::download(SearchStage stage, std::size_t block) {
     case SearchStage::kMasked:
       return out(*s.m2, 2, s.nq1, s.mask_template);
     case SearchStage::kFinal:
-      return out(*s.s3, 2, s.nq1 - s.ops1->composite_degree(), s.mask_template);
+      return out(*s.s3, 2, s.nq1 - 1, s.mask_template);
   }
   fail("bad stage");
 }
