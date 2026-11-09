@@ -127,6 +127,19 @@ def test_gpu_relin_rescale_mask_and_search(tmp_path: Path, d: int, preset: str) 
         mask_ct = cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(mask.tolist(), 1, 1))
         assert ofhe.SerializeToFile(str(in_dir / f"mask_{kind}.bin"), mask_ct, ofhe.BINARY)
 
+    # T1.10: more blocks of different data and a different mask per block (ragged: 7 blocks with
+    # max_batch 3 give chunks of 3, 3, 1). Block 0 reuses the stored columns above.
+    n_blocks = 7
+    for b in range(1, n_blocks):
+        blk = rng.standard_normal((slots, d))
+        for j in range(d):
+            col = cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(blk[:, j].tolist()))
+            assert ofhe.SerializeToFile(str(in_dir / f"stored_{b}_{j}.bin"), col, ofhe.BINARY)
+    for b in range(n_blocks):
+        bm = rng.integers(0, 2, size=slots).astype(np.float64)
+        mct = cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(bm.tolist(), 1, 1))
+        assert ofhe.SerializeToFile(str(in_dir / f"mask_blk_{b}.bin"), mct, ofhe.BINARY)
+
     out_dir = tmp_path / "search_out"
     out_dir.mkdir()
     out = _run(
@@ -138,9 +151,34 @@ def test_gpu_relin_rescale_mask_and_search(tmp_path: Path, d: int, preset: str) 
             str(out_dir),
             str(d),
             *masks,
+            f"blocks={n_blocks}",
         ],
         timeout=3600,
     )
+    for b in range(n_blocks):
+        for st in ("search sum", "relinearize", "rescale", "mask", "final rescale"):
+            assert f"multiblock {st} (block {b} of {n_blocks}): PASS" in out, (st, b)
+
+    # Negative check: judging the last block against block 0's chain must fail.
+    bad = subprocess.run(  # noqa: S603
+        [
+            str(_driver("ombra_search_gpu")),
+            str(tmp_path / "context.bin"),
+            str(tmp_path / "evalmult.bin"),
+            str(in_dir),
+            str(out_dir),
+            str(d),
+            "ones",
+            f"blocks={n_blocks}",
+            "inject=block",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=3600,
+    )
+    assert bad.returncode == 1, bad.stdout + bad.stderr
+    assert f"(block {n_blocks - 1} of {n_blocks}): FAIL" in bad.stdout
+    assert f"(block {n_blocks - 2} of {n_blocks}): FAIL" not in bad.stdout
     print(f"preset={preset} d={d}")
     for line in out.splitlines():
         print(line)  # PASS verdicts, shapes and timings only

@@ -103,7 +103,7 @@ One task per high or medium finding in `results/m1-crypto-review.md`. T1.10 shou
 **Depends on:** none
 **Steps:** run `ombra_search_gpu` with several blocks of different data, a ragged block count and `set_max_batch(3)`; compare every block at every stage with OpenFHE.
 **Done when:** the driver reports exact matches for every block on both presets on the A10.
-**Status:** todo
+**Status:** done
 
 ### T1.11 Real metadata for ciphertext x plaintext search (F3, medium)
 
