@@ -7,7 +7,8 @@ checks, against OpenFHE on the same doubles:
   * the GPU encoder against MakeCKKSPackedPlaintext (decision 0015): FFT and rounding within
     COEF_TOLERANCE units (1 unit = 1/scale in slot space); tower reduction and NTT of OpenFHE's own
     integer coefficients exactly; the GPU evaluation form exactly against OpenFHE's NTT of the GPU's
-    own coefficients (never skipped). test_gpu_encoder_oracle_detects_faults injects one wrong
+    own coefficients (never skipped); the GPU's coefficient words are one integer in every tower.
+    test_gpu_encoder_oracle_detects_faults injects one wrong
     reduction or NTT word beside a one-unit difference and needs the driver to fail;
   * the ct x pt search with OpenFHE-encoded plaintexts against EvalMult + EvalAdd, EXACTLY;
   * the fused encode-and-search path against encode-all then search.
@@ -119,11 +120,14 @@ def _run_driver(tmp_path: Path, preset: str, fmt: str, inject: str | None = None
     return proc, cc, keys, (ring, slots, scale, stored, q, decoded, columns)
 
 
-@pytest.mark.parametrize("inject", ["reduction", "ntt"])
+@pytest.mark.parametrize("inject", ["reduction", "ntt", "tower"])
+@pytest.mark.parametrize("fmt", ["f64", "fp16", "int8"])
 @pytest.mark.parametrize("preset", PRESETS)
-def test_gpu_encoder_oracle_detects_faults(tmp_path: Path, preset: str, inject: str) -> None:
+def test_gpu_encoder_oracle_detects_faults(
+    tmp_path: Path, preset: str, fmt: str, inject: str
+) -> None:
     """One wrong reduction or NTT word is caught although every coefficient is within one unit."""
-    proc, *_ = _run_driver(tmp_path, preset, "int8", inject)
+    proc, *_ = _run_driver(tmp_path, preset, fmt, inject)
     print(proc.stdout)
     assert proc.returncode == 1, f"driver did not fail (exit {proc.returncode}): {proc.stdout}"
     assert "encoding FFT and rounding" in proc.stdout
@@ -132,6 +136,7 @@ def test_gpu_encoder_oracle_detects_faults(tmp_path: Path, preset: str, inject: 
     wanted = {
         "reduction": "tower reduction of OpenFHE's integer coefficients, exact words: FAIL",
         "ntt": "NTT of OpenFHE's integer coefficients, exact words: FAIL",
+        "tower": "GPU coefficient words are one integer in every tower, exact: FAIL",
     }[inject]
     assert wanted in proc.stdout
     if inject == "ntt":

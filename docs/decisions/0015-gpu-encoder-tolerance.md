@@ -15,7 +15,7 @@ The GPU CKKS encoder (`core/kernels/encode.cu`) repeats OpenFHE's floating-point
 
 ## Decision
 
-Option B. The only tolerance is `COEF_TOLERANCE = 2` units on the centered difference between GPU and OpenFHE coefficients (1 unit = 1/scale in slot space), and it applies to the FFT and rounding only. Measured on the A10 with 16 synthetic columns: `m0_depth2` max difference 1 unit (27 to 30 of 786432 coefficient words differ, f64, fp16 and int8); `m0_compact_n8192` max difference 0 (all 393216 words identical). So the margin is 1 unit at `m0_depth2` and 2 units at `m0_compact_n8192`. Reduction and both NTT comparisons have no tolerance. A test-only fault injection in the driver (one wrong reduction word, one wrong NTT word, beside a one-unit coefficient difference) checks that the oracle fails.
+Option B. The only tolerance is `COEF_TOLERANCE = 2` units on the centered difference between GPU and OpenFHE coefficients (1 unit = 1/scale in slot space), and it applies to the FFT and rounding only. Measured on the A10 with 16 synthetic columns: `m0_depth2` max difference 1 unit (27 to 30 of 786432 coefficient words differ, f64, fp16 and int8); `m0_compact_n8192` max difference 0 (all 393216 words identical). So the margin is 1 unit at `m0_depth2` and 2 units at `m0_compact_n8192`. Reduction, both NTT comparisons and a check that the GPU's coefficient words are one integer in every tower have no tolerance. A test-only fault injection in the driver (one wrong reduction word, one wrong NTT word beside a one-unit coefficient difference, or one tower off by one unit) checks that the oracle fails, for both presets and all three formats.
 
 ## Consequences
 

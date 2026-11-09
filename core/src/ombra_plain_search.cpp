@@ -14,8 +14,9 @@
 //      every GPU coefficient from OpenFHE's MakeCKKSPackedPlaintext is at most <coef_tolerance>
 //      units (1 unit = 1 / scale of the value); (b) tower reduction and NTT of OpenFHE's own
 //      integer coefficients equal OpenFHE's words EXACTLY; (c) the GPU evaluation form equals
-//      OpenFHE's NTT of the GPU's own coefficients EXACTLY, always. An optional last argument
-//      (none|reduction|ntt) injects a fault, for tests of the oracle only.
+//      OpenFHE's NTT of the GPU's own coefficients EXACTLY, always; (d) the GPU's coefficient
+//      words are one integer reduced into every tower, EXACTLY. An optional last argument
+//      (none|reduction|ntt|tower) injects a fault, for tests of the oracle only.
 //   2. Search with OpenFHE-encoded plaintexts: the GPU result equals OpenFHE
 //      sum_j EvalMult(query_j, plaintext_j) (EvalAdd accumulation) EXACTLY (every RNS word and the
 //      metadata).
@@ -121,7 +122,7 @@ int main(int argc, char** argv) {
   if (argc != 7 && argc != 8) {
     std::fprintf(stderr,
                  "usage: ombra_plain_search <context> <dir> <dims> <f64|fp16|int8> "
-                 "<code_scale> <coef_tolerance> [none|reduction|ntt]\n");
+                 "<code_scale> <coef_tolerance> [none|reduction|ntt|tower]\n");
     return 2;
   }
   try {
@@ -181,8 +182,8 @@ int main(int argc, char** argv) {
     // reduction ("reduction") or in the NTT ("ntt"). It lets the tests show that the checks below
     // fail on such a defect; it is not a product feature and changes no kernel.
     const std::string inject = argc == 8 ? argv[7] : "none";
-    if (inject != "none" && inject != "reduction" && inject != "ntt") {
-      throw std::invalid_argument("inject must be none, reduction or ntt");
+    if (inject != "none" && inject != "reduction" && inject != "ntt" && inject != "tower") {
+      throw std::invalid_argument("inject must be none, reduction, ntt or tower");
     }
     const auto bump = [](u64& w, u64 q) { w = (w + 1) % q; };
     if (inject != "none") {
@@ -195,6 +196,8 @@ int main(int argc, char** argv) {
       }
       gpu_eval = enc.reduce_ntt_host(ints.data(), dims, true);
     }
+    // One tower of one coefficient off by one unit: the production path's reduction went wrong.
+    if (inject == "tower") bump(gpu_coef[n + 3], tables.moduli[1]);
 
     // 1a. FFT and rounding: centered coefficient difference within the tolerance.
     std::int64_t max_diff = 0;
@@ -262,6 +265,20 @@ int main(int argc, char** argv) {
     std::printf("encoding GPU evaluation form vs OpenFHE NTT of the GPU coefficients, exact: %s\n",
                 eval_ok ? "PASS" : "FAIL");
     ok = ok && eval_ok;
+
+    // 1d. The production path's coefficient words, in every tower, are one integer. Without this a
+    //     one-unit error in a single tower would pass 1a, and 1c would take it as its input.
+    std::vector<std::int64_t> own_ints(dims * n);
+    for (std::size_t c = 0; c < dims; ++c) {
+      for (std::size_t i = 0; i < n; ++i) {
+        own_ints[c * n + i] = center(gpu_coef[c * poly + i], tables.moduli[0]);
+      }
+    }
+    const bool towers_ok = enc.reduce_ntt_host(own_ints.data(), dims, false) == gpu_coef;
+    std::printf("encoding GPU coefficient words are one integer in every tower, exact: %s\n",
+                towers_ok ? "PASS" : "FAIL");
+    ok = ok && towers_ok;
+
     std::size_t exact_eval = 0;
     for (std::size_t k = 0; k < gpu_eval.size(); ++k) exact_eval += gpu_eval[k] == cpu_eval[k];
     std::printf("info: %zu of %zu evaluation words identical to OpenFHE's plaintext\n", exact_eval,
