@@ -85,6 +85,108 @@ T1.1, T1.2, T1.4 and T1.6 can start in parallel. T1.2 and T1.4 both touch the se
 
 ---
 
+## Follow-ups from the T1.1 crypto review
+
+One task per high or medium finding in `results/m1-crypto-review.md`. T1.10 should be done before T1.3 reports numbers. T1.12, T1.13 and T1.14 edit the same files, so run them one after the other.
+
+### T1.9 Exact oracle for the GPU encoder (F1, high)
+
+**Why:** the encoder is checked only within a tolerance, evaluation-form words are skipped when any coefficient differs, and GPU-encoded search is never compared with OpenFHE.
+**Depends on:** none
+**Steps:** test tower reduction and NTT exactly on OpenFHE's rounded integer coefficients; keep a tolerance only for the FFT and rounding; always compare the GPU evaluation form with OpenFHE's NTT of the GPU's own coefficients; record the tolerance as a decision.
+**Done when:** `ombra_plain_search` fails on any wrong reduction or NTT word even when coefficients differ by one unit, for both presets and all three formats, and the decision record exists.
+**Status:** todo
+
+### T1.10 Multi-block oracle for relinearize, rescale and mask (F2, medium)
+
+**Why:** every T1.2 oracle runs one node and one block, while T1.3 runs many and measures only time.
+**Depends on:** none
+**Steps:** run `ombra_search_gpu` with several blocks of different data, a ragged block count and `set_max_batch(3)`; compare every block at every stage with OpenFHE.
+**Done when:** the driver reports exact matches for every block on both presets on the A10.
+**Status:** todo
+
+### T1.11 Real metadata for ciphertext x plaintext search (F3, medium)
+
+**Why:** the plain-search metadata comparison copies OpenFHE's values and cannot fail.
+**Depends on:** none
+**Steps:** add a `ciphertext_ops` wrapper that derives level, degree and scale from the query and plaintext; compare its output with OpenFHE without using an OpenFHE result as the template.
+**Done when:** the oracle fails if the wrapper's metadata rule is wrong (shown by a negative test) and passes on both presets.
+**Status:** todo
+
+### T1.12 Validate metadata on expansion upload (F4, medium)
+
+**Why:** `GpuExpansion` ignores the metadata of uploaded ciphertexts and labels leaves with the sample's.
+**Depends on:** none
+**Steps:** reject uploads whose level, degree or scale differ from the sample; check every query in `ombra_recall_search`; add negative tests.
+**Done when:** a root with a different degree or scale is refused, covered by a test.
+**Status:** todo
+
+### T1.13 Key, context and encoding checks on GPU operations (F5, medium)
+
+**Why:** GPU paths skip OpenFHE's `TypeCheck`, so ciphertexts under different keys mix silently.
+**Depends on:** T1.12
+**Steps:** record key tag and encoding type when flattening and reject mixes; check evaluation-key tags; share one oracle comparator that includes these fields; add negative tests with two key pairs.
+**Done when:** every GPU entry point refuses mixed keys and the tests pass on the A10.
+**Status:** todo
+
+### T1.14 Shape check in batched search (F6, medium)
+
+**Why:** a query with a smaller ring dimension and matching moduli causes a host buffer over-read.
+**Depends on:** T1.13
+**Steps:** compare ring dimension and tower count across queries; check the buffer size before upload; add a negative test.
+**Done when:** a mismatched query is refused, covered by a test.
+**Status:** todo
+
+### T1.15 Enforce the 128-bit floor in C++ (F7, medium)
+
+**Why:** only the Python loader checks the floor, and M2 will accept contexts from clients.
+**Depends on:** none
+**Steps:** add one check used by the core entry points that rejects `HEStd_NotSet` and confirms log2(QP) against the standard's limit; add a negative test.
+**Done when:** a context below the floor is refused by every core entry point, covered by a test.
+**Status:** todo
+
+### T1.16 Version headers for ciphertext and key files (F8, medium)
+
+**Why:** hard rule 6 is not met: files are raw OpenFHE serialization.
+**Depends on:** none
+**Steps:** define an envelope (magic, format version, preset, OpenFHE version), or write a decision on what counts as compliant for temporary spike files.
+**Done when:** the format or the decision is merged, and readers refuse an unknown version, before M2 storage starts.
+**Status:** todo
+
+### T1.17 Decision on decryption noise (F9, medium)
+
+**Why:** decision 0010 relies on a mitigation that is heuristic, unpinned and untested, and client choices derived from decrypted scores reach the server.
+**Depends on:** none
+**Steps:** write a decision on the IND-CPA-D position; pin the CKKS data type and decryption mode in the presets; add a test that two decryptions of one ciphertext differ.
+**Done when:** the decision is **proposed**, the presets pin both settings and the test passes.
+**Status:** todo
+
+### T1.18 Decision on plaintext-DB disclosure (F10, medium)
+
+**Why:** a client can recover stored vectors with d unit-vector queries, which the threat model does not mention.
+**Depends on:** none
+**Steps:** write a decision on who this mode protects; update the threat model.
+**Done when:** the decision is **proposed** and `docs/product-requirements.md` states the limit.
+**Status:** todo
+
+### T1.19 Required check for the oracles (F11, medium)
+
+**Why:** oracle runs depend on someone running `make test-gpu` by hand.
+**Depends on:** none
+**Steps:** add a CI job for `make test` on every PR and `make test-gpu` on PRs touching `core/`, with Modal credentials as repository secrets; make it a required check.
+**Done when:** a PR with a failing oracle cannot be merged.
+**Status:** todo
+
+### T1.20 Restrict what is uploaded to Modal (F12, medium)
+
+**Why:** key files and secrets excluded by `.gitignore` are copied into the Modal image.
+**Depends on:** none
+**Steps:** replace the ignore list in `modal_app.py` with an allowlist of needed folders; add a test that the secret patterns in `.gitignore` are excluded.
+**Done when:** the test passes and `make test-gpu` still builds.
+**Status:** todo
+
+---
+
 ## Not in M1
 
 - **Seeded encryption:** deferred until after M2. It would halve encrypted-DB storage but has no OpenFHE support, so it breaks hard rule 3 and needs its own audit (`results/2026-11-09-t0.11-seeded-encryption.md`).
