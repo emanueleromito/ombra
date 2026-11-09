@@ -87,3 +87,6 @@ target_link_libraries(ombra_bench_plain_search PRIVATE ombra_core)
 
 add_executable(ombra_search_gpu src/ombra_search_gpu.cpp)
 target_link_libraries(ombra_search_gpu PRIVATE ombra_core)
+
+add_executable(ombra_bench_e2e src/ombra_bench_e2e.cpp)
+target_link_libraries(ombra_bench_e2e PRIVATE ombra_core)

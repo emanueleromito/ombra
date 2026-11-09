@@ -173,6 +173,22 @@ int main(int argc, char** argv) {
       check("pipeline stage: mask" + tag, gs.download(SearchStage::kMasked, 0), ref_masked);
       const Ct gpu_final = gs.download(SearchStage::kFinal, 0);
       check("pipeline final: rescale" + tag, gpu_final, ref_final);
+      if (m == 0) {
+        // T1.3 handoff: the query columns reach the search kernel device to device (as the
+        // expansion leaves do), with no host copy into the search's query buffer. Same exact
+        // comparison with the OpenFHE chain.
+        std::vector<ombra::core::CtHandle> handles;
+        std::vector<const std::uint64_t*> ptrs;
+        for (std::size_t j = 0; j < d; ++j) {
+          handles.push_back(gs.level0().device().upload(gs.level0().checked_words(query[j], 2)));
+          ptrs.push_back(gs.level0().device().device_ptr(handles.back()));
+        }
+        const auto qf = ombra::core::flatten_one(query[0]);
+        gs.set_query_from_device(ptrs, {qf.level, qf.noise_scale_deg, qf.scaling_factor});
+        gs.run();
+        check("pipeline final via device-to-device query handoff" + tag,
+              gs.download(SearchStage::kFinal, 0), ref_final);
+      }
       std::printf(
           "timing d=%zu mask=%s search_s=%.5f relin_s=%.5f rescale1_s=%.5f mask_s=%.5f "
           "rescale2_s=%.5f total_s=%.5f\n",

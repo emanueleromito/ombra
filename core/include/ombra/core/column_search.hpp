@@ -38,10 +38,17 @@ class ColumnSearchDevice {
 
     // Copy one stored block (shape.block_words() words) to the device. Words must be reduced.
     void upload_block(std::size_t block, const std::uint64_t* words, std::size_t count);
+    // T1.3: seconds the cudaMemcpy of the last upload_block took (excludes the range check).
+    double last_upload_seconds() const;
     // Device-to-device copy of block `src` into block `dst` (for synthetic benchmark data).
     void copy_block(std::size_t src, std::size_t dst);
     // Copy the query (shape.query_words() words) to the device. Words must be reduced.
     void upload_query(const std::uint64_t* words, std::size_t count);
+    // T1.3: device-to-device copy of query dimension j (2 * num_towers * ring_dim words, one
+    // ciphertext in the [component][tower][coeff] layout) from `src`, a device pointer, into the
+    // query buffer. Ordered after earlier work on the default stream. No host round trip and no
+    // range check of the words: the source is the output of the expansion kernels.
+    void set_query_column_from_device(std::size_t j, const std::uint64_t* src);
     // Score all blocks. Waits for completion; returns the kernel time in seconds (CUDA events).
     double run();
     // Copy the result (shape.out_words() words) to the host.

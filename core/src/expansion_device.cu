@@ -652,6 +652,11 @@ std::vector<std::uint64_t> ExpansionDevice::download(const CtHandle& ct) {
   return out;
 }
 
+const std::uint64_t* ExpansionDevice::device_ptr(const CtHandle& ct) const {
+  if (!ct) throw std::invalid_argument("expansion: null handle");
+  return ct->data();
+}
+
 void ExpansionDevice::synchronize() {
   const auto go = []() -> Status {
     OMBRA_CUDA_CHECK(cudaDeviceSynchronize());
