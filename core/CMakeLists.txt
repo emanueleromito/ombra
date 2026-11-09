@@ -100,5 +100,9 @@ target_link_libraries(ombra_profile_search PRIVATE ombra_rns_cuda)
 add_executable(ombra_search_gpu src/ombra_search_gpu.cpp)
 target_link_libraries(ombra_search_gpu PRIVATE ombra_core)
 
+# T1.15: calls the library entry points directly (no driver-side check) to show each one refuses.
+add_executable(ombra_security_floor_wiring src/ombra_security_floor_wiring.cpp)
+target_link_libraries(ombra_security_floor_wiring PRIVATE ombra_core)
+
 add_executable(ombra_bench_e2e src/ombra_bench_e2e.cpp)
 target_link_libraries(ombra_bench_e2e PRIVATE ombra_core)

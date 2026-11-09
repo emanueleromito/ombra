@@ -7,8 +7,8 @@
 //
 // Limits are the HomomorphicEncryption.org 128-bit classic table (maximum log2 of the full modulus
 // QP, special primes included, per ring dimension). A context declared at 192 or 256 bits is held
-// to the same 128-bit limit, which is the floor. The Python loader keeps a copy of the table;
-// tests/test_security_floor.py checks the two agree.
+// to the same 128-bit limit, which is the floor. Ring dimensions above 32768 are not in the table
+// and are refused until a verified value is added.
 #pragma once
 
 #include <cstddef>
@@ -32,11 +32,9 @@ struct SecurityLimit {
   std::size_t max_log2_qp;
 };
 
-// SECURITY_TABLE_BEGIN (parsed by tests/test_security_floor.py; keep "{ring_dim, limit}" pairs)
 inline constexpr SecurityLimit kSecurityTable128Classic[] = {
-    {1024, 27}, {2048, 54}, {4096, 109}, {8192, 218}, {16384, 438}, {32768, 881}, {65536, 1761},
+    {1024, 27}, {2048, 54}, {4096, 109}, {8192, 218}, {16384, 438}, {32768, 881},
 };
-// SECURITY_TABLE_END
 
 // Throws std::invalid_argument unless the level is declared and log2_qp is within the limit for
 // ring_dim. A ring dimension that is not in the table is refused. `extra_limit` (0 = none) can only

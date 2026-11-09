@@ -26,19 +26,6 @@ ACCEPTED_SECURITY_LEVELS = frozenset(
     }
 )
 
-# HomomorphicEncryption.org 128-bit classic limits: ring dimension -> maximum log2(QP). The C++
-# copy is in core/include/ombra/core/security_floor.hpp; tests/test_security_floor.py checks they
-# agree.
-MAX_LOG2_QP_128_CLASSIC = {
-    1024: 27,
-    2048: 54,
-    4096: 109,
-    8192: 218,
-    16384: 438,
-    32768: 881,
-    65536: 1761,
-}
-
 _REQUIRED_KEYS = (
     "security_level",
     "ring_dim",

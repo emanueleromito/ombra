@@ -80,3 +80,54 @@ def test_driver_refuses_below_limit(name: str, context_file: Path, tmp_path: Pat
     # Control: without the variable the check passes, so any failure is about the dummy inputs.
     control = _run(name, context_file, tmp_path, None)
     assert "security floor" not in control.stdout + control.stderr
+
+
+# Library entry points called directly by ombra_security_floor_wiring, which never calls the check
+# itself. Expected log2(QP) per preset, as computed by the C++ side (Q and P tower bit lengths).
+ENTRY_POINTS = [
+    "extract_expansion_tables",
+    "GpuExpansion",
+    "GpuCtOps",
+    "GpuSearch",
+    "gpu_eval_add (require_fixedmanual)",
+]
+EXPECTED_LOG2QP = {"m0_depth2": 280, "m0_compact_n8192": 195}
+
+
+@pytest.mark.parametrize("preset", PRESETS)
+def test_library_entry_points_refuse(preset: str, tmp_path: Path) -> None:
+    import openfhe as ofhe
+
+    _, cc = ombra_params.make_context(preset)
+    keys = cc.KeyGen()
+    cc.EvalMultKeyGen(keys.secretKey)
+    ctx, evk, ctf = tmp_path / "context.bin", tmp_path / "evalmult.bin", tmp_path / "ct.bin"
+    assert ofhe.SerializeToFile(str(ctx), cc, ofhe.BINARY)
+    assert ofhe.CryptoContext.SerializeEvalMultKey(str(evk), ofhe.BINARY, keys.publicKey.GetKeyTag())
+    ct = cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext([0.5, 0.25, 0.125]))
+    assert ofhe.SerializeToFile(str(ctf), ct, ofhe.BINARY)
+
+    def run(limit: str | None) -> subprocess.CompletedProcess[str]:
+        env = {k: v for k, v in os.environ.items() if k != "OMBRA_TEST_LOG2QP_LIMIT"}
+        if limit is not None:
+            env["OMBRA_TEST_LOG2QP_LIMIT"] = limit
+        return subprocess.run(
+            [str(_driver("ombra_security_floor_wiring")), str(ctx), str(evk), str(ctf)],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=120,
+        )
+
+    refused = run("1")
+    assert refused.returncode == 0, refused.stdout + refused.stderr
+    assert f"log2qp: {EXPECTED_LOG2QP[preset]}" in refused.stdout
+    for name in ENTRY_POINTS:
+        assert f"{name}: PASS" in refused.stdout
+
+    # Control: without the variable the check must not fire, so a refusal above was caused by it.
+    control = run(None)
+    assert "security floor" not in control.stdout + control.stderr
+    assert f"log2qp: {EXPECTED_LOG2QP[preset]}" in control.stdout
+    for name in ENTRY_POINTS:
+        assert f"{name}: PASS" not in control.stdout

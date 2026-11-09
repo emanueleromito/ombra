@@ -32,11 +32,16 @@ std::size_t sum_bits(const std::shared_ptr<ILDCRTParams<BigInteger>>& p) {
 
 }  // namespace
 
-void require_security_floor(const CryptoContext<DCRTPoly>& cc) {
+std::size_t context_log2_qp(const CryptoContext<DCRTPoly>& cc) {
   if (!cc) throw std::invalid_argument("security floor: null crypto context");
   const auto rns = std::dynamic_pointer_cast<CryptoParametersRNS>(cc->GetCryptoParameters());
   if (!rns) throw std::invalid_argument("security floor: not an RNS context; refusing");
-  const std::size_t log2_qp = sum_bits(rns->GetElementParams()) + sum_bits(rns->GetParamsP());
+  return sum_bits(rns->GetElementParams()) + sum_bits(rns->GetParamsP());
+}
+
+void require_security_floor(const CryptoContext<DCRTPoly>& cc) {
+  const std::size_t log2_qp = context_log2_qp(cc);
+  const auto rns = std::dynamic_pointer_cast<CryptoParametersRNS>(cc->GetCryptoParameters());
   std::size_t extra = 0;
   if (const char* env = std::getenv("OMBRA_TEST_LOG2QP_LIMIT")) {
     extra = std::strtoull(env, nullptr, 10);
