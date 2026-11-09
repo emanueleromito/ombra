@@ -1,6 +1,6 @@
 # 0007. Router plus sharded nodes, clusters as the unit of distribution
 
-- **Status:** accepted
+- **Status:** accepted; premise amended by 0011
 - **Date:** 2026-11-06
 
 ## Context
