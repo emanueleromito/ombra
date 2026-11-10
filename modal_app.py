@@ -75,6 +75,8 @@ image = (
         "protobuf-compiler",
         "protobuf-compiler-grpc",
         "pkg-config",
+        "libssl-dev",  # T2.9: REST over TLS
+        "openssl",  # T2.9: tests make a self-signed certificate with the CLI
     )
     .pip_install("grpcio", "grpcio-tools")
     # Source code last, so code changes don't rebuild OpenFHE.
