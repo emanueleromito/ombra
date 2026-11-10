@@ -1,6 +1,6 @@
 # 0019. Filter evaluation within depth 2
 
-- **Status:** proposed
+- **Status:** accepted (T2.7, 2026-11-10; measurements in `docs/plan/results/2026-11-10-t2.7-filter-0019.md`)
 - **Date:** 2026-11-10
 
 ## Context
@@ -66,7 +66,7 @@ Measured constants are `m0_depth2` on an A100 from T0.4/T0.5/T1.4; the compact p
 
 ## Decision
 
-**B**, the additive penalty folded into the vector query, chosen by the user on 2026-11-10. The record stays **proposed** until T2.7 has the following in it, measured on the compact preset and on `m0_depth2`, with an oracle test for the new device path (hard rule 3):
+**B**, the additive penalty folded into the vector query, chosen by the user on 2026-11-10. The record was **proposed** until T2.7 had the following in it (now measured, see Results), measured on the compact preset and on `m0_depth2`, with an oracle test for the new device path (hard rule 3):
 
 1. The score error with filter columns in the sum, against the band gap (lambda - 2 = 2), at F = 1, 4 and F_max.
 2. The decision-0012 recall rule with the extra columns.
@@ -77,3 +77,11 @@ A is the fallback if the decode rule hurts recall.
 ## Consequences
 
 If accepted: the collection schema lists the filter fields and their (bucketed) value counts, and the query ciphertext carries d + sum(V) entries (T2.4 message shape: `filter_fields[{id, cardinality}]` in the collection, no separate filter message). The client decodes bands (M3). T2.7 builds the extended dot product and the tombstone addition, and adds the oracle test. 0005 is amended: filters are additive penalties, not a multiplied mask. If rejected for A: T2.4 gets a filter ciphertext per query and AND across fields is limited to declared joint fields.
+
+## Results (T2.7)
+
+All three conditions are measured, on synthetic data, in `docs/plan/results/2026-11-10-t2.7-filter-0019.md`:
+1. Score error at F_max: 9.3e-8 (`m0_depth2`, F = 14) and 2.8e-5 (compact, F = 16), 11x and 7.9x the F = 0 error (the estimate was 15x and 16x); the observed band gap is about 3.6 and no vector was misclassified.
+2. The 0012 recall rule with the extra columns passes in both presets (worst gap 0.0001 against 0.005), on one synthetic dataset, not the two-dataset acceptance.
+3. Filtered recall@10 is 1.000 at 1%, 10% and 50% selectivity, except 0.954 (max_probe 8p) and 0.926 (4) for a 50% filter correlated with the clusters, where the "k matches found" stop is the weak point. The client library (M3) should offer a minimum probe count.
+Also: a tombstoned slot reaches 1 + lambda * (F + 1), which lowers F_max at `m0_depth2` from 15 to 14.
