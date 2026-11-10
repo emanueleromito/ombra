@@ -24,11 +24,12 @@ enum class CrashPoint : int {
   DropAfterCatalog,   // collection gone from the catalog, files and log not yet cleaned
   DropAfterWalReset,  // log checkpointed, files not yet unlinked
   DropAfterFirstFile, // some files unlinked
-  // Block replacement (replace_segment), in order.
+  // Block replacement (replace_segments), in order.
   ReplaceBeforeNewFile,  // log checkpointed, nothing written
   ReplaceAfterNewFile,   // new file durable, catalog untouched
   ReplaceAfterCatalog,   // catalog switched, old file still on disk
-  ReplaceAfterUnlink,    // old file gone
+  ReplaceAfterFirstUnlink,  // first of several old files gone
+  ReplaceAfterUnlink,    // all old files gone
   // Dropping fully tombstoned blocks (drop_dead_blocks), in order.
   CompactBeforeCatalog,
   CompactAfterCatalog,   // rows gone, files still on disk

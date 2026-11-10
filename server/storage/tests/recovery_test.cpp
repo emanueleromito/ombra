@@ -144,30 +144,43 @@ static void drop_case(CrashPoint p, bool expect_dropped, bool expect_crash) {
   CHECK(has_none(check_consistent(d.path, nullptr), kIdsB));
 }
 
-// replace_segment with a crash at p: block A lost a2; the client repacks to {a3, a1}.
+static std::vector<std::string> segments_of(const std::string& root, std::uint32_t cluster) {
+  Store s(root, kOfhe);
+  std::vector<std::string> v;
+  for (auto& r : s.catalog().segments("docs"))
+    if (r.cluster == cluster) v.push_back(r.file);
+  return v;
+}
+
+// replace_segments (2 -> 1) with a crash at p: cluster 0 has block A {a1,a2,a3} and block C {a4,a5};
+// a2 and a5 are deleted; the client merges the live ids into one block {a3, a4, a1}.
 static void replace_case(CrashPoint p, bool expect_new, bool expect_crash) {
   TempDir d;
   setup(d.path, true);
   {
     Store s(d.path, kOfhe);
-    s.remove("docs", {"a2"});
+    s.insert("docs", 0, {"a4", "a5"}, cols(3));
+    s.remove("docs", {"a2", "a5"});
   }
-  const std::string old_file = segment_of(d.path, 0);
+  const auto old_files = segments_of(d.path, 0);
+  CHECK(old_files.size() == 2);
   int code = run_child(d.path, p, [&](Store& s) {
-    s.replace_segment("docs", old_file, SegmentData{0, {"a3", "a1"}, cols(9)});
+    s.replace_segments("docs", old_files, SegmentData{0, {"a3", "a4", "a1"}, cols(9)});
   });
   CHECK(code == (expect_crash ? kCrashExitCode : 0));
   for (int round = 0; round < 2; ++round) {
     std::set<std::string> t;
     auto have = check_consistent(d.path, &t);
-    CHECK(has_all(have, {"a1", "a3"}) && has_all(have, kIdsB));  // no live id lost
-    if (expect_new) CHECK(!have.count("a2") && t.empty());
-    else CHECK(have.count("a2") && t == std::set<std::string>({"a2"}));
+    CHECK(has_all(have, {"a1", "a3", "a4"}) && has_all(have, kIdsB));  // no live id lost
+    if (expect_new) CHECK(!have.count("a2") && !have.count("a5") && t.empty());
+    else CHECK(have.count("a2") && have.count("a5") && t == std::set<std::string>({"a2", "a5"}));
     Store s(d.path, kOfhe);
-    const std::string f = segment_of(d.path, 0);
-    CHECK((f == old_file) == !expect_new);
-    auto sd = s.read_segment("docs", f);
-    CHECK(sd.ids.size() == (expect_new ? 2u : 3u));
+    const auto now = segments_of(d.path, 0);
+    CHECK(now.size() == (expect_new ? 1u : 2u));
+    CHECK((now == old_files) == !expect_new);
+    std::size_t n = 0;
+    for (const auto& f : now) n += s.read_segment("docs", f).ids.size();
+    CHECK(n == (expect_new ? 3u : 5u));
   }
 }
 
@@ -198,6 +211,7 @@ int main() {
   replace_case(CrashPoint::ReplaceBeforeNewFile, false, true);
   replace_case(CrashPoint::ReplaceAfterNewFile, false, true);
   replace_case(CrashPoint::ReplaceAfterCatalog, true, true);
+  replace_case(CrashPoint::ReplaceAfterFirstUnlink, true, true);
   replace_case(CrashPoint::ReplaceAfterUnlink, true, true);
 
   {  // Stats, refusals, pins.
@@ -215,26 +229,29 @@ int main() {
     }
     const std::string a = segment_of(d.path, 0), b = segment_of(d.path, 1), c = segment_of(d.path, 4);
     // Refusals, each leaving the block as it was.
-    CHECK_THROWS(s.replace_segment("docs", "s_nope.oseg", SegmentData{0, {"a1", "a3"}, cols(9)}));
-    CHECK_THROWS(s.replace_segment("docs", a, SegmentData{0, {"a1", "a2", "a3"}, cols(9)}));  // dead id kept
-    CHECK_THROWS(s.replace_segment("docs", a, SegmentData{0, {"a1"}, cols(9)}));              // live id lost
-    CHECK_THROWS(s.replace_segment("docs", a, SegmentData{0, {"a1", "a3", "zz"}, cols(9)}));  // foreign id
-    CHECK_THROWS(s.replace_segment("docs", a, SegmentData{0, {"a1", "a1"}, cols(9)}));        // duplicate
-    CHECK_THROWS(s.replace_segment("docs", a, SegmentData{1, {"a1", "a3"}, cols(9)}));        // cluster
-    CHECK_THROWS(s.replace_segment("docs", a, SegmentData{0, {"a1", "a3"}, {column(9)}}));     // columns
-    CHECK_THROWS(s.replace_segment("docs", a, SegmentData{0, {"a1", "a3"}, {column(9, 8, "m0_depth2"), column(9)}}));
-    CHECK_THROWS(s.replace_segment("docs", c, SegmentData{4, {"ctr0"}, cols(2)}));  // center block
-    CHECK_THROWS(s.replace_segment("docs", b, SegmentData{1, {}, cols(9)}));        // nothing live
+    CHECK_THROWS(s.replace_segments("docs", {"s_nope.oseg"}, SegmentData{0, {"a1", "a3"}, cols(9)}));
+    CHECK_THROWS(s.replace_segments("docs", {a}, SegmentData{0, {"a1", "a2", "a3"}, cols(9)}));  // dead id kept
+    CHECK_THROWS(s.replace_segments("docs", {a}, SegmentData{0, {"a1"}, cols(9)}));              // live id lost
+    CHECK_THROWS(s.replace_segments("docs", {a}, SegmentData{0, {"a1", "a3", "zz"}, cols(9)}));  // foreign id
+    CHECK_THROWS(s.replace_segments("docs", {a}, SegmentData{0, {"a1", "a1"}, cols(9)}));        // duplicate
+    CHECK_THROWS(s.replace_segments("docs", {a}, SegmentData{1, {"a1", "a3"}, cols(9)}));        // cluster
+    CHECK_THROWS(s.replace_segments("docs", {a}, SegmentData{0, {"a1", "a3"}, {column(9)}}));     // columns
+    CHECK_THROWS(s.replace_segments("docs", {a}, SegmentData{0, {"a1", "a3"}, {column(9, 8, "m0_depth2"), column(9)}}));
+    CHECK_THROWS(s.replace_segments("docs", {c}, SegmentData{4, {"ctr0"}, cols(2)}));  // center block
+    CHECK_THROWS(s.replace_segments("docs", {a, b}, SegmentData{0, {"a1", "a3"}, cols(9)}));  // two clusters
+    CHECK_THROWS(s.replace_segments("docs", {a, a}, SegmentData{0, {"a1", "a3"}, cols(9)}));  // listed twice
+    CHECK_THROWS(s.replace_segments("docs", {}, SegmentData{0, {"a1", "a3"}, cols(9)}));      // none
+    CHECK_THROWS(s.replace_segments("docs", {b}, SegmentData{1, {}, cols(9)}));        // nothing live
     CHECK(s.block_stats("docs").size() == 3 && fs::exists(s.segment_path(a)));
     bool typed = false;
     try {
-      s.replace_segment("docs", "s_nope.oseg", SegmentData{0, {"a1"}, cols(9)});
+      s.replace_segments("docs", {"s_nope.oseg"}, SegmentData{0, {"a1"}, cols(9)});
     } catch (const BlockNotFound&) {
       typed = true;
     }
     CHECK(typed);
     try {
-      s.replace_segment("docs", a, SegmentData{0, {"a1"}, cols(9)});
+      s.replace_segments("docs", {a}, SegmentData{0, {"a1"}, cols(9)});
       CHECK(false);
     } catch (const BlockMismatch&) {
     }
@@ -244,7 +261,7 @@ int main() {
       CHECK(snap.segments.size() == 3 && snap.tombstones.size() == 3);
       CHECK(s.drop_dead_blocks("docs") == 1);
       CHECK(fs::exists(s.segment_path(b)));  // deferred
-      const std::string a2 = s.replace_segment("docs", a, SegmentData{0, {"a3", "a1"}, cols(9)});
+      const std::string a2 = s.replace_segments("docs", {a}, SegmentData{0, {"a3", "a1"}, cols(9)});
       CHECK(fs::exists(s.segment_path(a)) && fs::exists(s.segment_path(a2)));
       CHECK(s.read_segment("docs", a).ids.size() == 3);  // old block still readable
     }

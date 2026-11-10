@@ -9,7 +9,7 @@
 //
 // Searches vs. block removal: a search takes snapshot() once per round. It sees the block list and
 // the tombstones of one instant and pins those segment files. drop_dead_blocks() and
-// replace_segment() change the catalog under the same mutex, so a snapshot is either wholly before
+// replace_segments() change the catalog under the same mutex, so a snapshot is either wholly before
 // or wholly after; the files they remove are unlinked only when no pin holds them (deferred_), so
 // a running search can still read every block of its snapshot. Segment names are never reused
 // (durable counter), so a cache keyed by segment name never serves a stale block.
@@ -36,7 +36,7 @@ struct RecoveryStats {
               orphans_removed = 0, torn_bytes_dropped = 0;
 };
 
-// Typed refusals of replace_segment / pins (the service maps them to proto error codes).
+// Typed refusals of replace_segments / pins (the service maps them to proto error codes).
 class BlockNotFound : public std::runtime_error {  // the collection has no such segment
  public:
   using std::runtime_error::runtime_error;
@@ -49,7 +49,7 @@ class BlockMismatch : public std::runtime_error {  // replacement does not satis
 class Store;
 
 // Keeps a set of segment files on disk while alive. A segment removed meanwhile (drop_dead_blocks,
-// replace_segment) is unlinked when the last pin on it is released. Move-only RAII.
+// replace_segments) is unlinked when the last pin on it is released. Move-only RAII.
 class SegmentPin {
  public:
   SegmentPin() = default;
@@ -150,16 +150,18 @@ class Store {
   // checkpointed first (all its records are in the catalog while the writer mutex is held), so
   // recovery can never roll a removed segment forward again.
   std::size_t drop_dead_blocks(const std::string& collection);
-  // Repack of one block by the client (it decrypts, drops deleted slots, re-encrypts). Precondition,
-  // else BlockMismatch: same cluster and column count as the old block, `neu.ids` are exactly the
-  // LIVE ids of the old block (any order: the client chooses the slot order; at least one), dead
-  // ids are dropped. BlockNotFound if old_segment is not a block of the collection; center blocks
-  // are refused. Order: checkpoint the log; write the new file durably; one catalog transaction
-  // (new row, live vectors repointed, dead vectors and tombstones removed, old row removed);
-  // unlink the old file. Atomic: after a crash either the old or the new block is in the catalog,
-  // and the other file is swept. Returns the new segment name.
-  std::string replace_segment(const std::string& collection, const std::string& old_segment,
-                              const SegmentData& neu);
+  // Repack by the client (it decrypts 1..N blocks of one cluster, drops deleted slots, merges,
+  // re-encrypts). Precondition, else BlockMismatch: all old blocks (distinct) are data blocks of
+  // one cluster with the same column count as `neu`, and `neu.ids` are exactly the union of their
+  // LIVE ids (any order: the client chooses the slot order; at least one), dead ids are dropped.
+  // BlockNotFound if an old segment is not a block of the collection; center blocks are refused.
+  // The caller checks that the new block fits the preset's slot count. Order: checkpoint the log;
+  // write the new file durably; one catalog transaction (new row, live vectors repointed, dead
+  // vectors and tombstones removed, old rows removed); unlink the old files (deferred while a
+  // search pins them). Atomic: after a crash either the old set or the new block is in the
+  // catalog, and the other files are swept. Returns the new segment name.
+  std::string replace_segments(const std::string& collection,
+                               const std::vector<std::string>& old_segments, const SegmentData& neu);
 
   const std::string& openfhe_version() const { return ofhe_; }
 

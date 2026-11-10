@@ -596,7 +596,8 @@ grpc::Status OmbraService::ReplaceBlock(grpc::ServerContext*, grpc::ServerReader
   };
   try {
     v1::ReplaceBlockRequest m;
-    std::string coll, segment;
+    std::string coll;
+    std::vector<std::string> segments;
     storage::SegmentData nd;
     bool have_header = false;
     std::size_t bytes = 0;
@@ -606,7 +607,9 @@ grpc::Status OmbraService::ReplaceBlock(grpc::ServerContext*, grpc::ServerReader
         if (have_header) return fail(Err::BadSequence, "second header");
         have_header = true;
         coll = m.header().collection();
-        segment = m.header().segment();
+        for (const auto& s : m.header().segments()) segments.push_back(s);
+        if (segments.empty() || segments.size() > kMaxClustersPerRound)
+          return fail(Err::InvalidArgument, "between 1 and 4096 blocks must be listed");
         for (const auto& id : m.header().ids()) {
           if (id.empty() || id.size() > kMaxIdBytes) return fail(Err::InvalidArgument, "invalid id");
           nd.ids.push_back(id);
@@ -626,15 +629,16 @@ grpc::Status OmbraService::ReplaceBlock(grpc::ServerContext*, grpc::ServerReader
     const PresetInfo* preset = find_preset(spec.preset);
     if (!preset) return fail(Err::Internal, "internal error");
     if (nd.ids.size() > preset->batch_size) return fail(Err::SizeLimit, "block has more ids than slots");
-    // The cluster is the old block's (the store checks the rest), so take it from the catalog.
+    // The cluster is the old blocks' (the store checks that they all share it), so take it from
+    // the catalog row of the first one.
     bool found = false;
     for (const auto& r : store_.segments(coll))
-      if (r.file == segment) {
+      if (r.file == segments.front()) {
         nd.cluster = r.cluster;
         found = true;
       }
     if (!found) return fail(Err::BlockNotFound, "block not found");
-    resp->set_segment(store_.replace_segment(coll, segment, nd));
+    resp->set_segment(store_.replace_segments(coll, segments, nd));
     log_line("replace_block", nd.ids.size(), bytes, ms_since(t0));
   } catch (...) {
     fill(resp->mutable_error(), classify_current());

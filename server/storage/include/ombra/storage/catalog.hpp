@@ -88,11 +88,11 @@ class Catalog {
   std::vector<std::string> live_ids(const std::string& collection, const std::string& file) const;
   // One transaction: removes the segment rows `files` with their vectors and tombstone rows.
   void drop_segments(const std::string& collection, const std::vector<std::string>& files);
-  // One transaction: adds `neu`, moves the vectors rows of `old_file` that are live to it, removes
-  // the dead ones (vectors and tombstones) and the old segment row. Throws if the live ids of
-  // old_file differ from `live_ids` (as a set) or old_file is unknown; rolls back then.
-  void replace_segment(const std::string& collection, const std::string& old_file,
-                       const SegmentRow& neu, const std::vector<std::string>& live_ids);
+  // One transaction: adds `neu`, moves the live vectors rows of all `old_files` to it, removes the
+  // dead ones (vectors and tombstones) and the old segment rows. Throws if the union of the live
+  // ids of old_files differs from `live_ids` (as a set) or a file is unknown; rolls back then.
+  void replace_segments(const std::string& collection, const std::vector<std::string>& old_files,
+                        const SegmentRow& neu, const std::vector<std::string>& live_ids);
 
   void put_key_file(const std::string& collection, const std::string& kind,
                     const std::string& file);

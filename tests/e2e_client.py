@@ -400,14 +400,16 @@ class OmbraClient:
         return header, cols
 
     def replace_block(
-        self, collection: str, segment: str, ids: list[bytes], columns: list[bytes]
+        self, collection: str, segments: list[str] | str, ids: list[bytes], columns: list[bytes]
     ) -> str:
+        """Replace 1..N blocks of one cluster by one block (the client has merged them)."""
+        segs = [segments] if isinstance(segments, str) else list(segments)
         pb = self.pb
 
         def msgs():
             yield pb.ReplaceBlockRequest(
                 api_version=1,
-                header=pb.ReplaceBlockHeader(collection=collection, segment=segment, ids=ids),
+                header=pb.ReplaceBlockHeader(collection=collection, segments=segs, ids=ids),
             )
             for c in columns:
                 yield pb.ReplaceBlockRequest(api_version=1, column=c)

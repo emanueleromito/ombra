@@ -506,8 +506,8 @@ def test_8_client_repack_with_get_and_replace_block(dep_c: Deployment) -> None:
     while blk.segment in _segment_files(dep_c) and time.monotonic() < deadline:
         time.sleep(0.1)
     assert blk.segment not in _segment_files(dep_c)
-    # A column-packed block always holds full-size ciphertexts, so one repacked block is as big as
-    # before: ReplaceBlock reclaims slots, and bytes are reclaimed when blocks are dropped (test 7).
+    # A column-packed block always holds full-size ciphertexts, so 1 -> 1 does not shrink the
+    # stored bytes; merging N blocks into one does (test 9).
     assert _stored_bytes(dep_c) <= bytes_before
     info = cl.get_collection("docs")
     data_blocks = [b for b in cl.list_blocks("docs") if b.cluster_id != CLUSTERS]
@@ -519,3 +519,121 @@ def test_8_client_repack_with_get_and_replace_block(dep_c: Deployment) -> None:
         w, tr = dep_c.brute_force(q, wants)
         dep_c.assert_same_topk(got.ids, w, tr, f"after repack {wants}")
         assert not {_ident(i) for i in victims} & set(got.ids)
+
+
+def _file_size(dep: Deployment, segment: str) -> int:
+    return (dep.data_dir / "segments" / segment).stat().st_size
+
+
+def test_9_merge_two_half_deleted_blocks_into_one(dep_c: Deployment) -> None:
+    """ReplaceBlock N -> 1: the stored bytes fall by one block; results stay correct."""
+    cl, pb = dep_c.client, dep_c.pb
+    cluster = 1
+    rng = np.random.default_rng(SEED + 9)
+    rows = [int(i) for i in np.nonzero(dep_c.assign == cluster)[0]]
+    assert len(rows) >= 4
+    # A second block in the same cluster: 12 new vectors, four of them close to the query.
+    q = dep_c.queries[2]
+    n_extra = 12
+    ex = rng.standard_normal((n_extra, D))
+    for i in range(4):
+        ex[i] = q + 0.05 * rng.standard_normal(D)
+    ex = ex / np.linalg.norm(ex, axis=1, keepdims=True)
+    ef = np.stack([rng.integers(0, c, size=n_extra) for c in CARDS], axis=1)
+    eids = [b"e%04d" % i for i in range(n_extra)]
+    cols_e = [cl.ct_envelope(cl.encrypt(c)) for c in dep_c._columns(ex, ef)]
+    blk = pb.InsertBlock(
+        api_version=1, collection="docs", cluster_id=cluster, ids=eids, columns=cols_e
+    )
+    assert cl.insert([blk]) == n_extra
+    old = [b for b in cl.list_blocks("docs") if b.cluster_id == cluster]
+    assert len(old) == 2
+
+    # Scattered deletes in both blocks (extra vectors 0 and 2 are close to q and get deleted).
+    victims = rows[::2]
+    evict = list(range(0, n_extra, 2))
+    assert cl.delete("docs", [_ident(i) for i in victims] + [eids[i] for i in evict]) == (
+        len(victims) + len(evict)
+    )
+    dep_c.deleted.update(victims)
+
+    # The client reads both blocks and merges the live slots into one (its own slot order).
+    live_ids: list[bytes] = []
+    live_vals: list[list[np.ndarray]] = []  # per block: per column, the live slot values
+    old_files = []
+    for b in old:
+        header, cols = cl.get_block("docs", b.segment)
+        ids = [bytes(i) for i in header.ids]
+        live = [j for j, d in enumerate(header.deleted) if not d]
+        assert len(ids) == b.n_vectors and len(ids) - len(live) == b.n_deleted
+        live_ids += [ids[j] for j in live]
+        live_vals.append([cl.decrypt_envelope(c)[live] for c in cols])
+        old_files.append((b.segment, ids, cols))
+    n_cols = len(live_vals[0])
+    assert len(live_ids) <= cl.slots
+    new_cols = []
+    for j in range(n_cols):
+        packed = np.zeros(cl.slots)
+        merged = np.concatenate([v[j] for v in live_vals])
+        packed[: len(merged)] = merged
+        new_cols.append(cl.ct_envelope(cl.encrypt(packed)))
+
+    def code(fn) -> int:
+        with pytest.raises(ec.ApiError) as ei:
+            fn()
+        return ei.value.code
+
+    segs = [b.segment for b in old]
+    assert code(lambda: cl.replace_block("docs", segs, live_ids[1:], new_cols)) == (
+        pb.ERROR_BLOCK_MISMATCH
+    )
+    assert code(lambda: cl.replace_block("docs", segs + segs[:1], live_ids, new_cols)) == (
+        pb.ERROR_BLOCK_MISMATCH
+    )
+    other = _block_of(dep_c, 3).segment  # a block of another cluster
+    assert code(lambda: cl.replace_block("docs", [segs[0], other], live_ids, new_cols)) == (
+        pb.ERROR_BLOCK_MISMATCH
+    )
+    assert [b.segment for b in cl.list_blocks("docs") if b.cluster_id == cluster] == segs
+
+    before = _stored_bytes(dep_c)
+    sizes_old = [_file_size(dep_c, sg) for sg in segs]
+    assert before >= sum(sizes_old)
+    new_segment = cl.replace_block("docs", segs, live_ids, new_cols)
+    deadline = time.monotonic() + 10
+    while any(sg in _segment_files(dep_c) for sg in segs) and time.monotonic() < deadline:
+        time.sleep(0.1)
+    assert not any(sg in _segment_files(dep_c) for sg in segs)
+    now = [b for b in cl.list_blocks("docs") if b.cluster_id == cluster]
+    assert [b.segment for b in now] == [new_segment]
+    assert now[0].n_vectors == len(live_ids) and now[0].n_deleted == 0
+
+    # Exact byte accounting. Segment file = 22 bytes of header and counts, per id 4 + len(id),
+    # per column 8 + len(envelope). All blocks have the same columns, so the difference between
+    # the old blocks and the new one is exactly one block of columns plus one header and the ids
+    # that were dropped.
+    def file_size(ids, cols) -> int:
+        return 22 + sum(4 + len(i) for i in ids) + sum(8 + len(c) for c in cols)
+
+    for (sg, ids, cols), size in zip(old_files, sizes_old, strict=True):
+        assert size == file_size(ids, cols)
+    assert _file_size(dep_c, new_segment) == file_size(live_ids, new_cols)
+    one_block_columns = sum(8 + len(c) for c in old_files[0][2])
+    assert sum(len(c) for c in new_cols) == sum(len(c) for c in old_files[0][2])
+    delta = before - _stored_bytes(dep_c)
+    dropped_ids = sum(4 + len(i) for _, ids, _ in old_files for i in ids) - sum(
+        4 + len(i) for i in live_ids
+    )
+    assert delta == one_block_columns + 22 + dropped_ids
+    assert delta > 0.9 * one_block_columns  # about one block of ciphertexts
+
+    # Search equals the numpy oracle over the originals plus the extra vectors.
+    top_all, true = dep_c.brute_force(q, [None, None], k=N)
+    for i in range(n_extra):
+        if i not in evict:
+            true[eids[i]] = float(ex[i] @ q)
+    want = sorted(true, key=lambda i: (-true[i], i))[:K]
+    got = _search_all(dep_c, q, [None, None])
+    dep_c.assert_same_topk(got.ids, want, true, "after merge")
+    assert eids[1] in want and not {eids[i] for i in evict} & set(got.ids)
+    assert not {_ident(i) for i in victims} & set(got.ids)

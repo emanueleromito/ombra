@@ -183,24 +183,32 @@ std::size_t Store::drop_dead_blocks(const std::string& collection) {
   return dead.size();
 }
 
-std::string Store::replace_segment(const std::string& collection, const std::string& old_segment,
-                                   const SegmentData& neu) {
+std::string Store::replace_segments(const std::string& collection,
+                                    const std::vector<std::string>& old_segments,
+                                    const SegmentData& neu) {
   std::lock_guard lk(mu_);
   const auto t0 = std::chrono::steady_clock::now();
   CollectionSpec spec;
   if (!catalog_->get_collection(collection, &spec)) throw std::runtime_error("unknown collection");
-  SegmentRow old;
-  if (!catalog_->segment_row(collection, old_segment, &old)) throw BlockNotFound("block not found");
-  if (old.cluster == spec.cluster_count) throw BlockMismatch("center blocks cannot be replaced");
-  if (neu.cluster != old.cluster) throw BlockMismatch("cluster differs from the old block's");
-  if (neu.column_envelopes.size() != old.n_columns)
-    throw BlockMismatch("column count differs from the old block's");
+  if (old_segments.empty()) throw BlockMismatch("no blocks to replace");
+  if (std::set<std::string>(old_segments.begin(), old_segments.end()).size() != old_segments.size())
+    throw BlockMismatch("a block is listed twice");
+  std::vector<std::string> live;
+  for (const auto& seg : old_segments) {
+    SegmentRow old;
+    if (!catalog_->segment_row(collection, seg, &old)) throw BlockNotFound("block not found");
+    if (old.cluster == spec.cluster_count) throw BlockMismatch("center blocks cannot be replaced");
+    if (neu.cluster != old.cluster) throw BlockMismatch("cluster differs from the old block's");
+    if (neu.column_envelopes.size() != old.n_columns)
+      throw BlockMismatch("column count differs from the old block's");
+    auto l = catalog_->live_ids(collection, seg);
+    live.insert(live.end(), l.begin(), l.end());
+  }
   if (neu.ids.empty()) throw BlockMismatch("no ids: a block with no live vector is dropped instead");
-  const auto live = catalog_->live_ids(collection, old_segment);
   if (std::set<std::string>(neu.ids.begin(), neu.ids.end()).size() != neu.ids.size() ||
       neu.ids.size() != live.size() ||
       std::set<std::string>(neu.ids.begin(), neu.ids.end()) != std::set<std::string>(live.begin(), live.end()))
-    throw BlockMismatch("ids are not exactly the live ids of the old block");
+    throw BlockMismatch("ids are not exactly the live ids of the old blocks");
   std::size_t bytes = 0;
   for (const auto& c : neu.column_envelopes) {
     core::read_envelope(c, core::EnvelopeKind::Ciphertext, spec.preset, ofhe_);
@@ -214,8 +222,8 @@ std::string Store::replace_segment(const std::string& collection, const std::str
   try {
     SegmentInfo info = write_segment(path, neu);
     maybe_crash(CrashPoint::ReplaceAfterNewFile);
-    catalog_->replace_segment(collection, old_segment,
-                              {neu.cluster, name, info.n_vectors, info.n_columns, info.crc}, neu.ids);
+    catalog_->replace_segments(collection, old_segments,
+                               {neu.cluster, name, info.n_vectors, info.n_columns, info.crc}, neu.ids);
   } catch (...) {
     if (!catalog_->has_segment(name)) {
       ::unlink(path.c_str());
@@ -224,7 +232,12 @@ std::string Store::replace_segment(const std::string& collection, const std::str
     throw;
   }
   maybe_crash(CrashPoint::ReplaceAfterCatalog);
-  unlink_or_defer(old_segment);
+  bool first = true;
+  for (const auto& f : old_segments) {
+    unlink_or_defer(f);
+    if (first) maybe_crash(CrashPoint::ReplaceAfterFirstUnlink);  // some old files gone
+    first = false;
+  }
   fsync_path(segments_dir());
   maybe_crash(CrashPoint::ReplaceAfterUnlink);
   log_line("replace_block", neu.ids.size(), bytes, ms_since(t0));

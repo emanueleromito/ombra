@@ -190,10 +190,12 @@ message GetBlockResponse {
 
 message ReplaceBlockHeader {
   string collection = 1;
-  string segment = 2;       // the block to replace (from ListBlocks / GetBlock)
-  repeated bytes ids = 3;   // exactly the LIVE ids of that block, in the new slot order
+  repeated string segments = 2;  // 1..N blocks of ONE data cluster (from ListBlocks / GetBlock)
+  repeated bytes ids = 3;        // exactly the union of their LIVE ids, in the new slot order;
+                                 // at most one block of slots
 }
-// Client stream: one header, then the columns in column order (same layout as the old block).
+// Client stream: one header, then the columns in column order (same layout as the old blocks).
+// N old blocks become ONE new block, so the stored bytes fall by N-1 blocks.
 message ReplaceBlockRequest {
   uint32 api_version = 1;   // must be 1 (the block is stored)
   oneof part { ReplaceBlockHeader header = 2; bytes column = 3; }

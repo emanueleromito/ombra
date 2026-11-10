@@ -408,32 +408,40 @@ void Catalog::drop_segments(const std::string& collection, const std::vector<std
   tx.commit();
 }
 
-void Catalog::replace_segment(const std::string& collection, const std::string& old_file,
-                              const SegmentRow& neu, const std::vector<std::string>& live_ids_in) {
+void Catalog::replace_segments(const std::string& collection,
+                               const std::vector<std::string>& old_files, const SegmentRow& neu,
+                               const std::vector<std::string>& live_ids_in) {
   Tx tx(db_);
-  SegmentRow old;
-  if (!segment_row(collection, old_file, &old)) throw std::runtime_error("catalog: unknown segment");
-  const auto have = live_ids(collection, old_file);
+  std::vector<std::string> have;
+  for (const auto& f : old_files) {
+    if (!segment_row(collection, f, nullptr)) throw std::runtime_error("catalog: unknown segment");
+    auto l = live_ids(collection, f);
+    have.insert(have.end(), l.begin(), l.end());
+  }
   if (std::set<std::string>(have.begin(), have.end()) !=
           std::set<std::string>(live_ids_in.begin(), live_ids_in.end()) ||
       have.size() != live_ids_in.size())
-    throw std::runtime_error("catalog: live ids of the block changed");
+    throw std::runtime_error("catalog: live ids of the blocks changed");
   Stmt(db_, "INSERT INTO segments VALUES(?,?,?,?,?,?)")
       .text(1, neu.file).text(2, collection).num(3, neu.cluster).num(4, neu.n_vectors)
       .num(5, neu.n_columns).num(6, neu.crc).run();
-  Stmt(db_,
-       "DELETE FROM tombstones WHERE collection=?1 AND id IN "
-       "(SELECT id FROM vectors WHERE collection=?1 AND segment=?2)")
-      .text(1, collection).text(2, old_file).run();
-  // Repoint the live vectors to the new segment, then delete what is left of the old one (the
-  // dead ids; their tombstones are gone above).
-  Stmt del(db_, "UPDATE vectors SET segment=?3 WHERE collection=?1 AND segment=?2 AND id=?4");
-  for (const auto& id : live_ids_in) {
-    del.reset();
-    del.text(1, collection).text(2, old_file).text(3, neu.file).blob(4, id).run();
+  // Repoint the live vectors to the new segment, then delete what is left of the old ones (the
+  // dead ids, after their tombstones).
+  for (const auto& f : old_files) {
+    Stmt(db_,
+         "DELETE FROM tombstones WHERE collection=?1 AND id IN "
+         "(SELECT id FROM vectors WHERE collection=?1 AND segment=?2)")
+        .text(1, collection).text(2, f).run();
   }
-  Stmt(db_, "DELETE FROM vectors WHERE collection=? AND segment=?").text(1, collection).text(2, old_file).run();
-  Stmt(db_, "DELETE FROM segments WHERE collection=? AND file=?").text(1, collection).text(2, old_file).run();
+  Stmt move(db_, "UPDATE vectors SET segment=?3 WHERE collection=?1 AND id=?2");
+  for (const auto& id : live_ids_in) {
+    move.reset();
+    move.text(1, collection).blob(2, id).text(3, neu.file).run();
+  }
+  for (const auto& f : old_files) {
+    Stmt(db_, "DELETE FROM vectors WHERE collection=? AND segment=?").text(1, collection).text(2, f).run();
+    Stmt(db_, "DELETE FROM segments WHERE collection=? AND file=?").text(1, collection).text(2, f).run();
+  }
   tx.commit();
 }
 
