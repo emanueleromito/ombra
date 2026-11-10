@@ -55,7 +55,7 @@ from pathlib import Path
 from typing import Any
 
 os.environ.setdefault("GRPC_ENABLE_FORK_SUPPORT", "0")  # the pool forks with a gRPC channel open
-os.environ.setdefault("OMP_NUM_THREADS", "1")  # one thread per forked worker (no oversubscription)
+os.environ["OMP_NUM_THREADS"] = "1"  # one thread per forked worker (no oversubscription)
 
 import numpy as np  # noqa: E402
 
@@ -493,9 +493,14 @@ def _run_case(
         raise SystemExit("ombra_server not found; build with `make build` (or via modal_app)")
     pb, pbg = ec.load_stubs(tmp / "stubs")
     data_dir = tmp / "data"
-    server = ec.ServerProcess(
-        binary, data_dir, VERSION, tmp / "server.log", GPU_BUDGET_MB, HOST_BUDGET_MB
-    )
+    omp = os.environ.pop("OMP_NUM_THREADS", None)  # the server keeps its own thread default
+    try:
+        server = ec.ServerProcess(
+            binary, data_dir, VERSION, tmp / "server.log", GPU_BUDGET_MB, HOST_BUDGET_MB
+        )
+    finally:
+        if omp is not None:
+            os.environ["OMP_NUM_THREADS"] = omp
     cl = ec.OmbraClient(pb, pbg, server.address, preset, VERSION)
     pool = None
     faulthandler.dump_traceback_later(900, repeat=True)  # a hang shows where, in the log
