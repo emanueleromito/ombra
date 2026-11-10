@@ -22,5 +22,6 @@ One short file per design decision, so the reasoning survives. New decisions cop
 | [0016](0016-ciphertext-file-envelope.md) | Ciphertext and key file envelope (magic, version, kind, preset, OpenFHE version); drivers keep raw files | accepted |
 | [0017](0017-decryption-noise-position.md) | Position on decryption noise: keep the default, pin it, do not claim IND-CPA-D | accepted |
 | [0018](0018-plaintext-db-disclosure.md) | Plaintext-DB mode: only for corpora any client may read | accepted |
+| [0019](0019-filter-evaluation-within-depth-2.md) | Filter evaluation within depth 2: additive penalty folded into the query | proposed |
 
 Smaller decisions (key management, threat model, accuracy, deletes, migrations, key rotation, parameter presets, format versioning, storage, API, client packaging) are recorded directly in [product-requirements.md](../product-requirements.md) and [architecture.md](../architecture.md).

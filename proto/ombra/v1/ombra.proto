@@ -1,0 +1,172 @@
+// Ombra gRPC API, version 1 (package ombra.v1). Decisions 0003, 0010, 0016, 0019.
+//
+// Hard rule 2: no message here has a field for a secret key, and none may get one. The server
+// receives ciphertexts (inside the 0016 envelope) and public evaluation keys only. Ids are opaque
+// bytes chosen by the client; documents and metadata values never appear in any message.
+// Version rule: every message that the server stores carries `api_version`; the server refuses a
+// stored-message value other than 1 with ERROR_UNSUPPORTED_VERSION. A new incompatible API gets
+// a new package (ombra.v2), not a changed field.
+syntax = "proto3";
+
+package ombra.v1;
+
+// Constants shared by client and server. Values are the limits; use them as ints.
+enum Limit {
+  LIMIT_UNSPECIFIED = 0;
+  LIMIT_API_VERSION = 1;
+  LIMIT_MAX_CHUNK_BYTES = 4194304;      // one `bytes` payload of a chunk
+  LIMIT_MAX_NAME_BYTES = 128;           // collection name
+  LIMIT_MAX_ID_BYTES = 256;             // one vector id
+  LIMIT_MAX_IDS_PER_REQUEST = 100000;   // delete ids, round 2 ids
+  LIMIT_MAX_FILTER_FIELDS = 16;         // F; the preset's headroom may lower it (see below)
+  LIMIT_MAX_FILTER_CARDINALITY = 64;    // values per field (higher cardinality is hashed)
+  LIMIT_MAX_CLUSTERS_PER_ROUND = 4096;
+}
+
+enum ErrorCode {
+  ERROR_UNSPECIFIED = 0;
+  ERROR_UNSUPPORTED_VERSION = 1;    // api_version or envelope version not understood
+  ERROR_COLLECTION_NOT_FOUND = 2;
+  ERROR_COLLECTION_EXISTS = 3;
+  ERROR_INVALID_ARGUMENT = 4;       // malformed message, empty required field
+  ERROR_SIZE_LIMIT = 5;             // a Limit was exceeded
+  ERROR_KEY_TAG_MISMATCH = 6;       // ciphertext or key made under another key than the collection's
+  ERROR_PRESET_MISMATCH = 7;        // envelope preset differs from the collection's
+  ERROR_INVALID_FILTER_LAYOUT = 8;  // filter fields above the limits or above the preset's headroom
+  ERROR_KEYS_MISSING = 9;           // search or insert before the evaluation keys were uploaded
+  ERROR_BAD_SEQUENCE = 10;          // stream messages out of order
+  ERROR_INTERNAL = 11;
+}
+
+message Error {
+  ErrorCode code = 1;
+  string message = 2;  // never contains ids, ciphertext bytes or values
+}
+
+enum SecurityLevel {
+  SECURITY_LEVEL_UNSPECIFIED = 0;
+  SECURITY_LEVEL_FAST = 1;
+  SECURITY_LEVEL_DECOY = 2;
+  SECURITY_LEVEL_STRICT = 3;
+}
+
+// One filter field (decision 0019). The server sees only the number of fields and their value
+// counts; names stay on the client. A one-hot column per value is stored for every vector.
+message FilterField {
+  uint32 field_id = 1;     // 0, 1, ... in order; opaque, not a name
+  uint32 cardinality = 2;  // number of values (1 .. LIMIT_MAX_FILTER_CARDINALITY)
+}
+
+// Stored in the catalog.
+message CollectionSpec {
+  uint32 api_version = 1;           // must be 1
+  string name = 2;
+  string preset = 3;                // "m0_depth2" or "m0_compact_n8192"
+  uint32 dimension = 4;             // d, vector dimension
+  SecurityLevel security_level = 5;
+  repeated FilterField filter_fields = 6;
+  string key_tag = 7;               // public key tag of the client's key (not secret)
+  uint32 cluster_count = 8;
+}
+
+// The query ciphertext carries dimension + sum(cardinality) entries (decision 0019).
+message CreateCollectionRequest { CollectionSpec spec = 1; }
+message CreateCollectionResponse { oneof result { CollectionSpec spec = 1; Error error = 2; } }
+
+message GetCollectionRequest { string name = 1; }
+message GetCollectionResponse {
+  oneof result { CollectionInfo info = 1; Error error = 2; }
+}
+
+message CollectionInfo {
+  CollectionSpec spec = 1;
+  uint64 vector_count = 2;
+  uint64 deleted_count = 3;
+  bool keys_uploaded = 4;
+}
+
+message ListCollectionsRequest {}
+message ListCollectionsResponse { repeated CollectionInfo collections = 1; }
+
+message DropCollectionRequest { string name = 1; }
+message DropCollectionResponse { Error error = 1; }  // unset on success
+
+// Evaluation keys (public): multiplication key and automorphism keys, in 0016 envelopes. Sent as
+// a client stream of chunks; `kind` says which file the bytes belong to.
+enum KeyKind {
+  KEY_KIND_UNSPECIFIED = 0;
+  KEY_KIND_CONTEXT = 1;
+  KEY_KIND_EVAL_MULT = 2;
+  KEY_KIND_AUTOMORPHISM = 3;
+}
+
+message UploadKeysChunk {
+  uint32 api_version = 1;  // must be 1 (the keys are stored)
+  string collection = 2;   // required on the first chunk
+  KeyKind kind = 3;
+  uint64 offset = 4;       // byte offset within this key file
+  bytes data = 5;          // at most LIMIT_MAX_CHUNK_BYTES
+  bool last = 6;           // last chunk of this kind
+}
+message UploadKeysResponse { Error error = 1; }
+
+// Insert: a client stream of blocks. A block is up to batch_size vectors of one cluster:
+// d column ciphertexts + sum(cardinality) one-hot ciphertexts, each in a 0016 envelope.
+message InsertBlock {
+  uint32 api_version = 1;       // must be 1 (the block is stored)
+  string collection = 2;
+  uint32 cluster_id = 3;
+  repeated bytes ids = 4;       // one per occupied slot, in slot order
+  repeated bytes columns = 5;   // dimension + sum(cardinality) envelopes, in that column order
+  bool is_center = 6;           // cluster-center block (stage 1) instead of data
+}
+message InsertResponse { uint64 inserted = 1; Error error = 2; }
+
+message DeleteRequest {
+  uint32 api_version = 1;  // must be 1 (tombstones are stored)
+  string collection = 2;
+  repeated bytes ids = 3;
+}
+message DeleteResponse { uint64 deleted = 1; Error error = 2; }
+
+// Search: one bidirectional stream. The query ciphertext is sent once and the server expands it
+// once (decision 0010). Round 1 returns center scores; round 2 is a SearchChosen answered by
+// SearchScores messages ending with `last`. A client may send further SearchChosen messages on
+// the same stream (decision 0019: a selective filter needs more clusters); each reuses the
+// expansion. The client half-closes to end the stream.
+message SearchStart {
+  string collection = 1;
+  string key_tag = 2;                 // checked against the collection's
+  bytes query = 3;                    // one 0016 envelope; dimension + sum(cardinality) entries
+  uint32 filter_leaves = 4;           // sum(cardinality); the server checks it against the spec
+}
+message SearchCenterScores {          // round 1 out: stage-1 scores, one ciphertext per block
+  repeated bytes score_blocks = 1;    // 0016 envelopes, each decrypts to one score per slot
+  uint32 center_count = 2;
+}
+message SearchChosen {                // round 2 in: chosen clusters (real and decoy, indistinguishable)
+  repeated uint32 cluster_ids = 1;    // at most LIMIT_MAX_CLUSTERS_PER_ROUND
+}
+message SearchScores {                // round 2 out: filtered scores and the ids they belong to
+  uint32 cluster_id = 1;
+  repeated bytes score_blocks = 2;    // each: slot i holds score + lambda * c (decision 0019)
+  repeated bytes ids = 3;             // slot order within the cluster, tombstoned slots included
+  bool last = 4;                      // last message of the stream
+}
+message SearchRequest {
+  oneof step { SearchStart start = 1; SearchChosen chosen = 2; }
+}
+message SearchResponse {
+  oneof step { SearchCenterScores centers = 1; SearchScores scores = 2; Error error = 3; }
+}
+
+service Ombra {
+  rpc CreateCollection(CreateCollectionRequest) returns (CreateCollectionResponse);
+  rpc GetCollection(GetCollectionRequest) returns (GetCollectionResponse);
+  rpc ListCollections(ListCollectionsRequest) returns (ListCollectionsResponse);
+  rpc DropCollection(DropCollectionRequest) returns (DropCollectionResponse);
+  rpc UploadKeys(stream UploadKeysChunk) returns (UploadKeysResponse);
+  rpc Insert(stream InsertBlock) returns (InsertResponse);
+  rpc Delete(DeleteRequest) returns (DeleteResponse);
+  rpc Search(stream SearchRequest) returns (stream SearchResponse);
+}

@@ -44,7 +44,7 @@ T2.1, T2.2 and T2.3 can start in parallel. T2.5 can start once T2.4 has fixed th
 **Depends on:** none
 **Steps:** write a decision record with options and a recommendation. Start from this candidate: one-hot field columns are stored encrypted like vector columns; the client sends a one-hot query for the filter value, the server expands it like a vector query (level 0) and multiplies it with the one-hot columns (level 0 to 1), in parallel with the scores, then applies the mask to the score with one multiplication (level 1 to 2). Cover: equality on one field, several fields (AND), small value sets (OR), the cost in columns per field and in stored bytes, what the server learns (the number and name of filter fields), and what is left out (ranges, text).
 **Done when:** the decision is **proposed** with at least two options measured or costed, and the level budget of the recommended option is shown to stay within depth 2. **Stop and ask the user before building anything.**
-**Status:** todo
+**Status:** done as a decision (0019 proposed; user chose B on 2026-11-10; accepted after the measurements in T2.7)
 
 ### T2.4 gRPC API v1
 
@@ -52,7 +52,7 @@ T2.1, T2.2 and T2.3 can start in parallel. T2.5 can start once T2.4 has fixed th
 **Depends on:** T2.3 (filter message shape)
 **Steps:** write `proto/ombra/v1/*.proto` with these calls: create, get, list and drop a collection; upload evaluation keys; insert; delete; and a search stream with two rounds (round 1: expanded query ciphertexts in, cluster-level scores out; round 2: the client's chosen clusters in, scores and ids out). Put the API version in the package name and every message that is stored. Add error codes, size limits and a compatibility test (generated code builds; an unknown version is refused). No secret key field anywhere (hard rule 2).
 **Done when:** the proto compiles for C++ and Python, a test checks that a v1 message round-trips and an unknown version is rejected, and the API is described in `docs/architecture.md`.
-**Status:** todo
+**Status:** done (`proto/ombra/v1/ombra.proto`, `client/tests/test_proto_v1.py`, architecture.md; filter shape per decision 0019)
 
 ### T2.5 Storage
 
@@ -74,8 +74,8 @@ T2.1, T2.2 and T2.3 can start in parallel. T2.5 can start once T2.4 has fixed th
 
 **Why:** it turns the kernels into the two-round search the client calls.
 **Depends on:** T2.4, T2.5, T2.6, T2.3 (for filters)
-**Steps:** one stream per query; expand the query once and reuse it in both stages; stage 1 scores the cluster centers; stage 2 scores the chosen clusters; compute filter masks as chosen in T2.3; handle deletes as tombstones folded into the mask; check key tags on every request (the wrong key is refused, as in the T1.12 to T1.14 refusals). Rule 3 applies to anything new on the device.
-**Done when:** an end-to-end gRPC test returns the same top-k as the CPU OpenFHE oracle on a small collection with and without a filter and with deleted vectors, and the new device code has exact OpenFHE oracle tests.
+**Steps:** one stream per query; expand the query once and reuse it in both stages; stage 1 scores the cluster centers; stage 2 scores the chosen clusters; filters as in decision 0019 (additive penalty: filter one-hots in the query, extra columns in the dot product, no mask multiply); deletes as a plaintext penalty added at the tombstoned slots; selective-filter behaviour per 0019 (more rounds on the same stream, then Strict or an `incomplete` answer); check key tags on every request (the wrong key is refused, as in the T1.12 to T1.14 refusals). Rule 3 applies to anything new on the device.
+**Done when:** an end-to-end gRPC test returns the same top-k as the CPU OpenFHE oracle on a small collection with and without a filter and with deleted vectors, the new device code has exact OpenFHE oracle tests, and the 0019 conditions are measured and written into `results/`: score error against the band gap on the compact preset at F = 1, 4 and F_max, the 0012 recall rule with the extra columns, and filtered top-10 recall at selectivity about 1%, 10% and 50% (with the extra rounds needed). Decision 0019 is then marked accepted or rejected.
 **Status:** todo
 
 ### T2.8 Compaction of deleted vectors
