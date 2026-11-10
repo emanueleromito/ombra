@@ -34,16 +34,14 @@ T3.2 and T3.3 can run in parallel after T3.1. T3.6 needs the server API from M2 
 **Depends on:** T3.1
 **Steps:** a key file in the 0016 envelope holding the secret key and the document master key, protected by a passphrase (a memory-hard key derivation and an authenticated cipher, parameters recorded in the file); create, export and import; permissions 0600; never log or print key material (hard rule 4).
 **Done when:** tests show a round trip, a wrong passphrase being refused, a changed byte being refused, and an unknown version being refused; no key material appears in logs or error messages.
-**Status:** todo
-
+**Status:** done
 ### T3.3 Presets and parameter derivation
 
 **Why:** users choose a preset and a dimension, never ring sizes or moduli (hard rule 1).
 **Depends on:** T3.1
 **Steps:** map preset name and vector dimension to the parameters in `core/params`; derive the column count and block layout; refuse any combination below 128-bit security, with a clear error; the accepted preset names follow decisions 0009 and 0013.
 **Done when:** a test covers every supported preset and dimension (384, 768, 1536) and a refusal for an unsupported dimension and for any parameter set below the floor; the derived values match the C++ presets.
-**Status:** todo
-
+**Status:** done
 ### T3.4 Documents and metadata with envelope encryption
 
 **Why:** the server must store documents and metadata it cannot read, and re-ranking needs exact vectors.
