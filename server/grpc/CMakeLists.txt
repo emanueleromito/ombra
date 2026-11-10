@@ -42,6 +42,14 @@ add_executable(server_policy_test tests/policy_test.cpp)
 target_link_libraries(server_policy_test PRIVATE ombra_server_policy)
 add_test(NAME server_policy COMMAND server_policy_test)
 
+# ---- T2.9 API keys, metrics, HTTP parsing: plain C++ (own SHA-256, no OpenSSL), CPU tests ---------
+add_library(ombra_server_admin STATIC src/auth.cpp src/metrics.cpp src/http.cpp)
+target_include_directories(ombra_server_admin PUBLIC include)
+
+add_executable(server_admin_test tests/admin_test.cpp)
+target_link_libraries(server_admin_test PRIVATE ombra_server_admin)
+add_test(NAME server_admin COMMAND server_admin_test)
+
 # ---- gRPC service and executable ----------------------------------------------------------------
 if(NOT OMBRA_ENABLE_CUDA)
   return()
@@ -90,9 +98,18 @@ add_library(ombra_proto STATIC ${_pb_srcs})
 target_include_directories(ombra_proto SYSTEM PUBLIC ${_pb_dir})
 target_link_libraries(ombra_proto PUBLIC ${_grpc_libs} protobuf::libprotobuf Threads::Threads)
 
-add_executable(ombra_server src/ombra_server.cpp src/service.cpp)
+# cudaMemGetInfo for /metrics. CMake 3.22 has no CUDA20 dialect, so CUDA_STANDARD 17 as elsewhere.
+add_library(ombra_gpu_info STATIC src/gpu_info.cu)
+target_include_directories(ombra_gpu_info PUBLIC src)
+set_target_properties(ombra_gpu_info PROPERTIES CUDA_SEPARABLE_COMPILATION OFF CUDA_STANDARD 17)
+
+# The REST port speaks TLS with OpenSSL, which gRPC already depends on.
+find_package(OpenSSL REQUIRED)
+
+add_executable(ombra_server src/ombra_server.cpp src/service.cpp src/rest_server.cpp)
 target_include_directories(ombra_server PRIVATE src)
-target_link_libraries(ombra_server PRIVATE ombra_server_policy ombra_search ombra_proto)
+target_link_libraries(ombra_server PRIVATE ombra_server_policy ombra_server_admin ombra_gpu_info
+                                           ombra_search ombra_proto OpenSSL::SSL OpenSSL::Crypto)
 # Default OpenFHE version of the stored envelopes (overridable with --openfhe-version). The
 # variable of core/'s find_package is directory-scoped, so look the package up again here.
 find_package(OpenFHE QUIET)

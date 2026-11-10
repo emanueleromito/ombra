@@ -38,6 +38,7 @@ T2.7: the measurements of decision 0019 through the gRPC server (core/bench/filt
 error with filter columns, the decision-0012 recall rule with the extra columns, filtered recall
 with the selective-filter loop. Output `<out>/t2.7-<preset>-a100.json` for each preset in
 `--presets-t27`. Runs only when asked for (`--task t2.7`).
+T2.10 (`--task t2.10`): end-to-end over gRPC at 100k and 1M, see grpc_e2e.py.
 
     python core/bench/run.py --task t0.7 --out <dir>
 """
@@ -490,6 +491,15 @@ def main() -> None:
         "--presets-t27", default="m0_depth2,m0_compact_n8192", help="t2.7: presets, one file each"
     )
     parser.add_argument("--queries-t27", type=int, default=1000, help="t2.7: queries for part 2")
+    parser.add_argument(
+        "--presets-t210", default="m0_depth2,m0_compact_n8192", help="t2.10: presets"
+    )
+    parser.add_argument("--sizes-t210", default="100000,1000000", help="t2.10: vector counts")
+    parser.add_argument("--queries-t210", type=int, default=30, help="t2.10: queries per variant")
+    parser.add_argument(
+        "--workers-t210", type=int, default=0, help="t2.10: client processes (0 = affinity)"
+    )
+    parser.add_argument("--rerun-t210", action="store_true", help="t2.10: redo existing files")
     parser.add_argument("--presets-t011", default="m0_depth2,m0_compact_n8192", help="t0.11")
     parser.add_argument(
         "--error-presets-t011", default="m0_compact_n8192", help="t0.11: presets with the e2e error"
@@ -497,13 +507,24 @@ def main() -> None:
     args = parser.parse_args()
 
     task = args.task.lower()
-    if task not in ("all", "t0.4", "t0.5", "t0.7", "t0.11", "t1.3", "t2.6", "t2.7"):
+    if task not in ("all", "t0.4", "t0.5", "t0.7", "t0.11", "t1.3", "t2.6", "t2.7", "t2.10"):
         raise SystemExit(f"unknown task {args.task!r}")
     dims = tuple(int(x) for x in args.dims.split(","))
     if task in ("all", "t0.4"):
         run_t04(args.out, dims, args.blocks, args.warmup, args.iters, args.name)
     if task in ("all", "t0.5"):
         run_t05(args.out, dims, args.warmup, args.iters, args.name_t05, args.profile)
+    if task == "t2.10":
+        from grpc_e2e import run_t210
+
+        run_t210(
+            args.out,
+            tuple(args.presets_t210.split(",")),
+            tuple(int(x) for x in args.sizes_t210.split(",")),
+            args.queries_t210,
+            args.workers_t210,
+            args.rerun_t210,
+        )
     if task == "t2.7":
         from filter_0019 import run_t27
 

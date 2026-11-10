@@ -75,6 +75,8 @@ image = (
         "protobuf-compiler",
         "protobuf-compiler-grpc",
         "pkg-config",
+        "libssl-dev",  # T2.9: REST over TLS
+        "openssl",  # T2.9: tests make a self-signed certificate with the CLI
     )
     .pip_install("grpcio", "grpcio-tools")
     # Source code last, so code changes don't rebuild OpenFHE.
@@ -209,6 +211,23 @@ def bench(task: str = "all", extra: str = "") -> None:
         return
     # `extra` carries run.py options, e.g. --extra "--presets-t13 m0_depth2,m0_compact_n8192"
     _run(["python", str(bench_script), "--task", task, "--out", str(out_dir), *extra.split()])
+    volume.commit()
+
+
+# T2.10 (`--task t2.10`): the client encrypts about 50k to 100k ciphertexts per preset at 1M vectors
+# in parallel processes, and the server keeps about 40 GB of ciphertexts per (preset, size) on the
+# container's local disk (deleted after each run). The run refuses, and says so in its JSON, if the
+# free disk is below the estimate. Run presets/sizes as separate invocations to stay within limits:
+#   modal run modal_app.py::bench_e2e --extra "--presets-t210 m0_depth2 --sizes-t210 1000000"
+@app.function(gpu="A100-40GB", cpu=16.0, memory=65536, timeout=86400, volumes={DATA_DIR: volume})
+def bench_e2e(extra: str = "") -> None:
+    """Release build; T2.10 end-to-end benchmark over gRPC on an A100."""
+    _build("Release")
+    out_dir = Path(DATA_DIR) / "results"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    script = Path(REPO_DIR) / "core" / "bench" / "run.py"
+    cmd = ["python", str(script), "--task", "t2.10", "--out", str(out_dir)]
+    _run([*cmd, "--workers-t210", "16", *extra.split()])
     volume.commit()
 
 

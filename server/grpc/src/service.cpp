@@ -164,7 +164,7 @@ void OmbraService::forget(const std::string& c) {
 // ---------------------------------------------------------------------------------------------
 // Collections
 
-grpc::Status OmbraService::CreateCollection(grpc::ServerContext*, const v1::CreateCollectionRequest* req,
+grpc::Status OmbraService::run_CreateCollection(grpc::ServerContext*, const v1::CreateCollectionRequest* req,
                                             v1::CreateCollectionResponse* resp) {
   const auto spec = to_storage(req->spec());
   Status st = validate_spec(spec);
@@ -204,7 +204,7 @@ static void fill_info(storage::Store& store, const storage::CollectionSpec& spec
   info->set_keys_uploaded(keys);
 }
 
-grpc::Status OmbraService::GetCollection(grpc::ServerContext*, const v1::GetCollectionRequest* req,
+grpc::Status OmbraService::run_GetCollection(grpc::ServerContext*, const v1::GetCollectionRequest* req,
                                          v1::GetCollectionResponse* resp) {
   try {
     storage::CollectionSpec spec;
@@ -218,7 +218,7 @@ grpc::Status OmbraService::GetCollection(grpc::ServerContext*, const v1::GetColl
   return grpc::Status::OK;
 }
 
-grpc::Status OmbraService::ListCollections(grpc::ServerContext*, const v1::ListCollectionsRequest*,
+grpc::Status OmbraService::run_ListCollections(grpc::ServerContext*, const v1::ListCollectionsRequest*,
                                            v1::ListCollectionsResponse* resp) {
   try {
     for (const auto& n : store_.list_collections()) {
@@ -231,7 +231,7 @@ grpc::Status OmbraService::ListCollections(grpc::ServerContext*, const v1::ListC
   return grpc::Status::OK;
 }
 
-grpc::Status OmbraService::DropCollection(grpc::ServerContext*, const v1::DropCollectionRequest* req,
+grpc::Status OmbraService::run_DropCollection(grpc::ServerContext*, const v1::DropCollectionRequest* req,
                                           v1::DropCollectionResponse* resp) {
   try {
     if (!store_.drop_collection(req->name()))
@@ -251,7 +251,7 @@ grpc::Status OmbraService::DropCollection(grpc::ServerContext*, const v1::DropCo
 // against the collection (envelopes, key tag, security floor, layout: SearchEngine::prepare_keys),
 // and only then stored (one catalog transaction) and installed. A refused upload leaves no key
 // file, no catalog row and the collection's loaded keys as they were.
-grpc::Status OmbraService::UploadKeys(grpc::ServerContext*, grpc::ServerReader<v1::UploadKeysChunk>* in,
+grpc::Status OmbraService::run_UploadKeys(grpc::ServerContext*, grpc::ServerReader<v1::UploadKeysChunk>* in,
                                       v1::UploadKeysResponse* resp) {
   const auto t0 = Clock::now();
   const auto fail = [&](Err c, const char* m) {
@@ -318,7 +318,7 @@ grpc::Status OmbraService::UploadKeys(grpc::ServerContext*, grpc::ServerReader<v
 // ---------------------------------------------------------------------------------------------
 // Insert and Delete
 
-grpc::Status OmbraService::Insert(grpc::ServerContext*, grpc::ServerReader<v1::InsertBlock>* in,
+grpc::Status OmbraService::run_Insert(grpc::ServerContext*, grpc::ServerReader<v1::InsertBlock>* in,
                                   v1::InsertResponse* resp) {
   const auto t0 = Clock::now();
   std::uint64_t inserted = 0;
@@ -382,7 +382,7 @@ grpc::Status OmbraService::Insert(grpc::ServerContext*, grpc::ServerReader<v1::I
   return grpc::Status::OK;
 }
 
-grpc::Status OmbraService::Delete(grpc::ServerContext*, const v1::DeleteRequest* req,
+grpc::Status OmbraService::run_Delete(grpc::ServerContext*, const v1::DeleteRequest* req,
                                   v1::DeleteResponse* resp) {
   const auto t0 = Clock::now();
   const auto fail = [&](Err c, const char* m) {
@@ -414,7 +414,7 @@ grpc::Status OmbraService::Delete(grpc::ServerContext*, const v1::DeleteRequest*
 // ---------------------------------------------------------------------------------------------
 // Search
 
-grpc::Status OmbraService::Search(grpc::ServerContext*,
+grpc::Status OmbraService::run_Search(grpc::ServerContext*,
                                   grpc::ServerReaderWriter<v1::SearchResponse, v1::SearchRequest>* stream) {
   // Sends an error message and ends the stream (status OK: the error is in the message).
   const auto send_error = [&](const Status& s) {
@@ -517,7 +517,7 @@ grpc::Status OmbraService::Search(grpc::ServerContext*,
 // ---------------------------------------------------------------------------------------------
 // Blocks
 
-grpc::Status OmbraService::ListBlocks(grpc::ServerContext*, const v1::ListBlocksRequest* req,
+grpc::Status OmbraService::run_ListBlocks(grpc::ServerContext*, const v1::ListBlocksRequest* req,
                                       v1::ListBlocksResponse* resp) {
   resp->set_api_version(kApiVersion);
   try {
@@ -540,7 +540,7 @@ grpc::Status OmbraService::ListBlocks(grpc::ServerContext*, const v1::ListBlocks
   return grpc::Status::OK;
 }
 
-grpc::Status OmbraService::GetBlock(grpc::ServerContext*, const v1::GetBlockRequest* req,
+grpc::Status OmbraService::run_GetBlock(grpc::ServerContext*, const v1::GetBlockRequest* req,
                                     grpc::ServerWriter<v1::GetBlockResponse>* out) {
   const auto t0 = Clock::now();
   const auto send_error = [&](const Status& s) {
@@ -586,7 +586,7 @@ grpc::Status OmbraService::GetBlock(grpc::ServerContext*, const v1::GetBlockRequ
   return grpc::Status::OK;
 }
 
-grpc::Status OmbraService::ReplaceBlock(grpc::ServerContext*, grpc::ServerReader<v1::ReplaceBlockRequest>* in,
+grpc::Status OmbraService::run_ReplaceBlock(grpc::ServerContext*, grpc::ServerReader<v1::ReplaceBlockRequest>* in,
                                         v1::ReplaceBlockResponse* resp) {
   const auto t0 = Clock::now();
   resp->set_api_version(kApiVersion);
@@ -644,6 +644,120 @@ grpc::Status OmbraService::ReplaceBlock(grpc::ServerContext*, grpc::ServerReader
     fill(resp->mutable_error(), classify_current());
   }
   return grpc::Status::OK;
+}
+
+
+namespace {
+
+std::string bearer_of(const grpc::ServerContext* ctx) {
+  const auto it = ctx->client_metadata().find("authorization");
+  if (it == ctx->client_metadata().end()) return {};
+  return std::string(it->second.data(), it->second.size());
+}
+
+}  // namespace
+
+template <class Resp, class Fn>
+grpc::Status OmbraService::guarded(grpc::ServerContext* ctx, Rpc rpc, Resp* resp, Fn&& fn) {
+  std::string key_id;
+  const AuthResult a = authorize(keys_, bearer_of(ctx), required_scope(rpc), &key_id);
+  if (a == AuthResult::Unauthenticated) {
+    metrics_.count_unauthenticated();
+    std::fprintf(stderr, "[ombra.server] refused rpc=%s reason=unauthenticated\n", rpc_name(rpc));
+    return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "missing or invalid API key");
+  }
+  if (a == AuthResult::PermissionDenied) {
+    metrics_.count_permission_denied();
+    std::fprintf(stderr, "[ombra.server] refused rpc=%s reason=scope key=%s\n", rpc_name(rpc),
+                 key_id.c_str());
+    return grpc::Status(grpc::StatusCode::PERMISSION_DENIED, "the API key's scope is too low");
+  }
+  const auto t0 = Clock::now();
+  grpc::Status st = fn();
+  bool failed = !st.ok();
+  if constexpr (requires(const Resp* r) { r->has_error(); }) failed = failed || resp->has_error();
+  metrics_.record(rpc, failed, ms_since(t0));
+  return st;
+}
+
+
+// ---------------------------------------------------------------------------------------------
+// Public RPCs: API key check and metrics around the bodies above
+
+grpc::Status OmbraService::CreateCollection(grpc::ServerContext* ctx,
+    const v1::CreateCollectionRequest* req,
+    v1::CreateCollectionResponse* resp) {
+  return guarded(ctx, Rpc::CreateCollection, resp,
+                 [&] { return run_CreateCollection(ctx, req, resp); });
+}
+
+grpc::Status OmbraService::GetCollection(grpc::ServerContext* ctx,
+    const v1::GetCollectionRequest* req,
+    v1::GetCollectionResponse* resp) {
+  return guarded(ctx, Rpc::GetCollection, resp,
+                 [&] { return run_GetCollection(ctx, req, resp); });
+}
+
+grpc::Status OmbraService::ListCollections(grpc::ServerContext* ctx,
+    const v1::ListCollectionsRequest* req,
+    v1::ListCollectionsResponse* resp) {
+  return guarded(ctx, Rpc::ListCollections, resp,
+                 [&] { return run_ListCollections(ctx, req, resp); });
+}
+
+grpc::Status OmbraService::DropCollection(grpc::ServerContext* ctx,
+    const v1::DropCollectionRequest* req,
+    v1::DropCollectionResponse* resp) {
+  return guarded(ctx, Rpc::DropCollection, resp,
+                 [&] { return run_DropCollection(ctx, req, resp); });
+}
+
+grpc::Status OmbraService::UploadKeys(grpc::ServerContext* ctx,
+    grpc::ServerReader<v1::UploadKeysChunk>* req,
+    v1::UploadKeysResponse* resp) {
+  return guarded(ctx, Rpc::UploadKeys, resp,
+                 [&] { return run_UploadKeys(ctx, req, resp); });
+}
+
+grpc::Status OmbraService::Insert(grpc::ServerContext* ctx,
+    grpc::ServerReader<v1::InsertBlock>* req,
+    v1::InsertResponse* resp) {
+  return guarded(ctx, Rpc::Insert, resp,
+                 [&] { return run_Insert(ctx, req, resp); });
+}
+
+grpc::Status OmbraService::Delete(grpc::ServerContext* ctx,
+    const v1::DeleteRequest* req,
+    v1::DeleteResponse* resp) {
+  return guarded(ctx, Rpc::Delete, resp,
+                 [&] { return run_Delete(ctx, req, resp); });
+}
+
+grpc::Status OmbraService::Search(grpc::ServerContext* ctx,
+    grpc::ServerReaderWriter<v1::SearchResponse, v1::SearchRequest>* req) {
+  return guarded(ctx, Rpc::Search, static_cast<void*>(nullptr),
+                 [&] { return run_Search(ctx, req); });
+}
+
+grpc::Status OmbraService::ListBlocks(grpc::ServerContext* ctx,
+    const v1::ListBlocksRequest* req,
+    v1::ListBlocksResponse* resp) {
+  return guarded(ctx, Rpc::ListBlocks, resp,
+                 [&] { return run_ListBlocks(ctx, req, resp); });
+}
+
+grpc::Status OmbraService::GetBlock(grpc::ServerContext* ctx,
+    const v1::GetBlockRequest* req,
+    grpc::ServerWriter<v1::GetBlockResponse>* resp) {
+  return guarded(ctx, Rpc::GetBlock, resp,
+                 [&] { return run_GetBlock(ctx, req, resp); });
+}
+
+grpc::Status OmbraService::ReplaceBlock(grpc::ServerContext* ctx,
+    grpc::ServerReader<v1::ReplaceBlockRequest>* req,
+    v1::ReplaceBlockResponse* resp) {
+  return guarded(ctx, Rpc::ReplaceBlock, resp,
+                 [&] { return run_ReplaceBlock(ctx, req, resp); });
 }
 
 }  // namespace ombra::server
