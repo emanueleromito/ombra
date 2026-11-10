@@ -86,7 +86,15 @@ def find_server_binary() -> Path | None:
 class ServerProcess:
     """`ombra_server` on 127.0.0.1 with a free port (the server prints the bound port)."""
 
-    def __init__(self, binary: Path, data_dir: Path, version: str, log_path: Path) -> None:
+    def __init__(
+        self,
+        binary: Path,
+        data_dir: Path,
+        version: str,
+        log_path: Path,
+        gpu_budget_mb: int = 1024,
+        host_budget_mb: int = 512,
+    ) -> None:
         self._log = open(log_path, "w")  # noqa: SIM115
         self.proc = subprocess.Popen(  # noqa: S603
             [
@@ -98,9 +106,9 @@ class ServerProcess:
                 "--openfhe-version",
                 version,
                 "--gpu-budget-mb",
-                "1024",
+                str(gpu_budget_mb),
                 "--host-budget-mb",
-                "512",
+                str(host_budget_mb),
             ],
             stdout=subprocess.PIPE,
             stderr=self._log,
