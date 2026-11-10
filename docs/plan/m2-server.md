@@ -68,7 +68,7 @@ T2.1, T2.2 and T2.3 can start in parallel. T2.5 can start once T2.4 has fixed th
 **Depends on:** T2.5
 **Steps:** pinned host memory pool holding the segments; a GPU cache with an eviction policy (LRU to start); asynchronous paging that overlaps copy and compute; a metric for hit rate that reveals no data. Measure the paging bandwidth on the A100.
 **Done when:** a test searches a collection larger than the configured GPU memory and gets the same results as with everything resident; paging throughput and hit rate are in `results/`.
-**Status:** in progress (code and tests written under `server/cache/`; `make test-gpu` and the A100 run `make bench TASK=t2.6` still to do, numbers go to `results/`)
+**Status:** done (paged search equals resident on A10 for both presets; A100 paging 22 to 26 GB/s, hit rate 0.32 uniform and 0.58 zipf at a 1/3 budget; overlap gives no gain while paging-bound; `results/2026-11-10-t2.6-gpu-cache.md`)
 
 ### T2.7 Search service
 

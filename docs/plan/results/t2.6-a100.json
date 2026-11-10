@@ -1,0 +1,249 @@
+{
+  "task": "t2.6",
+  "format_version": 1,
+  "preset": "m0_depth2",
+  "openfhe_version": "1.6.1",
+  "gpu_name": "NVIDIA A100-SXM4-40GB",
+  "gpu_memory_clocks": {
+    "command_output": "clocks.max.memory [MHz], memory.total [MiB]\n1215 MHz, 40960 MiB"
+  },
+  "results": [
+    {
+      "dims": 16,
+      "num_towers": 3,
+      "ring_dim": 16384,
+      "block_bytes": 12582912,
+      "blocks": 24,
+      "gpu_budget_blocks": 8,
+      "collection_to_budget": 3,
+      "gpu_budget_bytes": 100663296,
+      "host_pool_bytes": 301989888,
+      "lookahead": 1,
+      "warmup_pool_loads": 24,
+      "h2d_bandwidth": [
+        {
+          "mib": 1,
+          "pinned_gbps": 19.5747,
+          "pageable_gbps": 21.0186
+        },
+        {
+          "mib": 16,
+          "pinned_gbps": 23.1596,
+          "pageable_gbps": 18.0789
+        },
+        {
+          "mib": 64,
+          "pinned_gbps": 25.3151,
+          "pageable_gbps": 13.9255
+        },
+        {
+          "mib": 256,
+          "pinned_gbps": 24.6414,
+          "pageable_gbps": 15.7368
+        }
+      ],
+      "search": {
+        "accesses": 96,
+        "repetitions": 5,
+        "serial_seconds_median": 0.04664441,
+        "overlapped_seconds_median": 0.046392246,
+        "compute_only_seconds_median": 0.002221048,
+        "overlap_speedup": 1.00543548,
+        "paging_gbps_overlapped": 24.6818184,
+        "paging_gbps_serial": 24.5483862,
+        "serial_metrics": {
+          "hits": 5,
+          "misses": 91,
+          "evictions": 83,
+          "bytes_paged": 1145044992,
+          "hit_rate": 0.0520833
+        },
+        "overlapped_metrics": {
+          "hits": 5,
+          "misses": 91,
+          "evictions": 83,
+          "bytes_paged": 1145044992,
+          "hit_rate": 0.0520833
+        }
+      },
+      "hit_rate": {
+        "accesses": 384,
+        "uniform": {
+          "hits": 121,
+          "misses": 263,
+          "evictions": 255,
+          "bytes_paged": 3309305856,
+          "hit_rate": 0.315104
+        },
+        "uniform_seconds": 0.133081996,
+        "zipf_s1": {
+          "hits": 224,
+          "misses": 160,
+          "evictions": 152,
+          "bytes_paged": 2013265920,
+          "hit_rate": 0.583333
+        },
+        "zipf_seconds": 0.081682783
+      },
+      "note": "synthetic blocks (seeded random words); search = column search kernel, 3-component sums, no relinearization; gpu cache starts cold for every timed run, pinned pool warm; paging_gbps = bytes copied host to device / wall time of the whole search"
+    },
+    {
+      "dims": 64,
+      "num_towers": 3,
+      "ring_dim": 16384,
+      "block_bytes": 50331648,
+      "blocks": 24,
+      "gpu_budget_blocks": 8,
+      "collection_to_budget": 3,
+      "gpu_budget_bytes": 402653184,
+      "host_pool_bytes": 1207959552,
+      "lookahead": 1,
+      "warmup_pool_loads": 24,
+      "h2d_bandwidth": [
+        {
+          "mib": 1,
+          "pinned_gbps": 19.1067,
+          "pageable_gbps": 20.57
+        },
+        {
+          "mib": 16,
+          "pinned_gbps": 22.0197,
+          "pageable_gbps": 18.3825
+        },
+        {
+          "mib": 64,
+          "pinned_gbps": 24.005,
+          "pageable_gbps": 17.1982
+        },
+        {
+          "mib": 256,
+          "pinned_gbps": 24.9501,
+          "pageable_gbps": 13.2998
+        }
+      ],
+      "search": {
+        "accesses": 96,
+        "repetitions": 5,
+        "serial_seconds_median": 0.17325632,
+        "overlapped_seconds_median": 0.172627926,
+        "compute_only_seconds_median": 0.009522284,
+        "overlap_speedup": 1.00364016,
+        "paging_gbps_overlapped": 26.5320917,
+        "paging_gbps_serial": 26.4358609,
+        "serial_metrics": {
+          "hits": 5,
+          "misses": 91,
+          "evictions": 83,
+          "bytes_paged": 4580179968,
+          "hit_rate": 0.0520833
+        },
+        "overlapped_metrics": {
+          "hits": 5,
+          "misses": 91,
+          "evictions": 83,
+          "bytes_paged": 4580179968,
+          "hit_rate": 0.0520833
+        }
+      },
+      "hit_rate": {
+        "accesses": 384,
+        "uniform": {
+          "hits": 121,
+          "misses": 263,
+          "evictions": 255,
+          "bytes_paged": 13237223424,
+          "hit_rate": 0.315104
+        },
+        "uniform_seconds": 0.49923456,
+        "zipf_s1": {
+          "hits": 224,
+          "misses": 160,
+          "evictions": 152,
+          "bytes_paged": 8053063680,
+          "hit_rate": 0.583333
+        },
+        "zipf_seconds": 0.304551359
+      },
+      "note": "synthetic blocks (seeded random words); search = column search kernel, 3-component sums, no relinearization; gpu cache starts cold for every timed run, pinned pool warm; paging_gbps = bytes copied host to device / wall time of the whole search"
+    },
+    {
+      "dims": 256,
+      "num_towers": 3,
+      "ring_dim": 16384,
+      "block_bytes": 201326592,
+      "blocks": 24,
+      "gpu_budget_blocks": 8,
+      "collection_to_budget": 3,
+      "gpu_budget_bytes": 1610612736,
+      "host_pool_bytes": 4831838208,
+      "lookahead": 1,
+      "warmup_pool_loads": 24,
+      "h2d_bandwidth": [
+        {
+          "mib": 1,
+          "pinned_gbps": 19.018,
+          "pageable_gbps": 19.355
+        },
+        {
+          "mib": 16,
+          "pinned_gbps": 21.8535,
+          "pageable_gbps": 17.7454
+        },
+        {
+          "mib": 64,
+          "pinned_gbps": 25.3527,
+          "pageable_gbps": 16.33
+        },
+        {
+          "mib": 256,
+          "pinned_gbps": 24.6628,
+          "pageable_gbps": 13.9694
+        }
+      ],
+      "search": {
+        "accesses": 96,
+        "repetitions": 5,
+        "serial_seconds_median": 0.772652057,
+        "overlapped_seconds_median": 0.815958669,
+        "compute_only_seconds_median": 0.03541439,
+        "overlap_speedup": 0.946925483,
+        "paging_gbps_overlapped": 22.4529998,
+        "paging_gbps_serial": 23.7114749,
+        "serial_metrics": {
+          "hits": 5,
+          "misses": 91,
+          "evictions": 83,
+          "bytes_paged": 18320719872,
+          "hit_rate": 0.0520833
+        },
+        "overlapped_metrics": {
+          "hits": 5,
+          "misses": 91,
+          "evictions": 83,
+          "bytes_paged": 18320719872,
+          "hit_rate": 0.0520833
+        }
+      },
+      "hit_rate": {
+        "accesses": 384,
+        "uniform": {
+          "hits": 121,
+          "misses": 263,
+          "evictions": 255,
+          "bytes_paged": 52948893696,
+          "hit_rate": 0.315104
+        },
+        "uniform_seconds": 2.19476609,
+        "zipf_s1": {
+          "hits": 224,
+          "misses": 160,
+          "evictions": 152,
+          "bytes_paged": 32212254720,
+          "hit_rate": 0.583333
+        },
+        "zipf_seconds": 1.29403495
+      },
+      "note": "synthetic blocks (seeded random words); search = column search kernel, 3-component sums, no relinearization; gpu cache starts cold for every timed run, pinned pool warm; paging_gbps = bytes copied host to device / wall time of the whole search"
+    }
+  ]
+}
