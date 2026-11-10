@@ -93,7 +93,7 @@ T2.1, T2.2 and T2.3 can start in parallel. T2.5 can start once T2.4 has fixed th
 **Depends on:** T2.4
 **Steps:** REST endpoints for health and metrics (counts, latencies, GPU memory, cache hit rate; no data, no ids, no scores); TLS on the gRPC and REST ports; API keys, stored hashed, with a per-key scope (admin, read, write).
 **Done when:** tests show that a request without a valid key is refused, that the metrics output contains no vector, id or score, and that a plain-text connection is refused when TLS is on.
-**Status:** todo
+**Status:** done (PR #39; unit tests and the TLS and auth e2e tests pass in CI)
 
 ### T2.10 End-to-end test and benchmark over gRPC
 
