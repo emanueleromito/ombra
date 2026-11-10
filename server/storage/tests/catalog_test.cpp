@@ -32,8 +32,8 @@ int main() {
     c.tombstone("docs", {"a", "unknown"});
     c.tombstone("docs", {"a"});
     CHECK(c.tombstones("docs") == std::vector<std::string>{"a"});
-    c.put_key_file("docs", "eval_key", "k1.env");
-    c.put_key_file("docs", "eval_key", "k2.env");
+    c.put_key_file("docs", "eval_mult", "k1.env");
+    c.put_key_file("docs", "eval_mult", "k2.env");
     CHECK(c.key_files("docs").size() == 1 && c.key_files("docs")[0].second == "k2.env");
     sqlite3_exec(c.raw(), "UPDATE meta SET value=2 WHERE key='schema_version'", nullptr, nullptr,
                  nullptr);

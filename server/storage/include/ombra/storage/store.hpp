@@ -25,6 +25,12 @@ struct RecoveryStats {
               orphans_removed = 0, torn_bytes_dropped = 0;
 };
 
+// Key file kinds of put_key_file (proto KeyKind). The context is an envelope of kind Context; the
+// EvalMult and automorphism keys are envelopes of kind PublicEvalKey. There is no secret-key kind.
+inline constexpr const char* kKeyContext = "context";
+inline constexpr const char* kKeyEvalMult = "eval_mult";
+inline constexpr const char* kKeyAutomorphism = "automorphism";
+
 class Store {
  public:
   // Opens (creating if empty) and runs recovery. openfhe_version is what column envelopes must
@@ -34,18 +40,40 @@ class Store {
   void create_collection(const CollectionSpec& spec);
   bool get_collection(const std::string& name, CollectionSpec* out) const;
 
-  // Appends one cluster block as a new immutable segment. Returns the segment name once the
+  // Appends one cluster block as a new immutable segment. cluster == spec.cluster_count is the
+  // reserved id of the cluster-center blocks (d columns, no filter columns). Returns the segment name once the
   // write is acknowledged (durable). Throws on duplicate or tombstoned ids, unknown collection or
   // cluster, or a column envelope that does not match the collection's preset.
   std::string insert(const std::string& collection, std::uint32_t cluster,
                      const std::vector<std::string>& ids,
                      const std::vector<std::vector<std::uint8_t>>& column_envelopes);
+  // Names of all collections, sorted.
+  std::vector<std::string> list_collections() const;
+  // Removes a collection with all its rows, segment files and key files. Returns false if it does
+  // not exist. Order (crash safe): (1) one catalog transaction removes every row; that commit is
+  // the point of no return. (2) The write-ahead log is checkpointed, so no old record can touch a
+  // later collection of the same name. (3) The segment and key files are unlinked. A crash after
+  // (1) leaves only unreferenced files, which recovery sweeps; a crash before (1) leaves the
+  // collection untouched. Same-name re-creation is therefore safe at any point.
+  bool drop_collection(const std::string& name);
+  // True if `id` exists in a data cluster (not the center cluster spec.cluster_count) and is not
+  // tombstoned yet. Used by the server to filter a delete request.
+  bool is_live_data_id(const std::string& collection, const std::string& id) const;
   // Marks ids deleted (unknown ids ignored). Acknowledged on return.
   void remove(const std::string& collection, const std::vector<std::string>& ids);
 
-  // Stores a public key / context envelope file and registers it. kind: "context" or "eval_key".
+  // Stores a public key / context envelope file and registers it. kind: kKeyContext,
+  // kKeyEvalMult or kKeyAutomorphism.
   void put_key_file(const std::string& collection, const std::string& kind,
                     const std::vector<std::uint8_t>& envelope);
+
+  // The stored envelope of a key kind (false if none was uploaded).
+  bool get_key_file(const std::string& collection, const std::string& kind,
+                    std::vector<std::uint8_t>* out) const;
+  // Locked snapshots for the search path (the catalog() accessor is not serialised with writers).
+  std::vector<SegmentRow> segments(const std::string& collection) const;
+  std::vector<std::string> tombstones(const std::string& collection) const;
+  const std::string& openfhe_version() const { return ofhe_; }
 
   SegmentData read_segment(const std::string& collection, const std::string& segment) const;
   const Catalog& catalog() const { return *catalog_; }

@@ -15,6 +15,7 @@ ALLOWED_TOP_LEVEL = (
     "core",
     "client",
     "server",
+    "proto",
     "tests",
     "CMakeLists.txt",
     "pyproject.toml",

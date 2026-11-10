@@ -20,6 +20,10 @@ enum class CrashPoint : int {
   DeleteBeforeRecord,
   DeleteAfterRecord,
   DeleteAfterCatalog,
+  DropBeforeCatalog,
+  DropAfterCatalog,   // collection gone from the catalog, files and log not yet cleaned
+  DropAfterWalReset,  // log checkpointed, files not yet unlinked
+  DropAfterFirstFile, // some files unlinked
 };
 
 inline constexpr int kCrashExitCode = 42;

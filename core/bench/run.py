@@ -34,6 +34,11 @@ T2.6: GPU cluster cache (`ombra_bench_cache`, built from server/cache): paging b
 pageable, serial vs overlapped search over a collection 3x the GPU budget, hit rate for uniform and
 Zipf access. Output `<out>/t2.6-a100.json`. Runs only when asked for (`--task t2.6`).
 
+T2.7: the measurements of decision 0019 through the gRPC server (core/bench/filter_0019.py): score
+error with filter columns, the decision-0012 recall rule with the extra columns, filtered recall
+with the selective-filter loop. Output `<out>/t2.7-<preset>-a100.json` for each preset in
+`--presets-t27`. Runs only when asked for (`--task t2.7`).
+
     python core/bench/run.py --task t0.7 --out <dir>
 """
 
@@ -481,6 +486,10 @@ def main() -> None:
     )
     parser.add_argument("--e2e-queries", type=int, default=20, help="t1.3: timed queries per case")
     parser.add_argument("--e2e-warmup", type=int, default=3, help="t1.3: untimed queries per case")
+    parser.add_argument(
+        "--presets-t27", default="m0_depth2,m0_compact_n8192", help="t2.7: presets, one file each"
+    )
+    parser.add_argument("--queries-t27", type=int, default=1000, help="t2.7: queries for part 2")
     parser.add_argument("--presets-t011", default="m0_depth2,m0_compact_n8192", help="t0.11")
     parser.add_argument(
         "--error-presets-t011", default="m0_compact_n8192", help="t0.11: presets with the e2e error"
@@ -488,13 +497,17 @@ def main() -> None:
     args = parser.parse_args()
 
     task = args.task.lower()
-    if task not in ("all", "t0.4", "t0.5", "t0.7", "t0.11", "t1.3", "t2.6"):
+    if task not in ("all", "t0.4", "t0.5", "t0.7", "t0.11", "t1.3", "t2.6", "t2.7"):
         raise SystemExit(f"unknown task {args.task!r}")
     dims = tuple(int(x) for x in args.dims.split(","))
     if task in ("all", "t0.4"):
         run_t04(args.out, dims, args.blocks, args.warmup, args.iters, args.name)
     if task in ("all", "t0.5"):
         run_t05(args.out, dims, args.warmup, args.iters, args.name_t05, args.profile)
+    if task == "t2.7":
+        from filter_0019 import run_t27
+
+        run_t27(args.out, tuple(args.presets_t27.split(",")), args.queries_t27)
     if task == "t2.6":
         run_t26(
             args.out,

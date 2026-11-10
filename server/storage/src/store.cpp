@@ -80,6 +80,40 @@ bool Store::get_collection(const std::string& name, CollectionSpec* out) const {
   return catalog_->get_collection(name, out);
 }
 
+std::vector<std::string> Store::list_collections() const {
+  std::lock_guard lk(mu_);
+  return catalog_->list_collections();
+}
+
+bool Store::is_live_data_id(const std::string& collection, const std::string& id) const {
+  std::lock_guard lk(mu_);
+  CollectionSpec spec;
+  if (!catalog_->get_collection(collection, &spec)) return false;
+  return catalog_->is_live_in_other_cluster(collection, id, spec.cluster_count);
+}
+
+bool Store::drop_collection(const std::string& name) {
+  std::lock_guard lk(mu_);
+  const auto t0 = std::chrono::steady_clock::now();
+  std::vector<std::string> segs, keys;
+  maybe_crash(CrashPoint::DropBeforeCatalog);
+  if (!catalog_->drop_collection(name, &segs, &keys)) return false;
+  maybe_crash(CrashPoint::DropAfterCatalog);
+  wal_->reset();  // everything in the log is in the (durable) catalog or belongs to this collection
+  maybe_crash(CrashPoint::DropAfterWalReset);
+  bool first = true;
+  for (const auto& f : segs) {
+    ::unlink(segment_path(f).c_str());
+    if (first) maybe_crash(CrashPoint::DropAfterFirstFile);
+    first = false;
+  }
+  for (const auto& f : keys) ::unlink((root_ + "/keys/" + f).c_str());
+  fsync_path(segments_dir());
+  fsync_path(root_ + "/keys");
+  log_line("drop", segs.size() + keys.size(), 0, ms_since(t0));
+  return true;
+}
+
 std::string Store::insert(const std::string& collection, std::uint32_t cluster,
                           const std::vector<std::string>& ids,
                           const std::vector<std::vector<std::uint8_t>>& cols) {
@@ -87,7 +121,7 @@ std::string Store::insert(const std::string& collection, std::uint32_t cluster,
   const auto t0 = std::chrono::steady_clock::now();
   CollectionSpec spec;
   if (!catalog_->get_collection(collection, &spec)) throw std::runtime_error("unknown collection");
-  if (cluster >= spec.cluster_count) throw std::runtime_error("cluster out of range");
+  if (cluster > spec.cluster_count) throw std::runtime_error("cluster out of range");
   if (ids.empty()) throw std::runtime_error("insert: no ids");
   std::set<std::string> seen;
   for (const auto& id : ids)
@@ -156,8 +190,8 @@ void Store::put_key_file(const std::string& collection, const std::string& kind,
   CollectionSpec spec;
   if (!catalog_->get_collection(collection, &spec)) throw std::runtime_error("unknown collection");
   core::EnvelopeKind k;
-  if (kind == "context") k = core::EnvelopeKind::Context;
-  else if (kind == "eval_key") k = core::EnvelopeKind::PublicEvalKey;
+  if (kind == kKeyContext) k = core::EnvelopeKind::Context;
+  else if (kind == kKeyEvalMult || kind == kKeyAutomorphism) k = core::EnvelopeKind::PublicEvalKey;
   else throw std::runtime_error("unknown key file kind");
   core::read_envelope(envelope, k, spec.preset, ofhe_);  // also refuses unknown versions
   std::string old;
@@ -167,6 +201,27 @@ void Store::put_key_file(const std::string& collection, const std::string& kind,
   write_file_durable(root_ + "/keys/" + file, envelope);
   catalog_->put_key_file(collection, kind, file);
   if (!old.empty()) ::unlink((root_ + "/keys/" + old).c_str());
+}
+
+bool Store::get_key_file(const std::string& collection, const std::string& kind,
+                         std::vector<std::uint8_t>* out) const {
+  std::lock_guard lk(mu_);
+  for (auto& [kk, f] : catalog_->key_files(collection)) {
+    if (kk != kind) continue;
+    if (out) *out = read_file(root_ + "/keys/" + f);
+    return true;
+  }
+  return false;
+}
+
+std::vector<SegmentRow> Store::segments(const std::string& collection) const {
+  std::lock_guard lk(mu_);
+  return catalog_->segments(collection);
+}
+
+std::vector<std::string> Store::tombstones(const std::string& collection) const {
+  std::lock_guard lk(mu_);
+  return catalog_->tombstones(collection);
 }
 
 SegmentData Store::read_segment(const std::string& collection, const std::string& segment) const {
@@ -229,8 +284,16 @@ void Store::recover() {
       if (::unlink(segment_path(n).c_str()) == 0) ++stats_.orphans_removed;
     }
   }
-  for (const auto& n : list_dir(root_ + "/keys"))
-    if (ends_with(n, ".tmp")) ::unlink((root_ + "/keys/" + n).c_str());
+  // Key files: temp files and files no catalog row points to (aborted upload, or a dropped
+  // collection whose files were not yet unlinked).
+  {
+    auto kf = catalog_->all_key_files();
+    std::set<std::string> known_keys(kf.begin(), kf.end());
+    for (const auto& n : list_dir(root_ + "/keys"))
+      if (ends_with(n, ".tmp") || !known_keys.count(n)) {
+        if (::unlink((root_ + "/keys/" + n).c_str()) == 0) ++stats_.orphans_removed;
+      }
+  }
 
   // Everything in the log is now in the catalog, which is durable (synchronous=FULL): checkpoint.
   wal_->reset();

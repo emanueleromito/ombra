@@ -1,6 +1,6 @@
 # 0005. Homomorphic metadata filtering
 
-- **Status:** accepted
+- **Status:** accepted; amended by 0019 (the filter is an additive penalty, not a multiplied mask)
 - **Date:** 2026-10-31
 
 ## Context

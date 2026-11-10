@@ -76,7 +76,7 @@ T2.1, T2.2 and T2.3 can start in parallel. T2.5 can start once T2.4 has fixed th
 **Depends on:** T2.4, T2.5, T2.6, T2.3 (for filters)
 **Steps:** one stream per query; expand the query once and reuse it in both stages; stage 1 scores the cluster centers; stage 2 scores the chosen clusters; filters as in decision 0019 (additive penalty: filter one-hots in the query, extra columns in the dot product, no mask multiply); deletes as a plaintext penalty added at the tombstoned slots; selective-filter behaviour per 0019 (more rounds on the same stream, then Strict or an `incomplete` answer); check key tags on every request (the wrong key is refused, as in the T1.12 to T1.14 refusals). Rule 3 applies to anything new on the device.
 **Done when:** an end-to-end gRPC test returns the same top-k as the CPU OpenFHE oracle on a small collection with and without a filter and with deleted vectors, the new device code has exact OpenFHE oracle tests, and the 0019 conditions are measured and written into `results/`: score error against the band gap on the compact preset at F = 1, 4 and F_max, the 0012 recall rule with the extra columns, and filtered top-10 recall at selectivity about 1%, 10% and 50% (with the extra rounds needed). Decision 0019 is then marked accepted or rejected.
-**Status:** todo
+**Status:** done (engine `server/search`, gRPC `server/grpc`, exactness vs OpenFHE on A10, e2e `tests/test_gpu_e2e_grpc.py` 10 passed on both presets; decision 0019 accepted with measurements in `results/2026-11-10-t2.7-filter-0019.md`)
 
 ### T2.8 Compaction of deleted vectors
 

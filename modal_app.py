@@ -67,6 +67,16 @@ image = (
     # T0.8: reads the Hugging Face parquet embedding shards. A layer after the OpenFHE build, so
     # OpenFHE is not rebuilt. (ann-benchmarks.com does not host the dbpedia hdf5, so no h5py.)
     .pip_install("pyarrow==17.0.0")
+    # T2.7b: gRPC for C++ (the server) and Python (tests/e2e_client.py). Layers after the OpenFHE
+    # build, so OpenFHE is not rebuilt.
+    .apt_install(
+        "libgrpc++-dev",
+        "libprotobuf-dev",
+        "protobuf-compiler",
+        "protobuf-compiler-grpc",
+        "pkg-config",
+    )
+    .pip_install("grpcio", "grpcio-tools")
     # Source code last, so code changes don't rebuild OpenFHE.
     # Allowlist, not a blocklist: see modal_upload.py. The callable gets paths relative to ".".
     .add_local_dir(".", remote_path=REPO_DIR, ignore=_upload_ignore)
@@ -181,6 +191,9 @@ def bench_topk(blocks: int = 25, runs: int = 5, preset: str = "m0_depth2") -> No
 
 # memory: the T0.4 benchmark holds one block (about 1.2 GB at d = 1536) as OpenFHE ciphertexts plus
 # its flattened copy on the host at a time, so about 3 to 4 GB peak; 16 GiB leaves headroom.
+# T2.7 (`--task t2.7`, filter measurements of decision 0019) runs here too: it starts ombra_server
+# (built with everything else) and drives it over localhost; 16 GiB covers the client's cached
+# ciphertexts (about 1 GB) and the server's pinned pool (2 GiB budget).
 # T1.3 needs the 40 GB card (the plain "A100" sometimes lands on the 80 GB PCIe one) and more time:
 # 12 cases, each with 23 queries, plus encrypting two blocks per d. Host memory: block 0 flattened
 # (1.2 GB at d = 1536) plus its OpenFHE ciphertexts and the Python client; 16 GiB is enough.

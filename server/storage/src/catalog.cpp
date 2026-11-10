@@ -184,7 +184,9 @@ void Catalog::create_collection(const CollectionSpec& s) {
       .num(5, s.security_level).text(6, s.key_tag).num(7, s.cluster_count)
       .text(8, encode_filters(s.filter_fields)).run();
   Stmt c(db_, "INSERT INTO clusters VALUES(?,?)");
-  for (std::uint32_t i = 0; i < s.cluster_count; ++i) {
+  // Cluster ids 0 .. cluster_count - 1 are data clusters; the id cluster_count itself is reserved
+  // for the block(s) of cluster centers (stage 1 of the search).
+  for (std::uint32_t i = 0; i <= s.cluster_count; ++i) {
     c.reset();
     c.text(1, s.name).num(2, i).run();
   }
@@ -215,6 +217,30 @@ std::vector<std::string> Catalog::list_collections() const {
   std::vector<std::string> v;
   while (q.step()) v.push_back(q.col_text(0));
   return v;
+}
+
+bool Catalog::drop_collection(const std::string& name, std::vector<std::string>* segment_files,
+                              std::vector<std::string>* key_files) {
+  Tx tx(db_);
+  if (!get_collection(name, nullptr)) return false;
+  if (segment_files) {
+    segment_files->clear();
+    for (const auto& r : segments(name)) segment_files->push_back(r.file);
+  }
+  if (key_files) {
+    key_files->clear();
+    for (const auto& kv : this->key_files(name)) key_files->push_back(kv.second);
+  }
+  // Children first (foreign keys are on).
+  for (const char* sql : {"DELETE FROM tombstones WHERE collection=?",
+                          "DELETE FROM vectors WHERE collection=?",
+                          "DELETE FROM segments WHERE collection=?",
+                          "DELETE FROM clusters WHERE collection=?",
+                          "DELETE FROM key_files WHERE collection=?",
+                          "DELETE FROM collections WHERE name=?"})
+    Stmt(db_, sql).text(1, name).run();
+  tx.commit();
+  return true;
 }
 
 std::uint64_t Catalog::next_segment_id() {
@@ -307,6 +333,16 @@ std::vector<std::string> Catalog::vector_ids(const std::string& collection) cons
   return v;
 }
 
+bool Catalog::is_live_in_other_cluster(const std::string& collection, const std::string& id,
+                                       std::uint32_t excluded_cluster) const {
+  Stmt q(db_,
+         "SELECT 1 FROM vectors v JOIN segments s ON s.file=v.segment "
+         "WHERE v.collection=? AND v.id=? AND s.cluster<>? AND NOT EXISTS("
+         "SELECT 1 FROM tombstones t WHERE t.collection=v.collection AND t.id=v.id)");
+  q.text(1, collection).blob(2, id).num(3, excluded_cluster);
+  return q.step();
+}
+
 void Catalog::put_key_file(const std::string& collection, const std::string& kind,
                            const std::string& file) {
   Stmt(db_, "INSERT OR REPLACE INTO key_files VALUES(?,?,?)")
@@ -319,6 +355,13 @@ std::vector<std::pair<std::string, std::string>> Catalog::key_files(
   q.text(1, collection);
   std::vector<std::pair<std::string, std::string>> v;
   while (q.step()) v.emplace_back(q.col_text(0), q.col_text(1));
+  return v;
+}
+
+std::vector<std::string> Catalog::all_key_files() const {
+  Stmt q(db_, "SELECT file FROM key_files");
+  std::vector<std::string> v;
+  while (q.step()) v.push_back(q.col_text(0));
   return v;
 }
 

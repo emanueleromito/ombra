@@ -61,5 +61,5 @@ def test_filtered_score_headroom(preset: str) -> None:
     limit = MAX_VALUE[preset]
     for level in (1, 2):
         assert 2 ** best.get(level, -1) >= 2 * limit, (preset, level, best)
-    f_max = int((limit - 1) // LAMBDA)
+    f_max = int((limit - 1) // LAMBDA) - 1  # a tombstoned slot reaches 1 + LAMBDA * (F + 1)
     print(f"preset={preset} max_value={limit} lambda={LAMBDA} F_max={f_max}")

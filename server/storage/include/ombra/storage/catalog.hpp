@@ -47,6 +47,11 @@ class Catalog {
   void create_collection(const CollectionSpec& spec);  // also creates the cluster rows
   bool get_collection(const std::string& name, CollectionSpec* out) const;
   std::vector<std::string> list_collections() const;
+  // One transaction: removes the collection and every row that belongs to it (tombstones, vectors,
+  // segments, clusters, key file rows). Returns the segment and key file names that were
+  // registered, for the caller to unlink after the commit. False if the collection is unknown.
+  bool drop_collection(const std::string& name, std::vector<std::string>* segment_files,
+                       std::vector<std::string>* key_files);
 
   std::uint64_t next_segment_id();  // durable counter
   bool has_segment(const std::string& file) const;
@@ -62,10 +67,16 @@ class Catalog {
   void tombstone(const std::string& collection, const std::vector<std::string>& ids);
   std::vector<std::string> tombstones(const std::string& collection) const;
   std::vector<std::string> vector_ids(const std::string& collection) const;
+  // True if the id exists, is stored in a cluster other than `excluded_cluster` and is not yet
+  // tombstoned. (The server passes spec.cluster_count, the reserved id of the center blocks, so a
+  // delete can never reach a cluster center.)
+  bool is_live_in_other_cluster(const std::string& collection, const std::string& id,
+                                std::uint32_t excluded_cluster) const;
 
   void put_key_file(const std::string& collection, const std::string& kind,
                     const std::string& file);
   std::vector<std::pair<std::string, std::string>> key_files(const std::string& collection) const;
+  std::vector<std::string> all_key_files() const;
 
   sqlite3* raw() const { return db_; }  // for tests that tamper with versions
 
