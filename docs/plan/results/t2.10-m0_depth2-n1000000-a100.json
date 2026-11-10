@@ -1,0 +1,230 @@
+{
+  "task": "t2.10",
+  "preset": "m0_depth2",
+  "n_vectors": 1000000,
+  "d": 384,
+  "filter_fields": [
+    8,
+    8
+  ],
+  "filter_wants": [
+    2,
+    5
+  ],
+  "slots": 8192,
+  "target_blocks_per_cluster": 2,
+  "k": 10,
+  "n_queries_per_variant": 30,
+  "nprobe_timed": 2,
+  "nprobes_recall": [
+    1,
+    2,
+    4
+  ],
+  "host": {
+    "cpu_model_per_proc_cpuinfo": "unknown",
+    "note": "Modal virtualizes the CPU: /proc/cpuinfo may not name the real host CPU, and the visible logical CPUs may exceed the container's quota (cgroup cpu.max below). The client (this process and its workers) and the server run in the same container, so they share this one host description.",
+    "logical_cpus_in_proc_cpuinfo": 32,
+    "os_cpu_count": 32,
+    "sched_getaffinity": 32,
+    "cgroup_cpu_max": "3200000",
+    "gpu": "NVIDIA A100-SXM4-40GB, 40960 MiB, 610.57.04",
+    "git_commit": ""
+  },
+  "disk_free_bytes_at_start": 549561290752,
+  "disk_estimate_bytes": 44160000000,
+  "data": {
+    "generator": "gaussian mixture on the unit sphere, noise 0.7, comps = max(4, C // 4)",
+    "clusters": 61,
+    "cluster_size_min_mean_max": [
+      7382,
+      16393.44262295082,
+      67006
+    ],
+    "blocks_total": 154,
+    "blocks_per_cluster_mean": 2.5245901639344264,
+    "filter_matching_vectors": 15723,
+    "generate_and_cluster_s": 12.330403574999998
+  },
+  "keygen_s": 0.20105045900000107,
+  "key_bytes": {
+    "1": 670,
+    "2": 2623420,
+    "3": 26223732
+  },
+  "keys_upload_s": 0.15353637299999434,
+  "client_workers": 16,
+  "storage": {
+    "ingest_wall_s": 385.595558322,
+    "encrypt_cpu_s_summed_over_workers": 524.16,
+    "upload_call_s_summed": 351.1080532489997,
+    "ciphertext_bytes_uploaded": 48810168576,
+    "bytes_on_disk_apparent": 48953149066,
+    "bytes_on_disk_allocated": 48953190400,
+    "files": 162,
+    "bytes_per_vector_on_disk": 48953.149066,
+    "ingest_vectors_per_s": 2593.3908687945213
+  },
+  "variants": {
+    "no_filter": {
+      "latency_s": {
+        "encrypt": {
+          "mean": 0.010516824766665423,
+          "p50": 0.010481975999937276,
+          "p95": 0.01124569400008113
+        },
+        "stage1": {
+          "mean": 0.042479379433346294,
+          "p50": 0.04219405900016682,
+          "p95": 0.04465779599991038
+        },
+        "dec1": {
+          "mean": 0.01959467456666175,
+          "p50": 0.019509491999997408,
+          "p95": 0.02018558400004622
+        },
+        "stage2": {
+          "mean": 15.038609767833337,
+          "p50": 16.134659816000067,
+          "p95": 53.77779309999994
+        },
+        "decrypt": {
+          "mean": 0.023620467466666167,
+          "p50": 0.02352000299993051,
+          "p95": 0.02647896199994193
+        },
+        "topk": {
+          "mean": 0.00017825183332812836,
+          "p50": 0.0001575889999685387,
+          "p95": 0.0002970900000036636
+        },
+        "total": {
+          "mean": 15.134999365900004,
+          "p50": 16.231288761000314,
+          "p95": 53.8749891719998
+        }
+      },
+      "stage2_first_message_s": {
+        "mean": 15.034228777899987,
+        "p50": 16.129714225000043,
+        "p95": 53.77013043399995
+      },
+      "round2_extra_s": {
+        "mean": 14.069497151866676,
+        "p50": 17.651886486999956,
+        "p95": 27.475829345999955
+      },
+      "bytes_per_query": {
+        "query_up": 787464,
+        "stage1_down": 525574,
+        "stage2_down_mean": 3168032.0
+      },
+      "stage2_blocks_per_query_mean": 5.466666666666667,
+      "recall_at_10": {
+        "1": {
+          "encrypted_no_rerank": 0.39333333333333337,
+          "plaintext_same_clusters": 0.39333333333333337,
+          "gap": 0.0,
+          "same_cluster_choice_fraction": 1.0
+        },
+        "2": {
+          "encrypted_no_rerank": 0.6233333333333333,
+          "plaintext_same_clusters": 0.6233333333333333,
+          "gap": 0.0,
+          "same_cluster_choice_fraction": 1.0
+        },
+        "4": {
+          "encrypted_no_rerank": 0.8966666666666666,
+          "plaintext_same_clusters": 0.8966666666666666,
+          "gap": 0.0,
+          "same_cluster_choice_fraction": 1.0
+        }
+      },
+      "n_queries": 30,
+      "recall_rule_note": "tolerance 0.005 (decision 0012); few queries, no verdict"
+    },
+    "filter": {
+      "latency_s": {
+        "encrypt": {
+          "mean": 0.01053021953334034,
+          "p50": 0.01035946399997556,
+          "p95": 0.010608150000052774
+        },
+        "stage1": {
+          "mean": 0.04157264106668966,
+          "p50": 0.04127075099995636,
+          "p95": 0.043377404000011666
+        },
+        "dec1": {
+          "mean": 0.01946777899999385,
+          "p50": 0.019407961000069918,
+          "p95": 0.01976356099999066
+        },
+        "stage2": {
+          "mean": 10.039030173966678,
+          "p50": 4.451410186999965,
+          "p95": 30.832989261000193
+        },
+        "decrypt": {
+          "mean": 0.02332599273333926,
+          "p50": 0.022987457999988692,
+          "p95": 0.02738407099991491
+        },
+        "topk": {
+          "mean": 0.00018133466666464909,
+          "p50": 0.00016770499996709987,
+          "p95": 0.00030646100003650645
+        },
+        "total": {
+          "mean": 10.134108140966706,
+          "p50": 4.54355294800007,
+          "p95": 30.92791446300066
+        }
+      },
+      "stage2_first_message_s": {
+        "mean": 10.03479876973334,
+        "p50": 4.449520303000099,
+        "p95": 30.82747474300004
+      },
+      "round2_extra_s": {
+        "mean": 9.165109736399994,
+        "p50": 8.910438136999801,
+        "p95": 22.085175139000057
+      },
+      "bytes_per_query": {
+        "query_up": 787464,
+        "stage1_down": 525574,
+        "stage2_down_mean": 3168032.0
+      },
+      "stage2_blocks_per_query_mean": 5.466666666666667,
+      "recall_at_10": {
+        "1": {
+          "encrypted_no_rerank": 0.35666666666666663,
+          "plaintext_same_clusters": 0.35666666666666663,
+          "gap": 0.0,
+          "same_cluster_choice_fraction": 1.0
+        },
+        "2": {
+          "encrypted_no_rerank": 0.6099999999999999,
+          "plaintext_same_clusters": 0.6099999999999999,
+          "gap": 0.0,
+          "same_cluster_choice_fraction": 1.0
+        },
+        "4": {
+          "encrypted_no_rerank": 0.9033333333333332,
+          "plaintext_same_clusters": 0.9033333333333332,
+          "gap": 0.0,
+          "same_cluster_choice_fraction": 1.0
+        }
+      },
+      "n_queries": 30,
+      "recall_rule_note": "tolerance 0.005 (decision 0012); few queries, no verdict"
+    }
+  },
+  "server_log": {
+    "lines": 777,
+    "cache_lines": [],
+    "note": "GPU cache hit rate (/metrics) not available; these log lines are all there is"
+  },
+  "status": "done"
+}

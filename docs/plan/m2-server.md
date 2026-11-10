@@ -101,7 +101,7 @@ T2.1, T2.2 and T2.3 can start in parallel. T2.5 can start once T2.4 has fixed th
 **Depends on:** T2.1, T2.2, T2.7, T2.8, T2.9
 **Steps:** an end-to-end test (create, upload keys, insert, search with and without a filter, delete, restart, search again); a benchmark at 100k and 1M vectors on the A100 for the presets T2.2 accepted, with the latency split per step and the recall under encryption by the decision-0012 rule. Record the host CPU model and core count for the client and the server.
 **Done when:** the test passes in CI and the benchmark file in `results/` has the numbers, the CPU model and core count, and the recall figures.
-**Status:** todo
+**Status:** done (restart test in CI; benchmark at 100k and 1M for both presets in `results/2026-11-10-t2.10-e2e-bench.md`: 100k totals 54 to 94 ms, 1M is disk-bound at 4.5 to 16 s p50 with the small cache budgets; recall gaps 0.000; the CPU model is hidden by Modal, core count recorded)
 
 ---
 
