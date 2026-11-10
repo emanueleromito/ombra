@@ -82,8 +82,9 @@ T2.1, T2.2 and T2.3 can start in parallel. T2.5 can start once T2.4 has fixed th
 
 **Why:** tombstones in the mask keep deleted vectors in the search cost forever.
 **Depends on:** T2.5, T2.7
-**Steps:** a background job that rewrites a segment without tombstoned columns, swaps it in atomically through the catalog, and removes the old file; it must be safe against a crash and against concurrent searches.
-**Done when:** a test compacts a collection while searching it and gets consistent results before, during and after; a crash test at each step of the swap loses nothing; stored bytes fall in proportion to the deleted share.
+**Approach (decided by the user):** in column packing a deleted vector is one slot in every column, so the server cannot drop slots without rotation, which would change the level budget. So the server drops only blocks whose vectors are all deleted, and offers an atomic ReplaceBlock; the client repacks partly deleted blocks (T3.5). The server never sees a key or plaintext.
+**Steps:** a background job that drops fully deleted blocks through the catalog and removes their files; ListBlocks (deleted share per block, counts only); GetBlock and ReplaceBlock for the client repack; every swap is safe against a crash and against concurrent searches.
+**Done when:** fully deleted blocks are dropped and their files removed; a test searches while compacting and gets consistent results before, during and after; ReplaceBlock survives a crash test at each step of the swap (nothing lost, no orphan files); after a client repack of a block with scattered deletes the stored bytes fall in proportion to the deleted share.
 **Status:** todo
 
 ### T2.9 REST admin, TLS and API keys

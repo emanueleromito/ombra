@@ -85,3 +85,5 @@ All three conditions are measured, on synthetic data, in `docs/plan/results/2026
 2. The 0012 recall rule with the extra columns passes in both presets (worst gap 0.0001 against 0.005), on one synthetic dataset, not the two-dataset acceptance.
 3. Filtered recall@10 is 1.000 at 1%, 10% and 50% selectivity, except 0.954 (max_probe 8p) and 0.926 (4) for a 50% filter correlated with the clusters, where the "k matches found" stop is the weak point. The client library (M3) should offer a minimum probe count.
 Also: a tombstoned slot reaches 1 + lambda * (F + 1), which lowers F_max at `m0_depth2` from 15 to 14.
+
+Note (user, 2026-11-10): 0019 stays accepted. Filtered recall on a real dataset is due before release (T3.11). The client probes at least the clusters an unfiltered query probes and widens only if fewer than k matches are found.
