@@ -44,7 +44,7 @@ T2.1, T2.2 and T2.3 can start in parallel. T2.5 can start once T2.4 has fixed th
 **Depends on:** none
 **Steps:** write a decision record with options and a recommendation. Start from this candidate: one-hot field columns are stored encrypted like vector columns; the client sends a one-hot query for the filter value, the server expands it like a vector query (level 0) and multiplies it with the one-hot columns (level 0 to 1), in parallel with the scores, then applies the mask to the score with one multiplication (level 1 to 2). Cover: equality on one field, several fields (AND), small value sets (OR), the cost in columns per field and in stored bytes, what the server learns (the number and name of filter fields), and what is left out (ranges, text).
 **Done when:** the decision is **proposed** with at least two options measured or costed, and the level budget of the recommended option is shown to stay within depth 2. **Stop and ask the user before building anything.**
-**Status:** todo
+**Status:** decision 0019 proposed (additive penalty recommended, A multiplicative mask costed); waiting for the user's answer
 
 ### T2.4 gRPC API v1
 
