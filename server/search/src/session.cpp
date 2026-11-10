@@ -237,17 +237,41 @@ void SearchEngine::load_collection(const std::string& name) {
   const std::string& tag = c->spec.key_tag;
   CryptoContextImpl<DCRTPoly>::ClearEvalMultKeys(tag);
   CryptoContextImpl<DCRTPoly>::ClearEvalAutomorphismKeys(tag);
-  {
-    std::istringstream in(payload(mult_b, core::EnvelopeKind::PublicEvalKey),
-                          std::ios::in | std::ios::binary);
-    if (!CryptoContextImpl<DCRTPoly>::DeserializeEvalMultKey(in, SerType::BINARY))
-      throw SearchError("cannot read the EvalMult key");
-  }
-  {
-    std::istringstream in(payload(auto_b, core::EnvelopeKind::PublicEvalKey),
-                          std::ios::in | std::ios::binary);
-    if (!CryptoContextImpl<DCRTPoly>::DeserializeEvalAutomorphismKey(in, SerType::BINARY))
-      throw SearchError("cannot read the automorphism keys");
+  // The key files carry their own key tag and are inserted under it. Remember which tags exist,
+  // so that keys of another tag that this call inserts can be removed again when they are refused.
+  std::set<std::string> mult_before;
+  std::set<std::string> auto_before;
+  for (const auto& kv : CryptoContextImpl<DCRTPoly>::GetAllEvalMultKeys()) mult_before.insert(kv.first);
+  for (const auto& kv : CryptoContextImpl<DCRTPoly>::GetAllEvalAutomorphismKeys())
+    auto_before.insert(kv.first);
+  const auto drop_foreign = [&] {
+    std::vector<std::string> foreign;
+    for (const auto& kv : CryptoContextImpl<DCRTPoly>::GetAllEvalMultKeys())
+      if (!mult_before.count(kv.first)) foreign.push_back(kv.first);
+    for (const auto& t : foreign) CryptoContextImpl<DCRTPoly>::ClearEvalMultKeys(t);
+    foreign.clear();
+    for (const auto& kv : CryptoContextImpl<DCRTPoly>::GetAllEvalAutomorphismKeys())
+      if (!auto_before.count(kv.first)) foreign.push_back(kv.first);
+    for (const auto& t : foreign) CryptoContextImpl<DCRTPoly>::ClearEvalAutomorphismKeys(t);
+  };
+  try {
+    {
+      std::istringstream in(payload(mult_b, core::EnvelopeKind::PublicEvalKey),
+                            std::ios::in | std::ios::binary);
+      if (!CryptoContextImpl<DCRTPoly>::DeserializeEvalMultKey(in, SerType::BINARY))
+        throw SearchError("cannot read the EvalMult key");
+    }
+    {
+      std::istringstream in(payload(auto_b, core::EnvelopeKind::PublicEvalKey),
+                            std::ios::in | std::ios::binary);
+      if (!CryptoContextImpl<DCRTPoly>::DeserializeEvalAutomorphismKey(in, SerType::BINARY))
+        throw SearchError("cannot read the automorphism keys");
+    }
+  } catch (const lbcrypto::OpenFHEException&) {
+    // OpenFHE refuses to insert keys under a tag that already holds keys: the files belong to a key
+    // other than this collection's (a collection with the same files and another tag).
+    drop_foreign();
+    throw KeyTagMismatch("evaluation keys were made under another key than the collection's");
   }
   try {
     const auto& v = CryptoContextImpl<DCRTPoly>::GetEvalMultKeyVector(tag);
@@ -255,10 +279,13 @@ void SearchEngine::load_collection(const std::string& name) {
     c->relin = v[0];
     c->akeys = CryptoContextImpl<DCRTPoly>::GetEvalAutomorphismKeyMap(tag);
   } catch (const std::exception&) {
+    drop_foreign();
     throw KeyTagMismatch("evaluation keys were made under another key than the collection's");
   }
-  if (c->akeys.empty())
+  if (c->akeys.empty()) {
+    drop_foreign();
     throw KeyTagMismatch("evaluation keys were made under another key than the collection's");
+  }
 
   const auto cp = std::dynamic_pointer_cast<CryptoParametersRNS>(c->cc->GetCryptoParameters());
   if (!cp) throw SearchError("context is not an RNS scheme");
