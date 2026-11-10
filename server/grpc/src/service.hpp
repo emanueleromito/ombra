@@ -34,12 +34,17 @@ class OmbraService final : public ombra::v1::Ombra::Service {
   grpc::Status Delete(grpc::ServerContext*, const v1::DeleteRequest*, v1::DeleteResponse*) override;
   grpc::Status Search(grpc::ServerContext*,
                       grpc::ServerReaderWriter<v1::SearchResponse, v1::SearchRequest>*) override;
+  grpc::Status ListBlocks(grpc::ServerContext*, const v1::ListBlocksRequest*,
+                          v1::ListBlocksResponse*) override;
+  grpc::Status GetBlock(grpc::ServerContext*, const v1::GetBlockRequest*,
+                        grpc::ServerWriter<v1::GetBlockResponse>*) override;
+  grpc::Status ReplaceBlock(grpc::ServerContext*, grpc::ServerReader<v1::ReplaceBlockRequest>*,
+                            v1::ReplaceBlockResponse*) override;
 
  private:
   bool keys_present(const std::string& collection) const;
   // Loads the collection's keys into the engine unless already loaded (also after a restart).
   void ensure_loaded(const std::string& collection);
-  void reload(const std::string& collection);
   void forget(const std::string& collection);
 
   storage::Store& store_;

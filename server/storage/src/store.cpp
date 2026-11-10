@@ -7,6 +7,7 @@
 #include <cerrno>
 #include <chrono>
 #include <cstdio>
+#include <map>
 #include <set>
 #include <stdexcept>
 
@@ -114,6 +115,135 @@ bool Store::drop_collection(const std::string& name) {
   return true;
 }
 
+void SegmentPin::release() {
+  if (store_) store_->unpin(files_);
+  store_ = nullptr;
+  files_.clear();
+}
+
+void Store::unlink_or_defer(const std::string& file) {
+  auto it = pins_.find(file);
+  if (it != pins_.end() && it->second > 0) deferred_.insert(file);
+  else ::unlink(segment_path(file).c_str());
+}
+
+void Store::unpin(const std::vector<std::string>& files) const {
+  std::lock_guard lk(mu_);
+  bool any = false;
+  for (const auto& f : files) {
+    auto it = pins_.find(f);
+    if (it == pins_.end()) continue;
+    if (--it->second > 0) continue;
+    pins_.erase(it);
+    if (deferred_.erase(f)) {
+      ::unlink(segment_path(f).c_str());
+      any = true;
+    }
+  }
+  if (any) fsync_path(segments_dir());
+}
+
+Snapshot Store::snapshot(const std::string& collection) const {
+  std::lock_guard lk(mu_);
+  Snapshot s;
+  s.segments = catalog_->segments(collection);
+  s.tombstones = catalog_->tombstones(collection);
+  std::vector<std::string> files;
+  for (const auto& r : s.segments) {
+    ++pins_[r.file];
+    files.push_back(r.file);
+  }
+  s.pin = SegmentPin(this, std::move(files));
+  return s;
+}
+
+std::vector<BlockStat> Store::block_stats(const std::string& collection) const {
+  std::lock_guard lk(mu_);
+  return catalog_->block_stats(collection);
+}
+
+std::size_t Store::drop_dead_blocks(const std::string& collection) {
+  std::lock_guard lk(mu_);
+  const auto t0 = std::chrono::steady_clock::now();
+  CollectionSpec spec;
+  if (!catalog_->get_collection(collection, &spec)) return 0;
+  std::vector<std::string> dead;
+  for (const auto& b : catalog_->block_stats(collection))
+    if (b.cluster != spec.cluster_count && b.n_vectors > 0 && b.n_deleted == b.n_vectors)
+      dead.push_back(b.segment);
+  if (dead.empty()) return 0;
+  wal_->reset();  // see the header: nothing in the log is newer than the catalog
+  maybe_crash(CrashPoint::CompactBeforeCatalog);
+  catalog_->drop_segments(collection, dead);
+  maybe_crash(CrashPoint::CompactAfterCatalog);
+  for (const auto& f : dead) unlink_or_defer(f);
+  fsync_path(segments_dir());
+  maybe_crash(CrashPoint::CompactAfterUnlink);
+  log_line("drop_dead_blocks", dead.size(), 0, ms_since(t0));
+  return dead.size();
+}
+
+std::string Store::replace_segments(const std::string& collection,
+                                    const std::vector<std::string>& old_segments,
+                                    const SegmentData& neu) {
+  std::lock_guard lk(mu_);
+  const auto t0 = std::chrono::steady_clock::now();
+  CollectionSpec spec;
+  if (!catalog_->get_collection(collection, &spec)) throw std::runtime_error("unknown collection");
+  if (old_segments.empty()) throw BlockMismatch("no blocks to replace");
+  if (std::set<std::string>(old_segments.begin(), old_segments.end()).size() != old_segments.size())
+    throw BlockMismatch("a block is listed twice");
+  std::vector<std::string> live;
+  for (const auto& seg : old_segments) {
+    SegmentRow old;
+    if (!catalog_->segment_row(collection, seg, &old)) throw BlockNotFound("block not found");
+    if (old.cluster == spec.cluster_count) throw BlockMismatch("center blocks cannot be replaced");
+    if (neu.cluster != old.cluster) throw BlockMismatch("cluster differs from the old block's");
+    if (neu.column_envelopes.size() != old.n_columns)
+      throw BlockMismatch("column count differs from the old block's");
+    auto l = catalog_->live_ids(collection, seg);
+    live.insert(live.end(), l.begin(), l.end());
+  }
+  if (neu.ids.empty()) throw BlockMismatch("no ids: a block with no live vector is dropped instead");
+  if (std::set<std::string>(neu.ids.begin(), neu.ids.end()).size() != neu.ids.size() ||
+      neu.ids.size() != live.size() ||
+      std::set<std::string>(neu.ids.begin(), neu.ids.end()) != std::set<std::string>(live.begin(), live.end()))
+    throw BlockMismatch("ids are not exactly the live ids of the old blocks");
+  std::size_t bytes = 0;
+  for (const auto& c : neu.column_envelopes) {
+    core::read_envelope(c, core::EnvelopeKind::Ciphertext, spec.preset, ofhe_);
+    bytes += c.size();
+  }
+
+  wal_->reset();  // see the header: nothing in the log is newer than the catalog
+  const std::string name = hex_name('s', catalog_->next_segment_id(), ".oseg");
+  const std::string path = segment_path(name);
+  maybe_crash(CrashPoint::ReplaceBeforeNewFile);
+  try {
+    SegmentInfo info = write_segment(path, neu);
+    maybe_crash(CrashPoint::ReplaceAfterNewFile);
+    catalog_->replace_segments(collection, old_segments,
+                               {neu.cluster, name, info.n_vectors, info.n_columns, info.crc}, neu.ids);
+  } catch (...) {
+    if (!catalog_->has_segment(name)) {
+      ::unlink(path.c_str());
+      ::unlink((path + ".tmp").c_str());
+    }
+    throw;
+  }
+  maybe_crash(CrashPoint::ReplaceAfterCatalog);
+  bool first = true;
+  for (const auto& f : old_segments) {
+    unlink_or_defer(f);
+    if (first) maybe_crash(CrashPoint::ReplaceAfterFirstUnlink);  // some old files gone
+    first = false;
+  }
+  fsync_path(segments_dir());
+  maybe_crash(CrashPoint::ReplaceAfterUnlink);
+  log_line("replace_block", neu.ids.size(), bytes, ms_since(t0));
+  return name;
+}
+
 std::string Store::insert(const std::string& collection, std::uint32_t cluster,
                           const std::vector<std::string>& ids,
                           const std::vector<std::vector<std::uint8_t>>& cols) {
@@ -201,6 +331,43 @@ void Store::put_key_file(const std::string& collection, const std::string& kind,
   write_file_durable(root_ + "/keys/" + file, envelope);
   catalog_->put_key_file(collection, kind, file);
   if (!old.empty()) ::unlink((root_ + "/keys/" + old).c_str());
+}
+
+void Store::put_key_files(const std::string& collection,
+                          const std::vector<std::pair<std::string, std::vector<std::uint8_t>>>& files) {
+  std::lock_guard lk(mu_);
+  CollectionSpec spec;
+  if (!catalog_->get_collection(collection, &spec)) throw std::runtime_error("unknown collection");
+  for (const auto& [kind, envelope] : files) {
+    core::EnvelopeKind k;
+    if (kind == kKeyContext) k = core::EnvelopeKind::Context;
+    else if (kind == kKeyEvalMult || kind == kKeyAutomorphism) k = core::EnvelopeKind::PublicEvalKey;
+    else throw std::runtime_error("unknown key file kind");
+    core::read_envelope(envelope, k, spec.preset, ofhe_);
+  }
+  std::map<std::string, std::string> old;
+  for (auto& [kk, f] : catalog_->key_files(collection)) old[kk] = f;
+  std::vector<std::pair<std::string, std::string>> rows;
+  std::vector<std::string> written;
+  try {
+    for (const auto& [kind, envelope] : files) {
+      const std::string file = hex_name('k', catalog_->next_segment_id(), ".env");
+      write_file_durable(key_dir() + "/" + file, envelope);  // temp + fsync + rename
+      written.push_back(file);
+      rows.emplace_back(kind, file);
+    }
+    catalog_->put_key_files(collection, rows);
+  } catch (...) {
+    for (const auto& f : written) {
+      ::unlink((key_dir() + "/" + f).c_str());
+      ::unlink((key_dir() + "/" + f + ".tmp").c_str());
+    }
+    throw;
+  }
+  for (const auto& [kind, file] : rows) {
+    auto it = old.find(kind);
+    if (it != old.end()) ::unlink((key_dir() + "/" + it->second).c_str());
+  }
 }
 
 bool Store::get_key_file(const std::string& collection, const std::string& kind,

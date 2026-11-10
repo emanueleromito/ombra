@@ -36,6 +36,8 @@ enum ErrorCode {
   ERROR_KEYS_MISSING = 9;           // search or insert before the evaluation keys were uploaded
   ERROR_BAD_SEQUENCE = 10;          // stream messages out of order
   ERROR_INTERNAL = 11;
+  ERROR_BLOCK_NOT_FOUND = 12;       // no such block (segment) in the collection
+  ERROR_BLOCK_MISMATCH = 13;        // ReplaceBlock ids are not exactly the live ids, or cluster/columns differ
 }
 
 message Error {
@@ -160,6 +162,50 @@ message SearchResponse {
   oneof step { SearchCenterScores centers = 1; SearchScores scores = 2; Error error = 3; }
 }
 
+// Blocks (storage segments) and their upkeep. A deleted vector is one slot in every column of its
+// block, so the server cannot drop single slots; it drops blocks whose vectors are ALL deleted, and
+// the client repacks a block with many deleted slots: GetBlock, decrypt, drop the deleted slots,
+// re-encrypt, ReplaceBlock. The server never sees keys or plaintext. Counts only below, no ids.
+message BlockInfo {
+  string segment = 1;      // segment name: opaque, stable until the block is replaced or dropped
+  uint32 cluster_id = 2;   // == cluster_count for center blocks
+  uint64 n_vectors = 3;    // occupied slots, deleted ones included
+  uint64 n_deleted = 4;
+}
+message ListBlocksRequest { uint32 api_version = 1; string collection = 2; }
+message ListBlocksResponse { uint32 api_version = 1; repeated BlockInfo blocks = 2; Error error = 3; }
+
+message GetBlockRequest { uint32 api_version = 1; string collection = 2; string segment = 3; }
+message BlockHeader {
+  uint32 cluster_id = 1;
+  repeated bytes ids = 2;       // slot order
+  repeated bool deleted = 3;    // parallel to ids: tombstoned at this instant
+  uint32 n_columns = 4;         // the column messages that follow
+}
+// Stream: one header, then n_columns messages with `column` (0016 envelopes, in column order).
+message GetBlockResponse {
+  uint32 api_version = 1;
+  oneof part { BlockHeader header = 2; bytes column = 3; Error error = 4; }
+}
+
+message ReplaceBlockHeader {
+  string collection = 1;
+  repeated string segments = 2;  // 1..N blocks of ONE data cluster (from ListBlocks / GetBlock)
+  repeated bytes ids = 3;        // exactly the union of their LIVE ids, in the new slot order;
+                                 // at most one block of slots
+}
+// Client stream: one header, then the columns in column order (same layout as the old blocks).
+// N old blocks become ONE new block, so the stored bytes fall by N-1 blocks.
+message ReplaceBlockRequest {
+  uint32 api_version = 1;   // must be 1 (the block is stored)
+  oneof part { ReplaceBlockHeader header = 2; bytes column = 3; }
+}
+message ReplaceBlockResponse {
+  uint32 api_version = 1;
+  string segment = 2;       // name of the new block
+  Error error = 3;
+}
+
 service Ombra {
   rpc CreateCollection(CreateCollectionRequest) returns (CreateCollectionResponse);
   rpc GetCollection(GetCollectionRequest) returns (GetCollectionResponse);
@@ -169,4 +215,7 @@ service Ombra {
   rpc Insert(stream InsertBlock) returns (InsertResponse);
   rpc Delete(DeleteRequest) returns (DeleteResponse);
   rpc Search(stream SearchRequest) returns (stream SearchResponse);
+  rpc ListBlocks(ListBlocksRequest) returns (ListBlocksResponse);
+  rpc GetBlock(GetBlockRequest) returns (stream GetBlockResponse);
+  rpc ReplaceBlock(stream ReplaceBlockRequest) returns (ReplaceBlockResponse);
 }

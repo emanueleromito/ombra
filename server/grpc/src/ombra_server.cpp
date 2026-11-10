@@ -1,7 +1,10 @@
 // ombra_server --data-dir D --listen 127.0.0.1:PORT [--openfhe-version V]
-//                [--gpu-budget-mb N] [--host-budget-mb N]
+//                [--gpu-budget-mb N] [--host-budget-mb N] [--compact-interval-ms N]
 //
 // The ombra.v1 gRPC server over the storage engine and the GPU search engine (T2.7b).
+//
+// Every --compact-interval-ms (default 60000, 0 disables) a background thread drops, in every
+// collection, the blocks whose vectors are all deleted; it logs counts only.
 //
 // PLAINTEXT, LOCALHOST ONLY. TLS and API keys are T2.9; until then the server refuses to listen on
 // any address that is not loopback. It never accepts a secret key (hard rule 2).
@@ -45,6 +48,7 @@ constexpr int kMaxMessageBytes = 1 << 30;
 int main(int argc, char** argv) {
   std::string data_dir, listen, ofhe = OMBRA_OPENFHE_VERSION;
   std::size_t gpu_mb = 4096, host_mb = 2048;
+  std::size_t compact_ms = 60000;
   for (int i = 1; i < argc; ++i) {
     const std::string a = argv[i];
     auto next = [&]() -> std::string {
@@ -59,6 +63,7 @@ int main(int argc, char** argv) {
     else if (a == "--openfhe-version") ofhe = next();
     else if (a == "--gpu-budget-mb") gpu_mb = std::stoul(next());
     else if (a == "--host-budget-mb") host_mb = std::stoul(next());
+    else if (a == "--compact-interval-ms") compact_ms = std::stoul(next());
     else {
       std::fprintf(stderr, "unknown argument %s\n", a.c_str());
       return 2;
@@ -101,7 +106,26 @@ int main(int argc, char** argv) {
     const std::string host = listen.substr(0, listen.rfind(':'));
     std::printf("ombra_server listening on %s:%d\n", host.c_str(), port);
     std::fflush(stdout);
+    std::thread compactor;
+    if (compact_ms > 0) {
+      compactor = std::thread([&store, compact_ms] {
+        auto next = std::chrono::steady_clock::now() + std::chrono::milliseconds(compact_ms);
+        while (!g_stop.load()) {
+          std::this_thread::sleep_for(std::chrono::milliseconds(20));
+          if (std::chrono::steady_clock::now() < next) continue;
+          next = std::chrono::steady_clock::now() + std::chrono::milliseconds(compact_ms);
+          try {
+            std::size_t dropped = 0;
+            for (const auto& c : store.list_collections()) dropped += store.drop_dead_blocks(c);
+            if (dropped > 0) std::fprintf(stderr, "[ombra.server] compaction dropped=%zu\n", dropped);
+          } catch (const std::exception&) {
+            std::fprintf(stderr, "[ombra.server] compaction failed\n");
+          }
+        }
+      });
+    }
     while (!g_stop.load()) std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    if (compactor.joinable()) compactor.join();
     server->Shutdown(std::chrono::system_clock::now() + std::chrono::seconds(2));
     server->Wait();
   } catch (const std::exception& e) {

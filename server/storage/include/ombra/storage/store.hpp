@@ -6,12 +6,23 @@
 // loss. A write that was not acknowledged is either fully there (segment, all its ids, catalog
 // rows) or fully absent (no rows, no segment file); never partial. Single writer: methods are
 // serialised by a mutex. Logs carry sizes, counts and timings only (hard rule 4).
+//
+// Searches vs. block removal: a search takes snapshot() once per round. It sees the block list and
+// the tombstones of one instant and pins those segment files. drop_dead_blocks() and
+// replace_segments() change the catalog under the same mutex, so a snapshot is either wholly before
+// or wholly after; the files they remove are unlinked only when no pin holds them (deferred_), so
+// a running search can still read every block of its snapshot. Segment names are never reused
+// (durable counter), so a cache keyed by segment name never serves a stale block.
 #pragma once
 
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <mutex>
+#include <set>
+#include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "ombra/storage/catalog.hpp"
@@ -23,6 +34,53 @@ namespace ombra::storage {
 struct RecoveryStats {
   std::size_t records = 0, rolled_forward = 0, discarded = 0, deletes_applied = 0,
               orphans_removed = 0, torn_bytes_dropped = 0;
+};
+
+// Typed refusals of replace_segments / pins (the service maps them to proto error codes).
+class BlockNotFound : public std::runtime_error {  // the collection has no such segment
+ public:
+  using std::runtime_error::runtime_error;
+};
+class BlockMismatch : public std::runtime_error {  // replacement does not satisfy the precondition
+ public:
+  using std::runtime_error::runtime_error;
+};
+
+class Store;
+
+// Keeps a set of segment files on disk while alive. A segment removed meanwhile (drop_dead_blocks,
+// replace_segments) is unlinked when the last pin on it is released. Move-only RAII.
+class SegmentPin {
+ public:
+  SegmentPin() = default;
+  SegmentPin(SegmentPin&& o) noexcept : store_(o.store_), files_(std::move(o.files_)) { o.store_ = nullptr; }
+  SegmentPin& operator=(SegmentPin&& o) noexcept {
+    if (this != &o) {
+      release();
+      store_ = o.store_;
+      files_ = std::move(o.files_);
+      o.store_ = nullptr;
+    }
+    return *this;
+  }
+  SegmentPin(const SegmentPin&) = delete;
+  SegmentPin& operator=(const SegmentPin&) = delete;
+  ~SegmentPin() { release(); }
+
+ private:
+  friend class Store;
+  SegmentPin(const Store* s, std::vector<std::string> f) : store_(s), files_(std::move(f)) {}
+  void release();
+  const Store* store_ = nullptr;
+  std::vector<std::string> files_;
+};
+
+// A consistent view for one search round: the block list and the tombstones as of the same
+// instant, with the segment files pinned for as long as the view lives.
+struct Snapshot {
+  std::vector<SegmentRow> segments;
+  std::vector<std::string> tombstones;
+  SegmentPin pin;
 };
 
 // Key file kinds of put_key_file (proto KeyKind). The context is an envelope of kind Context; the
@@ -66,6 +124,11 @@ class Store {
   // kKeyEvalMult or kKeyAutomorphism.
   void put_key_file(const std::string& collection, const std::string& kind,
                     const std::vector<std::uint8_t>& envelope);
+  // Stores several key files as one unit: every envelope is checked first, then all files are
+  // written (temp, fsync, rename) and registered in ONE catalog transaction. If anything fails, no
+  // file and no catalog row is left behind (temp and unregistered files are removed).
+  void put_key_files(const std::string& collection,
+                     const std::vector<std::pair<std::string, std::vector<std::uint8_t>>>& files);
 
   // The stored envelope of a key kind (false if none was uploaded).
   bool get_key_file(const std::string& collection, const std::string& kind,
@@ -73,6 +136,33 @@ class Store {
   // Locked snapshots for the search path (the catalog() accessor is not serialised with writers).
   std::vector<SegmentRow> segments(const std::string& collection) const;
   std::vector<std::string> tombstones(const std::string& collection) const;
+  // Consistent view for a search (see "Blocks" below).
+  Snapshot snapshot(const std::string& collection) const;
+
+  // ---- Blocks: dead-block drop, replacement, metrics -------------------------------------------
+  // Counts per block, no ids: segment, cluster, n_vectors (tombstoned included), n_deleted. The
+  // center blocks (cluster == cluster_count) are listed too and never have deletes.
+  std::vector<BlockStat> block_stats(const std::string& collection) const;
+  // Removes every data block whose vectors are ALL tombstoned (never a center block): one catalog
+  // transaction removes the segment rows with their vectors and tombstone rows; the files are
+  // unlinked after the commit. Returns the number of blocks removed. A crash before the commit
+  // changes nothing; after it the files are unreferenced and recovery sweeps them. The log is
+  // checkpointed first (all its records are in the catalog while the writer mutex is held), so
+  // recovery can never roll a removed segment forward again.
+  std::size_t drop_dead_blocks(const std::string& collection);
+  // Repack by the client (it decrypts 1..N blocks of one cluster, drops deleted slots, merges,
+  // re-encrypts). Precondition, else BlockMismatch: all old blocks (distinct) are data blocks of
+  // one cluster with the same column count as `neu`, and `neu.ids` are exactly the union of their
+  // LIVE ids (any order: the client chooses the slot order; at least one), dead ids are dropped.
+  // BlockNotFound if an old segment is not a block of the collection; center blocks are refused.
+  // The caller checks that the new block fits the preset's slot count. Order: checkpoint the log;
+  // write the new file durably; one catalog transaction (new row, live vectors repointed, dead
+  // vectors and tombstones removed, old rows removed); unlink the old files (deferred while a
+  // search pins them). Atomic: after a crash either the old set or the new block is in the
+  // catalog, and the other files are swept. Returns the new segment name.
+  std::string replace_segments(const std::string& collection,
+                               const std::vector<std::string>& old_segments, const SegmentData& neu);
+
   const std::string& openfhe_version() const { return ofhe_; }
 
   SegmentData read_segment(const std::string& collection, const std::string& segment) const;
@@ -83,11 +173,20 @@ class Store {
   std::string segments_dir() const { return root_ + "/segments"; }
 
  private:
+  friend class SegmentPin;
   void recover();
+  // Unlinks `file` now, or when the last pin on it is released. Caller holds mu_.
+  void unlink_or_defer(const std::string& file);
+  void unpin(const std::vector<std::string>& files) const;
+  std::string key_dir() const { return root_ + "/keys"; }
   std::string root_, ofhe_;
   std::unique_ptr<Catalog> catalog_;
   std::unique_ptr<Wal> wal_;
   mutable std::mutex mu_;
+  // Pins (see Snapshot): segment file -> number of live pins; files removed from the catalog while
+  // pinned wait in deferred_ (memory only: after a crash recovery sweeps them as unknown files).
+  mutable std::map<std::string, int> pins_;
+  mutable std::set<std::string> deferred_;
   RecoveryStats stats_;
 };
 

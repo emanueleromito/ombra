@@ -91,7 +91,7 @@ Rules for the main session:
 2. Write or update the test first when possible.
 3. Implement, then run `make test` (and `make test-gpu` for anything in `core/`).
 4. Iterate until the "Done when" condition holds. Do not mark a task done on a partial result.
-5. If you make a design choice not already in `docs/`, add a short file in `docs/decisions/` (copy `docs/decisions/template.md`).
+5. If you make a design choice not already in `docs/`, add a short file in `docs/decisions/` (copy `docs/decisions/template.md`). Agents mark a decision "proposed" only; the user accepts or rejects it, and an agent never changes a status to "accepted" or "rejected".
 6. Record benchmark numbers in `docs/plan/results/`, never only in chat.
 
 ## Do not

@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cstdio>
 #include <exception>
+#include <map>
 #include <memory>
 #include <set>
 #include <unordered_set>
@@ -34,6 +35,8 @@ static_assert(static_cast<int>(v1::ERROR_INVALID_FILTER_LAYOUT) == static_cast<i
 static_assert(static_cast<int>(v1::ERROR_KEYS_MISSING) == static_cast<int>(Err::KeysMissing));
 static_assert(static_cast<int>(v1::ERROR_BAD_SEQUENCE) == static_cast<int>(Err::BadSequence));
 static_assert(static_cast<int>(v1::ERROR_INTERNAL) == static_cast<int>(Err::Internal));
+static_assert(static_cast<int>(v1::ERROR_BLOCK_NOT_FOUND) == static_cast<int>(Err::BlockNotFound));
+static_assert(static_cast<int>(v1::ERROR_BLOCK_MISMATCH) == static_cast<int>(Err::BlockMismatch));
 
 constexpr std::size_t kMaxKeyFileBytes = std::size_t{1} << 30;  // per key kind
 constexpr std::size_t kClustersPerGroup = 16;                   // clusters scored per write burst
@@ -58,6 +61,10 @@ Status err(Err c, const char* m) { return Status{c, m}; }
 Status classify_current() {
   try {
     throw;
+  } catch (const storage::BlockNotFound&) {
+    return {Err::BlockNotFound, "block not found"};
+  } catch (const storage::BlockMismatch& e) {
+    return {Err::BlockMismatch, e.what()};
   } catch (const search::KeyTagMismatch& e) {
     return {Err::KeyTagMismatch, e.what()};
   } catch (const search::KeysMissing& e) {
@@ -144,13 +151,6 @@ void OmbraService::ensure_loaded(const std::string& c) {
   std::lock_guard lk(load_mu_);
   if (loaded_.count(c)) return;
   engine_.load_collection(c);
-  loaded_.insert(c);
-}
-
-void OmbraService::reload(const std::string& c) {
-  std::lock_guard lk(load_mu_);
-  loaded_.erase(c);
-  engine_.load_collection(c);  // replaces the engine's entry; open sessions keep their keys
   loaded_.insert(c);
 }
 
@@ -247,6 +247,10 @@ grpc::Status OmbraService::DropCollection(grpc::ServerContext*, const v1::DropCo
 // ---------------------------------------------------------------------------------------------
 // UploadKeys
 
+// All three key kinds must arrive in one stream. They are collected in memory, checked as a unit
+// against the collection (envelopes, key tag, security floor, layout: SearchEngine::prepare_keys),
+// and only then stored (one catalog transaction) and installed. A refused upload leaves no key
+// file, no catalog row and the collection's loaded keys as they were.
 grpc::Status OmbraService::UploadKeys(grpc::ServerContext*, grpc::ServerReader<v1::UploadKeysChunk>* in,
                                       v1::UploadKeysResponse* resp) {
   const auto t0 = Clock::now();
@@ -257,7 +261,8 @@ grpc::Status OmbraService::UploadKeys(grpc::ServerContext*, grpc::ServerReader<v
   std::string coll;
   int cur_kind = 0;  // kind of the file being assembled, 0 if none
   std::vector<std::uint8_t> buf;
-  std::size_t chunks = 0, total = 0, stored = 0;
+  std::map<std::string, std::vector<std::uint8_t>> staged;  // kind name -> complete file
+  std::size_t chunks = 0, total = 0;
   try {
     v1::UploadKeysChunk c;
     while (in->Read(&c)) {
@@ -275,6 +280,7 @@ grpc::Status OmbraService::UploadKeys(grpc::ServerContext*, grpc::ServerReader<v
       if (cur_kind != 0 && kind != cur_kind) return fail(Err::BadSequence, "key kind changed before last");
       if (cur_kind == 0) {
         if (c.offset() != 0) return fail(Err::BadSequence, "first chunk of a key file must have offset 0");
+        if (staged.count(kind_name(kind))) return fail(Err::InvalidArgument, "key kind uploaded twice");
         cur_kind = kind;
         buf.clear();
       }
@@ -284,18 +290,26 @@ grpc::Status OmbraService::UploadKeys(grpc::ServerContext*, grpc::ServerReader<v
       buf.insert(buf.end(), c.data().begin(), c.data().end());
       total += c.data().size();
       if (c.last()) {
-        store_.put_key_file(coll, kind_name(cur_kind), buf);
-        ++stored;
+        staged[kind_name(cur_kind)] = std::move(buf);
         cur_kind = 0;
         buf.clear();
       }
     }
     if (chunks == 0) return fail(Err::BadSequence, "no chunks");
     if (cur_kind != 0) return fail(Err::BadSequence, "stream ended before the last chunk of a key file");
-    if (stored > 0 && keys_present(coll)) reload(coll);  // checks key tags against the collection
-    log_line("upload_keys", stored, total, ms_since(t0));
+    for (const char* k : {storage::kKeyContext, storage::kKeyEvalMult, storage::kKeyAutomorphism})
+      if (!staged.count(k)) return fail(Err::InvalidArgument, "an upload must contain all three key kinds");
+
+    std::lock_guard lk(load_mu_);
+    search::PreparedKeys prepared = engine_.prepare_keys(
+        coll, staged[storage::kKeyContext], staged[storage::kKeyEvalMult], staged[storage::kKeyAutomorphism]);
+    store_.put_key_files(coll, {{storage::kKeyContext, std::move(staged[storage::kKeyContext])},
+                                {storage::kKeyEvalMult, std::move(staged[storage::kKeyEvalMult])},
+                                {storage::kKeyAutomorphism, std::move(staged[storage::kKeyAutomorphism])}});
+    engine_.install_keys(std::move(prepared));
+    loaded_.insert(coll);
+    log_line("upload_keys", staged.size(), total, ms_since(t0));
   } catch (...) {
-    if (!coll.empty()) forget(coll);
     fill(resp->mutable_error(), classify_current());
   }
   return grpc::Status::OK;
@@ -496,6 +510,138 @@ grpc::Status OmbraService::Search(grpc::ServerContext*,
     } catch (...) {
       return send_error(classify_current());
     }
+  }
+  return grpc::Status::OK;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Blocks
+
+grpc::Status OmbraService::ListBlocks(grpc::ServerContext*, const v1::ListBlocksRequest* req,
+                                      v1::ListBlocksResponse* resp) {
+  resp->set_api_version(kApiVersion);
+  try {
+    if (req->api_version() != kApiVersion) {
+      fill(resp->mutable_error(), err(Err::UnsupportedVersion, "unsupported api_version"));
+    } else if (!store_.get_collection(req->collection(), nullptr)) {
+      fill(resp->mutable_error(), err(Err::CollectionNotFound, "collection not found"));
+    } else {
+      for (const auto& b : store_.block_stats(req->collection())) {
+        auto* o = resp->add_blocks();
+        o->set_segment(b.segment);
+        o->set_cluster_id(b.cluster);
+        o->set_n_vectors(b.n_vectors);
+        o->set_n_deleted(b.n_deleted);
+      }
+    }
+  } catch (...) {
+    fill(resp->mutable_error(), classify_current());
+  }
+  return grpc::Status::OK;
+}
+
+grpc::Status OmbraService::GetBlock(grpc::ServerContext*, const v1::GetBlockRequest* req,
+                                    grpc::ServerWriter<v1::GetBlockResponse>* out) {
+  const auto t0 = Clock::now();
+  const auto send_error = [&](const Status& s) {
+    v1::GetBlockResponse r;
+    r.set_api_version(kApiVersion);
+    fill(r.mutable_error(), s);
+    out->Write(r);
+    return grpc::Status::OK;
+  };
+  if (req->api_version() != kApiVersion) return send_error(err(Err::UnsupportedVersion, "unsupported api_version"));
+  try {
+    if (!store_.get_collection(req->collection(), nullptr))
+      return send_error(err(Err::CollectionNotFound, "collection not found"));
+    // The pin keeps the file readable even if the block is replaced while it is sent.
+    const storage::Snapshot snap = store_.snapshot(req->collection());
+    bool found = false;
+    for (const auto& r : snap.segments) found = found || r.file == req->segment();
+    if (!found) return send_error(err(Err::BlockNotFound, "block not found"));
+    const storage::SegmentData sd = store_.read_segment(req->collection(), req->segment());
+    const std::set<std::string> dead(snap.tombstones.begin(), snap.tombstones.end());
+    v1::GetBlockResponse head;
+    head.set_api_version(kApiVersion);
+    auto* h = head.mutable_header();
+    h->set_cluster_id(sd.cluster);
+    h->set_n_columns(static_cast<std::uint32_t>(sd.column_envelopes.size()));
+    for (const auto& id : sd.ids) {
+      h->add_ids(id);
+      h->add_deleted(dead.count(id) > 0);
+    }
+    if (!out->Write(head)) return grpc::Status::OK;
+    std::size_t bytes = 0;
+    for (const auto& c : sd.column_envelopes) {
+      v1::GetBlockResponse col;
+      col.set_api_version(kApiVersion);
+      col.set_column(to_str(c));
+      bytes += c.size();
+      if (!out->Write(col)) return grpc::Status::OK;
+    }
+    log_line("get_block", sd.column_envelopes.size(), bytes, ms_since(t0));
+  } catch (...) {
+    return send_error(classify_current());
+  }
+  return grpc::Status::OK;
+}
+
+grpc::Status OmbraService::ReplaceBlock(grpc::ServerContext*, grpc::ServerReader<v1::ReplaceBlockRequest>* in,
+                                        v1::ReplaceBlockResponse* resp) {
+  const auto t0 = Clock::now();
+  resp->set_api_version(kApiVersion);
+  const auto fail = [&](Err c, const char* m) {
+    fill(resp->mutable_error(), err(c, m));
+    return grpc::Status::OK;
+  };
+  try {
+    v1::ReplaceBlockRequest m;
+    std::string coll;
+    std::vector<std::string> segments;
+    storage::SegmentData nd;
+    bool have_header = false;
+    std::size_t bytes = 0;
+    while (in->Read(&m)) {
+      if (m.api_version() != kApiVersion) return fail(Err::UnsupportedVersion, "unsupported api_version");
+      if (m.part_case() == v1::ReplaceBlockRequest::kHeader) {
+        if (have_header) return fail(Err::BadSequence, "second header");
+        have_header = true;
+        coll = m.header().collection();
+        for (const auto& s : m.header().segments()) segments.push_back(s);
+        if (segments.empty() || segments.size() > kMaxClustersPerRound)
+          return fail(Err::InvalidArgument, "between 1 and 4096 blocks must be listed");
+        for (const auto& id : m.header().ids()) {
+          if (id.empty() || id.size() > kMaxIdBytes) return fail(Err::InvalidArgument, "invalid id");
+          nd.ids.push_back(id);
+        }
+        if (nd.ids.size() > kMaxIdsPerRequest) return fail(Err::SizeLimit, "too many ids");
+      } else if (m.part_case() == v1::ReplaceBlockRequest::kColumn) {
+        if (!have_header) return fail(Err::BadSequence, "a column before the header");
+        nd.column_envelopes.emplace_back(m.column().begin(), m.column().end());
+        bytes += m.column().size();
+      } else {
+        return fail(Err::InvalidArgument, "empty message");
+      }
+    }
+    if (!have_header) return fail(Err::BadSequence, "no header");
+    storage::CollectionSpec spec;
+    if (!store_.get_collection(coll, &spec)) return fail(Err::CollectionNotFound, "collection not found");
+    const PresetInfo* preset = find_preset(spec.preset);
+    if (!preset) return fail(Err::Internal, "internal error");
+    if (nd.ids.size() > preset->batch_size) return fail(Err::SizeLimit, "block has more ids than slots");
+    // The cluster is the old blocks' (the store checks that they all share it), so take it from
+    // the catalog row of the first one.
+    bool found = false;
+    for (const auto& r : store_.segments(coll))
+      if (r.file == segments.front()) {
+        nd.cluster = r.cluster;
+        found = true;
+      }
+    if (!found) return fail(Err::BlockNotFound, "block not found");
+    resp->set_segment(store_.replace_segments(coll, segments, nd));
+    log_line("replace_block", nd.ids.size(), bytes, ms_since(t0));
+  } catch (...) {
+    fill(resp->mutable_error(), classify_current());
   }
   return grpc::Status::OK;
 }

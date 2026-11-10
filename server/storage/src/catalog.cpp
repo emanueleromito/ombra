@@ -2,6 +2,8 @@
 
 #include <sqlite3.h>
 
+#include <map>
+#include <set>
 #include <stdexcept>
 
 namespace ombra::storage {
@@ -341,6 +343,113 @@ bool Catalog::is_live_in_other_cluster(const std::string& collection, const std:
          "SELECT 1 FROM tombstones t WHERE t.collection=v.collection AND t.id=v.id)");
   q.text(1, collection).blob(2, id).num(3, excluded_cluster);
   return q.step();
+}
+
+std::vector<BlockStat> Catalog::block_stats(const std::string& collection) const {
+  std::map<std::string, std::pair<std::uint64_t, std::uint64_t>> counts;  // segment -> (all, dead)
+  {
+    Stmt q(db_,
+           "SELECT v.segment, COUNT(*), COUNT(t.id) FROM vectors v LEFT JOIN tombstones t "
+           "ON t.collection=v.collection AND t.id=v.id WHERE v.collection=? GROUP BY v.segment");
+    q.text(1, collection);
+    while (q.step())
+      counts[q.col_text(0)] = {static_cast<std::uint64_t>(q.col_num(1)),
+                               static_cast<std::uint64_t>(q.col_num(2))};
+  }
+  std::vector<BlockStat> v;
+  for (const auto& r : segments(collection)) {
+    auto it = counts.find(r.file);
+    BlockStat b;
+    b.segment = r.file;
+    b.cluster = r.cluster;
+    if (it != counts.end()) {
+      b.n_vectors = it->second.first;
+      b.n_deleted = it->second.second;
+    }
+    v.push_back(std::move(b));
+  }
+  return v;
+}
+
+bool Catalog::segment_row(const std::string& collection, const std::string& file,
+                          SegmentRow* out) const {
+  Stmt q(db_,
+         "SELECT cluster,file,n_vectors,n_columns,crc FROM segments WHERE collection=? AND file=?");
+  q.text(1, collection).text(2, file);
+  if (!q.step()) return false;
+  if (out)
+    *out = {static_cast<std::uint32_t>(q.col_num(0)), q.col_text(1),
+            static_cast<std::uint32_t>(q.col_num(2)), static_cast<std::uint32_t>(q.col_num(3)),
+            static_cast<std::uint32_t>(q.col_num(4))};
+  return true;
+}
+
+std::vector<std::string> Catalog::live_ids(const std::string& collection,
+                                           const std::string& file) const {
+  Stmt q(db_,
+         "SELECT v.id FROM vectors v WHERE v.collection=? AND v.segment=? AND NOT EXISTS("
+         "SELECT 1 FROM tombstones t WHERE t.collection=v.collection AND t.id=v.id) ORDER BY v.id");
+  q.text(1, collection).text(2, file);
+  std::vector<std::string> v;
+  while (q.step()) v.push_back(q.col_text(0));
+  return v;
+}
+
+void Catalog::drop_segments(const std::string& collection, const std::vector<std::string>& files) {
+  Tx tx(db_);
+  for (const auto& f : files) {
+    Stmt(db_,
+         "DELETE FROM tombstones WHERE collection=?1 AND id IN "
+         "(SELECT id FROM vectors WHERE collection=?1 AND segment=?2)")
+        .text(1, collection).text(2, f).run();
+    Stmt(db_, "DELETE FROM vectors WHERE collection=? AND segment=?").text(1, collection).text(2, f).run();
+    Stmt(db_, "DELETE FROM segments WHERE collection=? AND file=?").text(1, collection).text(2, f).run();
+  }
+  tx.commit();
+}
+
+void Catalog::replace_segments(const std::string& collection,
+                               const std::vector<std::string>& old_files, const SegmentRow& neu,
+                               const std::vector<std::string>& live_ids_in) {
+  Tx tx(db_);
+  std::vector<std::string> have;
+  for (const auto& f : old_files) {
+    if (!segment_row(collection, f, nullptr)) throw std::runtime_error("catalog: unknown segment");
+    auto l = live_ids(collection, f);
+    have.insert(have.end(), l.begin(), l.end());
+  }
+  if (std::set<std::string>(have.begin(), have.end()) !=
+          std::set<std::string>(live_ids_in.begin(), live_ids_in.end()) ||
+      have.size() != live_ids_in.size())
+    throw std::runtime_error("catalog: live ids of the blocks changed");
+  Stmt(db_, "INSERT INTO segments VALUES(?,?,?,?,?,?)")
+      .text(1, neu.file).text(2, collection).num(3, neu.cluster).num(4, neu.n_vectors)
+      .num(5, neu.n_columns).num(6, neu.crc).run();
+  // Repoint the live vectors to the new segment, then delete what is left of the old ones (the
+  // dead ids, after their tombstones).
+  for (const auto& f : old_files) {
+    Stmt(db_,
+         "DELETE FROM tombstones WHERE collection=?1 AND id IN "
+         "(SELECT id FROM vectors WHERE collection=?1 AND segment=?2)")
+        .text(1, collection).text(2, f).run();
+  }
+  Stmt move(db_, "UPDATE vectors SET segment=?3 WHERE collection=?1 AND id=?2");
+  for (const auto& id : live_ids_in) {
+    move.reset();
+    move.text(1, collection).blob(2, id).text(3, neu.file).run();
+  }
+  for (const auto& f : old_files) {
+    Stmt(db_, "DELETE FROM vectors WHERE collection=? AND segment=?").text(1, collection).text(2, f).run();
+    Stmt(db_, "DELETE FROM segments WHERE collection=? AND file=?").text(1, collection).text(2, f).run();
+  }
+  tx.commit();
+}
+
+void Catalog::put_key_files(const std::string& collection,
+                            const std::vector<std::pair<std::string, std::string>>& kind_file) {
+  Tx tx(db_);
+  for (const auto& [k, f] : kind_file) put_key_file(collection, k, f);
+  tx.commit();
 }
 
 void Catalog::put_key_file(const std::string& collection, const std::string& kind,

@@ -94,6 +94,7 @@ class ServerProcess:
         log_path: Path,
         gpu_budget_mb: int = 1024,
         host_budget_mb: int = 512,
+        extra_args: tuple[str, ...] = (),
     ) -> None:
         self._log = open(log_path, "w")  # noqa: SIM115
         self.proc = subprocess.Popen(  # noqa: S603
@@ -109,6 +110,7 @@ class ServerProcess:
                 str(gpu_budget_mb),
                 "--host-budget-mb",
                 str(host_budget_mb),
+                *extra_args,
             ],
             stdout=subprocess.PIPE,
             stderr=self._log,
@@ -373,6 +375,48 @@ class OmbraClient:
         )
         self.check(r.error)
         return r.deleted
+
+    # ---- blocks (T2.8) ------------------------------------------------------------------------
+    def list_blocks(self, collection: str) -> list[Any]:
+        r = self.stub.ListBlocks(self.pb.ListBlocksRequest(api_version=1, collection=collection))
+        self.check(r.error)
+        return list(r.blocks)
+
+    def get_block(self, collection: str, segment: str) -> tuple[Any, list[bytes]]:
+        """(header, column envelopes) of one block."""
+        stream = self.stub.GetBlock(
+            self.pb.GetBlockRequest(api_version=1, collection=collection, segment=segment)
+        )
+        header, cols = None, []
+        for m in stream:
+            part = m.WhichOneof("part")
+            if part == "error":
+                raise ApiError(m.error.code, m.error.message)
+            if part == "header":
+                header = m.header
+            else:
+                cols.append(bytes(m.column))
+        assert header is not None and len(cols) == header.n_columns
+        return header, cols
+
+    def replace_block(
+        self, collection: str, segments: list[str] | str, ids: list[bytes], columns: list[bytes]
+    ) -> str:
+        """Replace 1..N blocks of one cluster by one block (the client has merged them)."""
+        segs = [segments] if isinstance(segments, str) else list(segments)
+        pb = self.pb
+
+        def msgs():
+            yield pb.ReplaceBlockRequest(
+                api_version=1,
+                header=pb.ReplaceBlockHeader(collection=collection, segments=segs, ids=ids),
+            )
+            for c in columns:
+                yield pb.ReplaceBlockRequest(api_version=1, column=c)
+
+        r = self.stub.ReplaceBlock(msgs())
+        self.check(r.error)
+        return r.segment
 
     def open_search(
         self, collection: str, query: bytes, filter_leaves: int, key_tag: str | None = None

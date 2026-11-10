@@ -89,7 +89,15 @@ def _validate(pb, msg) -> pb.ErrorCode:
 
 
 def test_unknown_version_is_refused(pb) -> None:
-    for cls in (pb.CollectionSpec, pb.UploadKeysChunk, pb.InsertBlock, pb.DeleteRequest):
+    for cls in (
+        pb.CollectionSpec,
+        pb.UploadKeysChunk,
+        pb.InsertBlock,
+        pb.DeleteRequest,
+        pb.ListBlocksRequest,
+        pb.GetBlockRequest,
+        pb.ReplaceBlockRequest,
+    ):
         assert _validate(pb, cls(api_version=2)) == pb.ERROR_UNSUPPORTED_VERSION, cls
         assert _validate(pb, cls(api_version=1)) == pb.ERROR_UNSPECIFIED, cls
         # An unset version (a v0 client) is refused too.
@@ -97,7 +105,18 @@ def test_unknown_version_is_refused(pb) -> None:
 
 
 def test_every_stored_message_has_api_version(pb) -> None:
-    for name in ("CollectionSpec", "UploadKeysChunk", "InsertBlock", "DeleteRequest"):
+    for name in (
+        "CollectionSpec",
+        "UploadKeysChunk",
+        "InsertBlock",
+        "DeleteRequest",
+        "ListBlocksRequest",
+        "ListBlocksResponse",
+        "GetBlockRequest",
+        "GetBlockResponse",
+        "ReplaceBlockRequest",
+        "ReplaceBlockResponse",
+    ):
         assert "api_version" in getattr(pb, name).DESCRIPTOR.fields_by_name, name
 
 
@@ -107,3 +126,10 @@ def test_no_secret_key_field_anywhere(pb) -> None:
     for msg in pb.DESCRIPTOR.message_types_by_name.values():
         for field in msg.fields:
             assert not bad.search(field.name), (msg.name, field.name)
+
+
+def test_block_messages_carry_counts_only(pb) -> None:
+    """ListBlocks exposes counts and the segment name, no ids (hard rule 4)."""
+    fields = set(pb.BlockInfo.DESCRIPTOR.fields_by_name)
+    assert fields == {"segment", "cluster_id", "n_vectors", "n_deleted"}
+    assert pb.ERROR_BLOCK_NOT_FOUND == 12 and pb.ERROR_BLOCK_MISMATCH == 13

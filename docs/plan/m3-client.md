@@ -56,8 +56,8 @@ T3.2 and T3.3 can run in parallel after T3.1. T3.6 needs the server API from M2 
 
 **Why:** clustering and encrypted centers are what make the two-stage search possible.
 **Depends on:** T3.2, T3.3, T2.4
-**Steps:** cluster the vectors with faiss k-means; encrypt the cluster centers; generate the evaluation keys and upload them once; create the collection on the server; a re-clustering job that builds a new clustering and swaps it in.
-**Done when:** a test on a synthetic corpus creates a collection against the server (or the local mode) and the clusters, centers and keys are present; re-clustering keeps search working and the results correct during and after.
+**Steps:** cluster the vectors with faiss k-means; encrypt the cluster centers; generate the evaluation keys and upload them once; create the collection on the server; a re-clustering job that builds a new clustering and swaps it in and drops deleted slots while it rewrites blocks; a standalone repack (ListBlocks, GetBlock, decrypt, drop deleted slots, re-encrypt, ReplaceBlock, from T2.8) for any block over a deleted-share threshold (default 30%).
+**Done when:** a test on a synthetic corpus creates a collection against the server (or the local mode) and the clusters, centers and keys are present; re-clustering keeps search working and the results correct during and after; a block with 30% or more deleted slots is repacked and the stored bytes fall accordingly, with unchanged results.
 **Status:** todo
 
 ### T3.6 Insert, delete and search
@@ -90,6 +90,14 @@ T3.2 and T3.3 can run in parallel after T3.1. T3.6 needs the server API from M2 
 **Depends on:** T3.6
 **Steps:** build on the T1.6 recall check; a command that takes the user's vectors and a sample of queries, runs plaintext and encrypted search at the chosen settings and prints recall@10 and the gap, with no data written out.
 **Done when:** the tool runs on a sample corpus and prints recall@10 for plaintext and encrypted search, and the 0012 rule's pass or fail.
+**Status:** todo
+
+### T3.11 Filtered recall on a real dataset
+
+**Why:** decision 0019 was measured on synthetic data only (`results/2026-11-10-t2.7-filter-0019.md`).
+**Depends on:** T3.6
+**Steps:** measure filtered recall@10 on a real dataset at filter selectivity of about 1%, 10% and 50%, including filters correlated with the clusters, with the probe rule of 0019 (at least the clusters an unfiltered query probes, widening only below k matches); record the extra rounds.
+**Done when:** the numbers are in `results/`; 0019's recall condition holds on real data, or the user is told it does not. **Due before release.**
 **Status:** todo
 
 ### T3.10 Quickstart docs

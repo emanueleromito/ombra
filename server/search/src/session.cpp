@@ -212,15 +212,30 @@ cache::CacheMetrics SearchEngine::cache_metrics() const { return impl_->gpu_cach
 
 void SearchEngine::load_collection(const std::string& name) {
   EngineCore& e = *impl_;
-  auto c = std::make_shared<Coll>();
-  if (!e.store.get_collection(name, &c->spec)) throw CollectionNotFound("unknown collection");
-  const std::string ofhe = e.store.openfhe_version();
-
   std::vector<std::uint8_t> ctx_b, mult_b, auto_b;
+  if (!e.store.get_collection(name, nullptr)) throw CollectionNotFound("unknown collection");
   if (!e.store.get_key_file(name, storage::kKeyContext, &ctx_b) ||
       !e.store.get_key_file(name, storage::kKeyEvalMult, &mult_b) ||
       !e.store.get_key_file(name, storage::kKeyAutomorphism, &auto_b))
     throw KeysMissing("context, EvalMult key or automorphism keys not uploaded");
+  install_keys(prepare_keys(name, ctx_b, mult_b, auto_b));
+}
+
+void SearchEngine::install_keys(PreparedKeys&& prepared) {
+  EngineCore& e = *impl_;
+  if (!prepared.c_) throw SearchError("no prepared keys");
+  std::lock_guard g(e.gpu_mu);
+  e.colls[prepared.c_->spec.name] = std::move(prepared.c_);
+}
+
+PreparedKeys SearchEngine::prepare_keys(const std::string& name,
+                                        const std::vector<std::uint8_t>& ctx_b,
+                                        const std::vector<std::uint8_t>& mult_b,
+                                        const std::vector<std::uint8_t>& auto_b) {
+  EngineCore& e = *impl_;
+  auto c = std::make_shared<Coll>();
+  if (!e.store.get_collection(name, &c->spec)) throw CollectionNotFound("unknown collection");
+  const std::string ofhe = e.store.openfhe_version();
 
   const auto payload = [&](const std::vector<std::uint8_t>& b, core::EnvelopeKind k) {
     return to_string_bytes(core::read_envelope(b, k, c->spec.preset, ofhe).payload);
@@ -302,8 +317,9 @@ void SearchEngine::load_collection(const std::string& name) {
     throw InvalidQuery(ex.what());
   }
 
-  std::lock_guard g(e.gpu_mu);
-  e.colls[name] = std::move(c);
+  PreparedKeys out;
+  out.c_ = std::move(c);
+  return out;
 }
 
 std::unique_ptr<SearchSession> SearchEngine::open_session(
@@ -394,8 +410,11 @@ std::vector<BlockScores> SearchSession::Impl::run(const std::vector<std::uint32_
     storage::SegmentRow row;
   };
   std::vector<Item> items;
+  // One consistent view of the blocks and tombstones; the pin keeps every block file of the view on
+  // disk even if a compaction or a client repack removes it from the catalog meanwhile.
+  const storage::Snapshot snap = e.store.snapshot(c.spec.name);
   {
-    const auto rows = e.store.segments(c.spec.name);
+    const auto& rows = snap.segments;
     for (auto cl : clusters)
       for (const auto& r : rows)
         if (r.cluster == cl) items.push_back({e.segment_index(c.spec.name, r), r});
@@ -406,7 +425,7 @@ std::vector<BlockScores> SearchSession::Impl::run(const std::vector<std::uint32_
 
   std::unordered_set<std::string> tombstones;
   if (!centers) {
-    for (auto& t : e.store.tombstones(c.spec.name)) tombstones.insert(std::move(t));
+    for (const auto& t : snap.tombstones) tombstones.insert(t);
   }
 
   const std::size_t nq = c.nq, n = c.ring, pw = nq * n;
