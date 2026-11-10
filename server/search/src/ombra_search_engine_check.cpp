@@ -23,6 +23,7 @@
 // which alone holds the secret key. Prints PASS/FAIL lines, counts and timings, never data.
 // Exit code: 0 all exact, 1 mismatch, 2 error.
 
+#include <typeinfo>
 #include <cstdio>
 #include <exception>
 #include <filesystem>
@@ -174,9 +175,15 @@ bool throws_as(F&& f) {
     f();
   } catch (const E&) {
     return true;
+  } catch (const std::exception& ex) {
+    // The text of our own errors carries no data; print the type to diagnose a wrong refusal.
+    std::fprintf(stderr, "  threw %s: %s\n", typeid(ex).name(), ex.what());
+    return false;
   } catch (...) {
+    std::fprintf(stderr, "  threw a non-std exception\n");
     return false;
   }
+  std::fprintf(stderr, "  did not throw\n");
   return false;
 }
 
