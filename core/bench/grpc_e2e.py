@@ -112,6 +112,32 @@ def _ct_envelope(ct: Any) -> bytes:
     return write_envelope(Kind.CIPHERTEXT, st["preset"], VERSION, raw)
 
 
+class _InlinePool:
+    """workers = 1: run in this process (a way to tell a pool hang from an encryption bug)."""
+
+    class _Done:
+        def __init__(self, v: Any) -> None:
+            self._v = v
+
+        def get(self) -> Any:
+            return self._v
+
+    def apply_async(self, fn: Any, args: tuple) -> Any:
+        return self._Done(fn(*args))
+
+    def map(self, fn: Any, items: Any, chunksize: int = 1) -> list:
+        return [fn(x) for x in items]
+
+    def close(self) -> None:
+        pass
+
+    def terminate(self) -> None:
+        pass
+
+    def join(self) -> None:
+        pass
+
+
 def _enc_block(
     task: tuple[int, bool, int, int],
 ) -> tuple[int, bool, list[bytes], list[bytes], float]:
@@ -490,7 +516,7 @@ def _run_case(
             db=db, fields=fields, order=order, centers=centers,
         )  # fmt: skip
         n_workers = workers or len(os.sched_getaffinity(0))
-        pool = mp.get_context("fork").Pool(n_workers)
+        pool = _InlinePool() if n_workers == 1 else mp.get_context("fork").Pool(n_workers)
         result["client_workers"] = n_workers
         print(f"[t2.10 {preset} n={n}] pool of {n_workers} workers, {len(blocks) + 1} block tasks", flush=True)
 
