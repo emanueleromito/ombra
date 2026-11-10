@@ -60,7 +60,7 @@ T2.1, T2.2 and T2.3 can start in parallel. T2.5 can start once T2.4 has fixed th
 **Depends on:** T2.4
 **Steps:** segment files (one per cluster block, inside the 0016 envelope); a write-ahead log for insert and delete; a SQLite catalog for collections, clusters, segment lists, key tags and tombstones; recovery that replays the log after a crash; fsync rules written down. No plaintext in logs (hard rule 4).
 **Done when:** a crash-recovery test kills the writer at each step of an insert and a delete (before the log record, after it, before the segment, after it) and every restart returns a consistent collection with no lost acknowledged write; readers refuse an unknown envelope version.
-**Status:** todo
+**Status:** done (`server/storage/`, ctest `storage_*`, also under ASan/UBSan; the crash matrix kills the writer at 6 insert and 3 delete points; SQLite 3.46.1 amalgamation fetched by CMake with a pinned hash; durability rules in `docs/architecture.md`)
 
 ### T2.6 GPU cluster cache
 
@@ -68,7 +68,7 @@ T2.1, T2.2 and T2.3 can start in parallel. T2.5 can start once T2.4 has fixed th
 **Depends on:** T2.5
 **Steps:** pinned host memory pool holding the segments; a GPU cache with an eviction policy (LRU to start); asynchronous paging that overlaps copy and compute; a metric for hit rate that reveals no data. Measure the paging bandwidth on the A100.
 **Done when:** a test searches a collection larger than the configured GPU memory and gets the same results as with everything resident; paging throughput and hit rate are in `results/`.
-**Status:** todo
+**Status:** done (paged search equals resident on A10 for both presets; A100 paging 22 to 26 GB/s, hit rate 0.32 uniform and 0.58 zipf at a 1/3 budget; overlap gives no gain while paging-bound; `results/2026-11-10-t2.6-gpu-cache.md`)
 
 ### T2.7 Search service
 
