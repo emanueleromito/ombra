@@ -47,6 +47,18 @@ class Store {
   std::string insert(const std::string& collection, std::uint32_t cluster,
                      const std::vector<std::string>& ids,
                      const std::vector<std::vector<std::uint8_t>>& column_envelopes);
+  // Names of all collections, sorted.
+  std::vector<std::string> list_collections() const;
+  // Removes a collection with all its rows, segment files and key files. Returns false if it does
+  // not exist. Order (crash safe): (1) one catalog transaction removes every row; that commit is
+  // the point of no return. (2) The write-ahead log is checkpointed, so no old record can touch a
+  // later collection of the same name. (3) The segment and key files are unlinked. A crash after
+  // (1) leaves only unreferenced files, which recovery sweeps; a crash before (1) leaves the
+  // collection untouched. Same-name re-creation is therefore safe at any point.
+  bool drop_collection(const std::string& name);
+  // True if `id` exists in a data cluster (not the center cluster spec.cluster_count) and is not
+  // tombstoned yet. Used by the server to filter a delete request.
+  bool is_live_data_id(const std::string& collection, const std::string& id) const;
   // Marks ids deleted (unknown ids ignored). Acknowledged on return.
   void remove(const std::string& collection, const std::vector<std::string>& ids);
 

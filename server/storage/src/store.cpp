@@ -80,6 +80,40 @@ bool Store::get_collection(const std::string& name, CollectionSpec* out) const {
   return catalog_->get_collection(name, out);
 }
 
+std::vector<std::string> Store::list_collections() const {
+  std::lock_guard lk(mu_);
+  return catalog_->list_collections();
+}
+
+bool Store::is_live_data_id(const std::string& collection, const std::string& id) const {
+  std::lock_guard lk(mu_);
+  CollectionSpec spec;
+  if (!catalog_->get_collection(collection, &spec)) return false;
+  return catalog_->is_live_in_other_cluster(collection, id, spec.cluster_count);
+}
+
+bool Store::drop_collection(const std::string& name) {
+  std::lock_guard lk(mu_);
+  const auto t0 = std::chrono::steady_clock::now();
+  std::vector<std::string> segs, keys;
+  maybe_crash(CrashPoint::DropBeforeCatalog);
+  if (!catalog_->drop_collection(name, &segs, &keys)) return false;
+  maybe_crash(CrashPoint::DropAfterCatalog);
+  wal_->reset();  // everything in the log is in the (durable) catalog or belongs to this collection
+  maybe_crash(CrashPoint::DropAfterWalReset);
+  bool first = true;
+  for (const auto& f : segs) {
+    ::unlink(segment_path(f).c_str());
+    if (first) maybe_crash(CrashPoint::DropAfterFirstFile);
+    first = false;
+  }
+  for (const auto& f : keys) ::unlink((root_ + "/keys/" + f).c_str());
+  fsync_path(segments_dir());
+  fsync_path(root_ + "/keys");
+  log_line("drop", segs.size() + keys.size(), 0, ms_since(t0));
+  return true;
+}
+
 std::string Store::insert(const std::string& collection, std::uint32_t cluster,
                           const std::vector<std::string>& ids,
                           const std::vector<std::vector<std::uint8_t>>& cols) {
@@ -250,8 +284,16 @@ void Store::recover() {
       if (::unlink(segment_path(n).c_str()) == 0) ++stats_.orphans_removed;
     }
   }
-  for (const auto& n : list_dir(root_ + "/keys"))
-    if (ends_with(n, ".tmp")) ::unlink((root_ + "/keys/" + n).c_str());
+  // Key files: temp files and files no catalog row points to (aborted upload, or a dropped
+  // collection whose files were not yet unlinked).
+  {
+    auto kf = catalog_->all_key_files();
+    std::set<std::string> known_keys(kf.begin(), kf.end());
+    for (const auto& n : list_dir(root_ + "/keys"))
+      if (ends_with(n, ".tmp") || !known_keys.count(n)) {
+        if (::unlink((root_ + "/keys/" + n).c_str()) == 0) ++stats_.orphans_removed;
+      }
+  }
 
   // Everything in the log is now in the catalog, which is durable (synchronous=FULL): checkpoint.
   wal_->reset();
