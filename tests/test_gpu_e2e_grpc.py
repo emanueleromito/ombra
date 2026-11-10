@@ -254,7 +254,7 @@ def test_3_selective_filter_needs_a_second_round(dep: Deployment) -> None:
 def test_4_deleted_vectors_never_appear(dep: Deployment) -> None:
     cl, q = dep.client, dep.queries[0]
     top, _ = dep.brute_force(q, [None, None])
-    victims = [int(i[1:]) for i in top[:3]] + [7, 100, 250]
+    victims = list(dict.fromkeys([int(i[1:]) for i in top[:3]] + [7, 100, 250]))  # unique ids
     ask = [_ident(i) for i in victims] + [b"center0", b"center3", b"unknown-id"]
     assert cl.delete("docs", ask) == len(victims)  # centers and unknown ids are ignored
     assert cl.delete("docs", ask) == 0  # already deleted
