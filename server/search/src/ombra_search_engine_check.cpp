@@ -321,7 +321,10 @@ int main(int argc, char** argv) {
           if (pen.empty()) pen.assign(cc->GetEncodingParams()->GetBatchSize(), 0.0);
           pen[s] = penalty;
         }
-        if (!pen.empty()) out = cc->EvalAdd(out, cc->MakeCKKSPackedPlaintext(pen, 1, 1));
+        if (!pen.empty()) {
+          Plaintext pen_pt = cc->MakeCKKSPackedPlaintext(pen, 1, 1);
+          out = cc->EvalAdd(out, pen_pt);
+        }
       }
       return out;
     };
