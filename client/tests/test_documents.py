@@ -130,3 +130,14 @@ def test_fresh_key_per_blob_and_no_leak_in_repr_or_errors(codec: DocumentCodec) 
 def test_store_enforces_bucket_size() -> None:
     with pytest.raises(BlobStoreError):
         InMemoryBlobStore().put(COL, KIND_DOCUMENT, b"d", b"short")
+
+
+def test_bucket_sizes_match_proto():
+    import pathlib
+    import re
+
+    from ombra.blobstore import BUCKET_SIZES
+
+    proto = pathlib.Path(__file__).resolve().parents[2] / "proto/ombra/v1/ombra.proto"
+    found = re.findall(r"LIMIT_BLOB_BUCKET_\d+ = (\d+);", proto.read_text())
+    assert tuple(int(v) for v in found) == BUCKET_SIZES
