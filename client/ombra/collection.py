@@ -12,9 +12,12 @@ one-hot column per filter value; the center block holds the centers as D columns
 
 Re-clustering. The server has no way to move a vector between clusters or to replace the center
 block (ReplaceBlock keeps the cluster; center blocks cannot be replaced). So `recluster` builds a
-new collection (generation g + 1, with its own keys upload) from the live vectors of the old one
-and leaves the old one untouched and searchable; the caller switches to the new one and calls
-`retire()` on the old one. Dropped slots never reach the new collection.
+new collection (generation g + 1) from the live vectors of the old one, under the SAME key pair
+(so the user's key file stays valid; the public keys are uploaded again to the new collection),
+copies the encrypted record and document blobs byte for byte (their associated data binds the
+base name, not the generation, so they need no re-encryption), and leaves the old one untouched
+and searchable; the caller switches to the new one and calls `retire()` on the old one. Dropped
+slots never reach the new collection.
 
 The transport is a protobuf messages module `pb` and a gRPC stub of service ombra.v1.Ombra,
 passed in by the caller (the generated modules are built from proto/ombra/v1/ombra.proto).
@@ -63,6 +66,7 @@ class KeyKit:
 
         self.derived = derived
         self.openfhe_version = openfhe_version
+        self.n_leaves = n_leaves
         self.slots = derived.batch_size
         cc = ofhe.GenCryptoContext(make_ckks_params(derived.values))
         for feature in (
@@ -206,6 +210,7 @@ class Collection:
         openfhe_version: str | None = None,
         seed: int = 0,
         generation: int = 0,
+        kit: KeyKit | None = None,
     ) -> Collection:
         """Cluster, create the collection, upload the keys once, insert centers and data."""
         x = np.asarray(vectors, dtype=np.float64)
@@ -224,7 +229,11 @@ class Collection:
             import openfhe as ofhe
 
             openfhe_version = ofhe.__version__
-        kit = KeyKit(derived, openfhe_version, derived.dimension + sum(cards))
+        n_leaves = derived.dimension + sum(cards)
+        if kit is None:
+            kit = KeyKit(derived, openfhe_version, n_leaves)
+        elif kit.derived.preset != derived.preset or kit.n_leaves != n_leaves:
+            raise ValueError("the key kit was made for another preset or layout")
         self = cls(
             pb,
             stub,
@@ -440,7 +449,8 @@ class Collection:
 
         Search keeps working on this collection throughout. When the new one is ready the caller
         switches to it and calls `retire()` on this one. Deleted slots are not carried over, so
-        the new blocks are dense. The new collection has its own keys and key upload.
+        the new blocks are dense. The new collection uses the same key pair (its public keys are
+        uploaded again) and gets a byte-for-byte copy of the record and document blobs.
         """
         ids: list[bytes] = []
         vecs, fields = [], []
@@ -453,7 +463,7 @@ class Collection:
             fields.append(f)
         if not ids:
             raise ValueError("no live vectors to cluster")
-        return Collection.create(
+        new = Collection.create(
             self.pb,
             self.stub,
             self.base_name,
@@ -466,7 +476,47 @@ class Collection:
             openfhe_version=openfhe_version or self.kit.openfhe_version,
             seed=seed,
             generation=self.generation + 1,
+            kit=self.kit,
         )
+        try:
+            self._copy_blobs(new.name, ids)
+        except Exception:
+            new.retire()
+            raise
+        return new
+
+    def _copy_blobs(self, target: str, ids: Sequence[bytes]) -> None:
+        """Copy the encrypted blobs of `ids` (opaque bytes) to `target`, skipping missing ones."""
+        pb = self.pb
+        for kind in (pb.BLOB_KIND_RECORD, pb.BLOB_KIND_DOCUMENT):
+            for blob_id in ids:
+                req = pb.GetBlobRequest(
+                    api_version=API_VERSION, collection=self.name, kind=kind, id=blob_id
+                )
+                data, size = bytearray(), None
+                for r in self.stub.GetBlob(req):
+                    part = r.WhichOneof("part")
+                    if part == "error":
+                        if r.error.code == pb.ERROR_BLOB_NOT_FOUND:
+                            break
+                        raise CollectionError(r.error.code, r.error.message)
+                    if part == "size":
+                        size = r.size
+                    else:
+                        data += r.data
+                if size is None:
+                    continue
+                if len(data) != size:
+                    raise CollectionError(pb.ERROR_INTERNAL, "incomplete blob stream")
+                header = pb.PutBlobHeader(collection=target, kind=kind, id=blob_id, size=size)
+
+                def msgs(header=header, data=bytes(data)):
+                    yield pb.PutBlobRequest(api_version=API_VERSION, header=header)
+                    for o in range(0, len(data), pb.LIMIT_MAX_CHUNK_BYTES):
+                        chunk = data[o : o + pb.LIMIT_MAX_CHUNK_BYTES]
+                        yield pb.PutBlobRequest(api_version=API_VERSION, data=chunk)
+
+                _check(self.stub.PutBlob(msgs()).error)
 
 
 def _fields(fields: np.ndarray | None, n: int, cards: Sequence[int]) -> np.ndarray:

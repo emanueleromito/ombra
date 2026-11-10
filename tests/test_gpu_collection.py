@@ -137,8 +137,34 @@ def test_create_recluster_repack(tmp_path) -> None:
         assert col.repack(0.3).groups == 0  # nothing left over the threshold
 
         # (d) recluster: the old collection works until retired; the new one is correct
+        pb = env.pb
+        kept = ids[int(np.nonzero(live)[0][0])]  # a live id, so recluster carries it over
+        blob = rng.bytes(pb.LIMIT_BLOB_BUCKET_0)  # stands in for an encrypted record (opaque)
+        put = env.stub.PutBlob(
+            iter(
+                [
+                    pb.PutBlobRequest(
+                        api_version=1,
+                        header=pb.PutBlobHeader(
+                            collection=col.name, kind=pb.BLOB_KIND_RECORD, id=kept, size=len(blob)
+                        ),
+                    ),
+                    pb.PutBlobRequest(api_version=1, data=blob),
+                ]
+            )
+        )
+        assert not put.HasField("error")
         new = col.recluster(n_clusters=2)
         assert new.name != col.name and new.cluster_count == 2
+        assert new.kit is col.kit  # same key pair: the key file stays valid
+        got = list(
+            env.stub.GetBlob(
+                pb.GetBlobRequest(
+                    api_version=1, collection=new.name, kind=pb.BLOB_KIND_RECORD, id=kept
+                )
+            )
+        )
+        assert got[0].size == len(blob) and b"".join(r.data for r in got[1:]) == blob
         for q in queries:
             want, true = _brute(x, fields, live, q)
             _same(env.search(col, q).ids, want, true)  # during: old still answers
