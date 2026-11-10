@@ -7,7 +7,7 @@ name = "ombra"
 version = "0.1.0"
 description = "Client for Ombra, a vector database with fully homomorphic encryption"
 requires-python = ">=3.11"
-dependencies = ["numpy", "cryptography"]
+dependencies = ["numpy", "cryptography", "faiss-cpu"]
 
 [project.optional-dependencies]
 local = ["openfhe"]

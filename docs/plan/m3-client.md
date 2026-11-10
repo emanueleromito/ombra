@@ -57,7 +57,7 @@ T3.2 and T3.3 can run in parallel after T3.1. T3.6 needs the server API from M2 
 **Depends on:** T3.2, T3.3, T2.4
 **Steps:** cluster the vectors with faiss k-means; encrypt the cluster centers; generate the evaluation keys and upload them once; create the collection on the server; a re-clustering job that builds a new clustering, swaps it in and repacks blocks as it rewrites them, dropping deleted slots via ReplaceBlock (T2.8); a standalone repack (ListBlocks, GetBlock, decrypt, drop deleted slots, re-encrypt, ReplaceBlock, from T2.8) for any block over 30% deleted slots (threshold configurable).
 **Done when:** a test on a synthetic corpus creates a collection against the server (or the local mode) and the clusters, centers and keys are present; re-clustering keeps search working and the results correct during and after; a block with 30% or more deleted slots is repacked and the stored bytes fall accordingly, with unchanged results.
-**Status:** todo
+**Status:** done
 
 ### T3.6 Insert, delete and search
 
