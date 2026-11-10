@@ -26,7 +26,7 @@ def test_overwrite_is_atomic_replace(tmp_path):
     path = tmp_path / "k.key"
     keyfile.export_key_file(path, material(), PASS, scrypt_params=FAST)
     m2 = material()
-    keyfile.export_key_file(path, m2, PASS, scrypt_params=FAST)
+    keyfile.export_key_file(path, m2, PASS, scrypt_params=FAST, overwrite=True)
     assert keyfile.import_key_file(path, PASS) == m2
 
 
@@ -103,3 +103,13 @@ def test_no_secrets_in_logs_errors_or_repr(caplog):
         for n in needles:
             assert n not in t
         assert str(list(m.master_key)) not in t
+
+
+def test_export_refuses_to_overwrite(tmp_path):
+    path = tmp_path / "k.ombrakey"
+    m = KeyMaterial.generate(b"sk-blob")
+    keyfile.export_key_file(path, m, "pw", scrypt_params=(2**4, 1, 1))
+    with pytest.raises(KeyFileError, match="already exists"):
+        keyfile.export_key_file(path, m, "pw", scrypt_params=(2**4, 1, 1))
+    keyfile.export_key_file(path, m, "pw2", scrypt_params=(2**4, 1, 1), overwrite=True)
+    assert keyfile.import_key_file(path, "pw2") == m

@@ -119,9 +119,16 @@ def export_key_file(
     passphrase: str,
     *,
     scrypt_params: tuple[int, int, int] = DEFAULT_SCRYPT,
+    overwrite: bool = False,
 ) -> None:
-    """Write atomically (temp file in the same directory, mode 0600, then rename)."""
+    """Write atomically (temp file in the same directory, mode 0600, then rename).
+
+    Refuses to replace an existing file unless ``overwrite`` is set: it may hold the only copy
+    of a secret key.
+    """
     target = Path(path)
+    if target.exists() and not overwrite:
+        raise KeyFileError("key file already exists; pass overwrite=True to replace it")
     blob = export_key_bytes(material, passphrase, scrypt_params=scrypt_params)
     fd, tmp = tempfile.mkstemp(dir=target.parent, prefix=f".{target.name}.", suffix=".tmp")
     try:
