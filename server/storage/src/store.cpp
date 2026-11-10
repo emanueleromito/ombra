@@ -87,7 +87,7 @@ std::string Store::insert(const std::string& collection, std::uint32_t cluster,
   const auto t0 = std::chrono::steady_clock::now();
   CollectionSpec spec;
   if (!catalog_->get_collection(collection, &spec)) throw std::runtime_error("unknown collection");
-  if (cluster >= spec.cluster_count) throw std::runtime_error("cluster out of range");
+  if (cluster > spec.cluster_count) throw std::runtime_error("cluster out of range");
   if (ids.empty()) throw std::runtime_error("insert: no ids");
   std::set<std::string> seen;
   for (const auto& id : ids)
@@ -156,8 +156,8 @@ void Store::put_key_file(const std::string& collection, const std::string& kind,
   CollectionSpec spec;
   if (!catalog_->get_collection(collection, &spec)) throw std::runtime_error("unknown collection");
   core::EnvelopeKind k;
-  if (kind == "context") k = core::EnvelopeKind::Context;
-  else if (kind == "eval_key") k = core::EnvelopeKind::PublicEvalKey;
+  if (kind == kKeyContext) k = core::EnvelopeKind::Context;
+  else if (kind == kKeyEvalMult || kind == kKeyAutomorphism) k = core::EnvelopeKind::PublicEvalKey;
   else throw std::runtime_error("unknown key file kind");
   core::read_envelope(envelope, k, spec.preset, ofhe_);  // also refuses unknown versions
   std::string old;
@@ -167,6 +167,17 @@ void Store::put_key_file(const std::string& collection, const std::string& kind,
   write_file_durable(root_ + "/keys/" + file, envelope);
   catalog_->put_key_file(collection, kind, file);
   if (!old.empty()) ::unlink((root_ + "/keys/" + old).c_str());
+}
+
+bool Store::get_key_file(const std::string& collection, const std::string& kind,
+                         std::vector<std::uint8_t>* out) const {
+  std::lock_guard lk(mu_);
+  for (auto& [kk, f] : catalog_->key_files(collection)) {
+    if (kk != kind) continue;
+    if (out) *out = read_file(root_ + "/keys/" + f);
+    return true;
+  }
+  return false;
 }
 
 SegmentData Store::read_segment(const std::string& collection, const std::string& segment) const {

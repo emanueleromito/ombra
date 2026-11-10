@@ -25,6 +25,12 @@ struct RecoveryStats {
               orphans_removed = 0, torn_bytes_dropped = 0;
 };
 
+// Key file kinds of put_key_file (proto KeyKind). The context is an envelope of kind Context; the
+// EvalMult and automorphism keys are envelopes of kind PublicEvalKey. There is no secret-key kind.
+inline constexpr const char* kKeyContext = "context";
+inline constexpr const char* kKeyEvalMult = "eval_mult";
+inline constexpr const char* kKeyAutomorphism = "automorphism";
+
 class Store {
  public:
   // Opens (creating if empty) and runs recovery. openfhe_version is what column envelopes must
@@ -34,7 +40,8 @@ class Store {
   void create_collection(const CollectionSpec& spec);
   bool get_collection(const std::string& name, CollectionSpec* out) const;
 
-  // Appends one cluster block as a new immutable segment. Returns the segment name once the
+  // Appends one cluster block as a new immutable segment. cluster == spec.cluster_count is the
+  // reserved id of the cluster-center blocks (d columns, no filter columns). Returns the segment name once the
   // write is acknowledged (durable). Throws on duplicate or tombstoned ids, unknown collection or
   // cluster, or a column envelope that does not match the collection's preset.
   std::string insert(const std::string& collection, std::uint32_t cluster,
@@ -43,9 +50,15 @@ class Store {
   // Marks ids deleted (unknown ids ignored). Acknowledged on return.
   void remove(const std::string& collection, const std::vector<std::string>& ids);
 
-  // Stores a public key / context envelope file and registers it. kind: "context" or "eval_key".
+  // Stores a public key / context envelope file and registers it. kind: kKeyContext,
+  // kKeyEvalMult or kKeyAutomorphism.
   void put_key_file(const std::string& collection, const std::string& kind,
                     const std::vector<std::uint8_t>& envelope);
+
+  // The stored envelope of a key kind (false if none was uploaded).
+  bool get_key_file(const std::string& collection, const std::string& kind,
+                    std::vector<std::uint8_t>* out) const;
+  const std::string& openfhe_version() const { return ofhe_; }
 
   SegmentData read_segment(const std::string& collection, const std::string& segment) const;
   const Catalog& catalog() const { return *catalog_; }

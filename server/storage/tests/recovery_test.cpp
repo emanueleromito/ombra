@@ -154,11 +154,26 @@ int main() {
     Store s(d.path, kOfhe);
     s.create_collection(spec());
     ombra::core::Envelope e{ombra::core::EnvelopeKind::PublicEvalKey, kPreset, kOfhe, {1, 2, 3}};
-    s.put_key_file("docs", "eval_key", ombra::core::write_envelope(e));
-    CHECK(s.catalog().key_files("docs").size() == 1);
+    s.put_key_file("docs", kKeyEvalMult, ombra::core::write_envelope(e));
+    s.put_key_file("docs", kKeyAutomorphism, ombra::core::write_envelope(e));
+    CHECK(s.catalog().key_files("docs").size() == 2);
+    std::vector<std::uint8_t> back;
+    CHECK(s.get_key_file("docs", kKeyAutomorphism, &back) && back == ombra::core::write_envelope(e));
+    CHECK(!s.get_key_file("docs", kKeyContext, &back));
+    CHECK_THROWS(s.put_key_file("docs", "eval_key", ombra::core::write_envelope(e)));  // old name
+    CHECK_THROWS(s.put_key_file("docs", kKeyContext, ombra::core::write_envelope(e)));  // wrong kind
     e.preset = "m0_depth2";
-    CHECK_THROWS(s.put_key_file("docs", "eval_key", ombra::core::write_envelope(e)));
+    CHECK_THROWS(s.put_key_file("docs", kKeyEvalMult, ombra::core::write_envelope(e)));
     CHECK_THROWS(s.insert("docs", 0, {"x"}, {column(1, 8, "m0_depth2")}));  // wrong preset column
+  }
+  {  // The id cluster_count holds the center blocks; one above it is out of range.
+    TempDir d;
+    Store s(d.path, kOfhe);
+    s.create_collection(spec());  // cluster_count = 4
+    s.insert("docs", 4, {"ctr0"}, cols(1));
+    CHECK_THROWS(s.insert("docs", 5, {"ctr1"}, cols(1)));
+    auto rows = s.catalog().segments("docs");
+    CHECK(rows.size() == 1 && rows[0].cluster == 4);
   }
   {  // A reader refuses a segment whose envelope version was changed on disk.
     TempDir d;

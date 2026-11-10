@@ -184,7 +184,9 @@ void Catalog::create_collection(const CollectionSpec& s) {
       .num(5, s.security_level).text(6, s.key_tag).num(7, s.cluster_count)
       .text(8, encode_filters(s.filter_fields)).run();
   Stmt c(db_, "INSERT INTO clusters VALUES(?,?)");
-  for (std::uint32_t i = 0; i < s.cluster_count; ++i) {
+  // Cluster ids 0 .. cluster_count - 1 are data clusters; the id cluster_count itself is reserved
+  // for the block(s) of cluster centers (stage 1 of the search).
+  for (std::uint32_t i = 0; i <= s.cluster_count; ++i) {
     c.reset();
     c.text(1, s.name).num(2, i).run();
   }
