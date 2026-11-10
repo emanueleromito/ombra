@@ -35,11 +35,11 @@ A field has V possible values, fixed when the collection is created. Every vecto
 
 ## Headroom: the largest value a filtered score may hold (measured)
 
-A decrypted slot is `score + lambda * c` with |score| <= 1 and c <= F, so |slot| <= 1 + lambda * F (lambda = 4). `client/tests/test_filter_headroom.py` sweeps a value 2^k through 0, 1 and 2 multiply-and-rescale steps and records the largest k that decrypts within a relative error of 1e-3 (Modal, CPU, OpenFHE 1.6.1):
+A decrypted slot is `score + lambda * c` with |score| <= 1 and c <= F, so |slot| <= 1 + lambda * F (lambda = 4); a tombstoned slot also gets `-lambda * (F + 1)`, so the bound that counts is 1 + lambda * (F + 1). `client/tests/test_filter_headroom.py` sweeps a value 2^k through 0, 1 and 2 multiply-and-rescale steps and records the largest k that decrypts within a relative error of 1e-3 (Modal, CPU, OpenFHE 1.6.1):
 
 | Preset | first modulus / scale | cliff at level 1 (where B decrypts) | cliff at level 2 (if a path rescales twice) | Allowed value (cliff - margin) | F_max |
 | --- | --- | --- | --- | --- | --- |
-| `m0_depth2` | 60 / 50 bits | 2^56 | 2^21 | 64 = 2^6 | **15** (1 + 4*15 = 61) |
+| `m0_depth2` | 60 / 50 bits | 2^56 | 2^21 | 64 = 2^6 | **14** (a tombstoned slot reaches 1 + 4 * (14 + 1) = 61; at 15 it would reach 65) |
 | `m0_compact_n8192` | 55 / 40 bits | 2^56 | 2^25 | 2048 = 2^11 | **16** (limit `LIMIT_MAX_FILTER_FIELDS`; the headroom alone would allow 511) |
 
 The allowed value is the textbook bound at the lowest level, `2^(first modulus bits - scale bits - 1)` = 2^9 and 2^14, less 3 bits. The measured cliffs are above that bound, so the bound is the safe side; the code does not rely on the measured cliff. The client refuses a schema whose F is above F_max of its preset (`ERROR_INVALID_FILTER_LAYOUT` on the server as well) and a query with d + sum(V) above N/2 (8192 at `m0_depth2`, 4096 at `m0_compact_n8192`), because the expansion tree separates index j from N - j. Noise on the true score also grows by about sqrt(1 + lambda^2 * F) (each of the F one-hot entries has weight lambda): 16x at F = 16. That is an estimate; T2.7 measures it.

@@ -34,8 +34,8 @@ static CollectionSpec spec(std::uint32_t d, std::vector<std::uint32_t> cards) {
 }
 
 int main() {
-  // F_max from the headroom (decision 0019): m0_depth2 (60/50 bits) 15, compact (55/40 bits) 16.
-  CHECK(max_filter_fields(60, 50) == 15);
+  // F_max from the headroom (decision 0019): m0_depth2 (60/50 bits) 14, compact (55/40 bits) 16 (tombstone penalty included).
+  CHECK(max_filter_fields(60, 50) == 14);
   CHECK(max_filter_fields(55, 40) == 16);
   CHECK(max_filter_fields(52, 50) == 0);
 

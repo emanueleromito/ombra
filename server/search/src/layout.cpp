@@ -13,9 +13,9 @@ std::size_t QueryLayout::filter_leaves() const {
 std::size_t max_filter_fields(std::size_t first_mod_bits, std::size_t scale_bits) {
   if (first_mod_bits < scale_bits + 5) return 0;
   const std::size_t allowed = std::size_t{1} << (first_mod_bits - scale_bits - 1 - 3);
-  // 1 + lambda * F <= allowed
-  if (allowed < 1 + static_cast<std::size_t>(kFilterLambda)) return 0;
-  const std::size_t f = (allowed - 1) / static_cast<std::size_t>(kFilterLambda);
+  // The largest magnitude is a tombstoned slot: |score - lambda * (F + 1)| <= 1 + lambda * (F + 1).
+  if (allowed < 1 + 2 * static_cast<std::size_t>(kFilterLambda)) return 0;
+  const std::size_t f = (allowed - 1) / static_cast<std::size_t>(kFilterLambda) - 1;
   return std::min(f, kMaxFilterFields);
 }
 
