@@ -1,11 +1,13 @@
 # T2.5 storage engine: segments, write-ahead log, SQLite catalog, recovery. No OpenFHE, no GPU.
 include(FetchContent)
+if(POLICY CMP0135)
+  cmake_policy(SET CMP0135 NEW)  # extract time = now (the option below needs CMake 3.24)
+endif()
 # SQLite amalgamation 3.46.1, pinned by hash (public domain). Built as a static library.
 FetchContent_Declare(
   sqlite_amalgamation
   URL https://www.sqlite.org/2024/sqlite-amalgamation-3460100.zip
-  URL_HASH SHA256=77823cb110929c2bcb0f5d48e4833b5c59a8a6e40cdea3936b99e199dbbe5784
-  DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+  URL_HASH SHA256=77823cb110929c2bcb0f5d48e4833b5c59a8a6e40cdea3936b99e199dbbe5784)
 FetchContent_MakeAvailable(sqlite_amalgamation)
 
 add_library(ombra_sqlite STATIC ${sqlite_amalgamation_SOURCE_DIR}/sqlite3.c)
