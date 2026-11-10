@@ -6,7 +6,6 @@ import hashlib
 import os
 
 import pytest
-
 from ombra.blobstore import (
     BUCKET_SIZES,
     KIND_DOCUMENT,
