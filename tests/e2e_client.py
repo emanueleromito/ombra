@@ -95,7 +95,11 @@ class ServerProcess:
         gpu_budget_mb: int = 1024,
         host_budget_mb: int = 512,
         extra_args: tuple[str, ...] = (),
+        secure: bool = False,
     ) -> None:
+        # Tests that do not exercise T2.9 run without TLS and keys; `secure=True` passes none of
+        # the two flags, so extra_args must bring --tls-cert/--tls-key (and keys must exist).
+        insecure_args = () if secure else ("--insecure", "--no-auth")
         self._log = open(log_path, "w")  # noqa: SIM115
         self.proc = subprocess.Popen(  # noqa: S603
             [
@@ -110,6 +114,7 @@ class ServerProcess:
                 str(gpu_budget_mb),
                 "--host-budget-mb",
                 str(host_budget_mb),
+                *insecure_args,
                 *extra_args,
             ],
             stdout=subprocess.PIPE,
@@ -130,6 +135,14 @@ class ServerProcess:
             self.stop()
             raise RuntimeError(f"server did not start; log tail:\n{self.log_tail()}")
         self.address = line.strip().split()[-1]
+        self.rest_address = ""
+        if "--rest-port" in extra_args:
+            ready, _, _ = select.select([self.proc.stdout], [], [], 30.0)
+            rest_line = self.proc.stdout.readline() if ready else ""
+            if not rest_line.startswith("ombra_server rest listening on "):
+                self.stop()
+                raise RuntimeError(f"REST port did not start; log tail:\n{self.log_tail()}")
+            self.rest_address = rest_line.strip().split()[-1]
 
     def log_tail(self, n: int = 30) -> str:
         self._log.flush()
@@ -194,17 +207,36 @@ class SearchStream:
 
 
 class OmbraClient:
-    def __init__(self, pb: Any, pbg: Any, address: str, preset: str, version: str) -> None:
+    def __init__(
+        self,
+        pb: Any,
+        pbg: Any,
+        address: str,
+        preset: str,
+        version: str,
+        root_cert: bytes | None = None,
+        api_token: str | None = None,
+    ) -> None:
+        """`root_cert` switches to TLS; `api_token` is sent as `authorization: Bearer <token>`.
+
+        The API token is an access token for the server, unrelated to the FHE keys.
+        """
         import grpc
 
         self.pb, self.version, self.preset = pb, version, preset
-        self.channel = grpc.insecure_channel(
-            address,
-            options=[
-                ("grpc.max_send_message_length", MAX_MESSAGE),
-                ("grpc.max_receive_message_length", MAX_MESSAGE),
-            ],
-        )
+        options = [
+            ("grpc.max_send_message_length", MAX_MESSAGE),
+            ("grpc.max_receive_message_length", MAX_MESSAGE),
+        ]
+        if root_cert is None:
+            self.channel = grpc.insecure_channel(address, options=options)
+        else:
+            creds = grpc.ssl_channel_credentials(root_certificates=root_cert)
+            if api_token is not None:
+                creds = grpc.composite_channel_credentials(
+                    creds, grpc.access_token_call_credentials(api_token)
+                )
+            self.channel = grpc.secure_channel(address, creds, options=options)
         self.stub = pbg.OmbraStub(self.channel)
         self.slots = ombra_params.get_preset(preset)["batch_size"]
         self.cc = None
