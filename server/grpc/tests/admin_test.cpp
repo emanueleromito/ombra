@@ -67,6 +67,9 @@ static void test_scopes() {
   CHECK(required_scope(Rpc::Delete) == Scope::Write);
   CHECK(required_scope(Rpc::UploadKeys) == Scope::Write);
   CHECK(required_scope(Rpc::ReplaceBlock) == Scope::Write);
+  CHECK(required_scope(Rpc::PutBlob) == Scope::Write);
+  CHECK(required_scope(Rpc::DeleteBlobs) == Scope::Write);
+  CHECK(required_scope(Rpc::GetBlob) == Scope::Read);
   CHECK(required_scope(Rpc::DropCollection) == Scope::Admin);
   CHECK(scope_allows(Scope::Admin, Scope::Write) && scope_allows(Scope::Write, Scope::Read));
   CHECK(!scope_allows(Scope::Read, Scope::Write) && !scope_allows(Scope::Write, Scope::Admin));

@@ -75,7 +75,7 @@ Search reads whole clusters in big sequential chunks and pushes them to the GPU,
 
 #### Durability rules
 
-Implemented in `server/storage/`. Layout under the data root: `catalog.db` (SQLite, WAL mode, `synchronous=FULL`), `wal.log`, `segments/*.oseg`, `keys/*.env`. Every file has a version header (segment container "OSEG" v1 with a CRC32 of the body, log "OWAL" v1 with a CRC32 per record, catalog `schema_version` and `api_version` 1); readers refuse an unknown version, and column envelopes keep their own 0016 version, checked against the collection's preset.
+Implemented in `server/storage/`. Layout under the data root: `catalog.db` (SQLite, WAL mode, `synchronous=FULL`), `wal.log`, `segments/*.oseg`, `keys/*.env`, `blobs/*.oblob` (T3.4 encrypted blob store: container "OBLB" v1 with CRC32; catalog schema_version 2 adds the blobs table, version 1 catalogs are migrated). Every file has a version header (segment container "OSEG" v1 with a CRC32 of the body, log "OWAL" v1 with a CRC32 per record, catalog `schema_version` 2 and `api_version` 1); readers refuse an unknown version, and column envelopes keep their own 0016 version, checked against the collection's preset.
 
 Insert, in this order; each step is durable before the next starts:
 

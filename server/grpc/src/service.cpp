@@ -37,6 +37,13 @@ static_assert(static_cast<int>(v1::ERROR_BAD_SEQUENCE) == static_cast<int>(Err::
 static_assert(static_cast<int>(v1::ERROR_INTERNAL) == static_cast<int>(Err::Internal));
 static_assert(static_cast<int>(v1::ERROR_BLOCK_NOT_FOUND) == static_cast<int>(Err::BlockNotFound));
 static_assert(static_cast<int>(v1::ERROR_BLOCK_MISMATCH) == static_cast<int>(Err::BlockMismatch));
+static_assert(static_cast<int>(v1::ERROR_BLOB_NOT_FOUND) == static_cast<int>(Err::BlobNotFound));
+static_assert(static_cast<std::uint64_t>(v1::LIMIT_BLOB_BUCKET_0) == storage::kBlobBuckets[0]);
+static_assert(static_cast<std::uint64_t>(v1::LIMIT_BLOB_BUCKET_1) == storage::kBlobBuckets[1]);
+static_assert(static_cast<std::uint64_t>(v1::LIMIT_BLOB_BUCKET_2) == storage::kBlobBuckets[2]);
+static_assert(static_cast<std::uint64_t>(v1::LIMIT_BLOB_BUCKET_3) == storage::kBlobBuckets[3]);
+static_assert(static_cast<std::uint32_t>(v1::BLOB_KIND_RECORD) == storage::kBlobKindRecord);
+static_assert(static_cast<std::uint32_t>(v1::BLOB_KIND_DOCUMENT) == storage::kBlobKindDocument);
 
 constexpr std::size_t kMaxKeyFileBytes = std::size_t{1} << 30;  // per key kind
 constexpr std::size_t kClustersPerGroup = 16;                   // clusters scored per write burst
@@ -63,6 +70,10 @@ Status classify_current() {
     throw;
   } catch (const storage::BlockNotFound&) {
     return {Err::BlockNotFound, "block not found"};
+  } catch (const storage::BlobSizeError&) {
+    return {Err::SizeLimit, "blob size is not a bucket size"};
+  } catch (const storage::BlobKindError&) {
+    return {Err::InvalidArgument, "unknown blob kind"};
   } catch (const storage::BlockMismatch& e) {
     return {Err::BlockMismatch, e.what()};
   } catch (const search::KeyTagMismatch& e) {
@@ -646,6 +657,123 @@ grpc::Status OmbraService::run_ReplaceBlock(grpc::ServerContext*, grpc::ServerRe
   return grpc::Status::OK;
 }
 
+// ---------------------------------------------------------------------------------------------
+// Blob store (T3.4). Blobs are opaque bytes; ids and bytes are never logged.
+
+grpc::Status OmbraService::run_PutBlob(grpc::ServerContext*, grpc::ServerReader<v1::PutBlobRequest>* in,
+                                       v1::PutBlobResponse* resp) {
+  const auto t0 = Clock::now();
+  resp->set_api_version(kApiVersion);
+  const auto fail = [&](Err c, const char* m) {
+    fill(resp->mutable_error(), err(c, m));
+    return grpc::Status::OK;
+  };
+  try {
+    v1::PutBlobRequest m;
+    bool have_header = false;
+    std::string coll, id;
+    std::uint32_t kind = 0;
+    std::uint64_t size = 0;
+    std::vector<std::uint8_t> payload;
+    while (in->Read(&m)) {
+      if (m.api_version() != kApiVersion) return fail(Err::UnsupportedVersion, "unsupported api_version");
+      if (m.part_case() == v1::PutBlobRequest::kHeader) {
+        if (have_header) return fail(Err::BadSequence, "second header");
+        have_header = true;
+        const auto& h = m.header();
+        coll = h.collection();
+        id = h.id();
+        kind = static_cast<std::uint32_t>(h.kind());
+        size = h.size();
+        if (coll.empty() || coll.size() > kMaxNameBytes) return fail(Err::InvalidArgument, "invalid collection name");
+        if (id.empty() || id.size() > kMaxIdBytes) return fail(Err::InvalidArgument, "invalid id");
+        if (!storage::is_blob_kind(kind)) return fail(Err::InvalidArgument, "unknown blob kind");
+        if (!storage::is_blob_bucket(size)) return fail(Err::SizeLimit, "blob size is not a bucket size");
+        payload.reserve(static_cast<std::size_t>(size));
+      } else if (m.part_case() == v1::PutBlobRequest::kData) {
+        if (!have_header) return fail(Err::BadSequence, "data before the header");
+        if (m.data().size() > kMaxChunkBytes) return fail(Err::SizeLimit, "chunk too large");
+        if (payload.size() + m.data().size() > size) return fail(Err::InvalidArgument, "more data than the header's size");
+        payload.insert(payload.end(), m.data().begin(), m.data().end());
+      } else {
+        return fail(Err::InvalidArgument, "empty message");
+      }
+    }
+    if (!have_header) return fail(Err::BadSequence, "no header");
+    if (payload.size() != size) return fail(Err::InvalidArgument, "less data than the header's size");
+    if (!store_.get_collection(coll, nullptr)) return fail(Err::CollectionNotFound, "collection not found");
+    store_.put_blob(coll, kind, id, payload);
+    log_line("put_blob", 1, payload.size(), ms_since(t0));
+  } catch (...) {
+    fill(resp->mutable_error(), classify_current());
+  }
+  return grpc::Status::OK;
+}
+
+grpc::Status OmbraService::run_GetBlob(grpc::ServerContext*, const v1::GetBlobRequest* req,
+                                       grpc::ServerWriter<v1::GetBlobResponse>* out) {
+  const auto t0 = Clock::now();
+  const auto send_error = [&](const Status& s) {
+    v1::GetBlobResponse r;
+    r.set_api_version(kApiVersion);
+    fill(r.mutable_error(), s);
+    out->Write(r);
+    return grpc::Status::OK;
+  };
+  if (req->api_version() != kApiVersion) return send_error(err(Err::UnsupportedVersion, "unsupported api_version"));
+  try {
+    const auto kind = static_cast<std::uint32_t>(req->kind());
+    if (!storage::is_blob_kind(kind)) return send_error(err(Err::InvalidArgument, "unknown blob kind"));
+    if (req->id().empty() || req->id().size() > kMaxIdBytes) return send_error(err(Err::InvalidArgument, "invalid id"));
+    if (!store_.get_collection(req->collection(), nullptr))
+      return send_error(err(Err::CollectionNotFound, "collection not found"));
+    std::vector<std::uint8_t> bytes;
+    if (!store_.get_blob(req->collection(), kind, req->id(), &bytes))
+      return send_error(err(Err::BlobNotFound, "blob not found"));
+    v1::GetBlobResponse head;
+    head.set_api_version(kApiVersion);
+    head.set_size(bytes.size());
+    if (!out->Write(head)) return grpc::Status::OK;
+    for (std::size_t pos = 0; pos < bytes.size(); pos += kMaxChunkBytes) {
+      const std::size_t n = std::min(kMaxChunkBytes, bytes.size() - pos);
+      v1::GetBlobResponse chunk;
+      chunk.set_api_version(kApiVersion);
+      chunk.set_data(reinterpret_cast<const char*>(bytes.data() + pos), n);
+      if (!out->Write(chunk)) return grpc::Status::OK;
+    }
+    log_line("get_blob", 1, bytes.size(), ms_since(t0));
+  } catch (...) {
+    return send_error(classify_current());
+  }
+  return grpc::Status::OK;
+}
+
+grpc::Status OmbraService::run_DeleteBlobs(grpc::ServerContext*, const v1::DeleteBlobsRequest* req,
+                                           v1::DeleteBlobsResponse* resp) {
+  const auto t0 = Clock::now();
+  const auto fail = [&](Err c, const char* m) {
+    fill(resp->mutable_error(), err(c, m));
+    return grpc::Status::OK;
+  };
+  try {
+    if (req->api_version() != kApiVersion) return fail(Err::UnsupportedVersion, "unsupported api_version");
+    const auto kind = static_cast<std::uint32_t>(req->kind());
+    if (!storage::is_blob_kind(kind)) return fail(Err::InvalidArgument, "unknown blob kind");
+    if (static_cast<std::size_t>(req->ids_size()) > kMaxIdsPerRequest) return fail(Err::SizeLimit, "too many ids");
+    std::vector<std::string> ids;
+    for (const auto& id : req->ids()) {
+      if (id.empty() || id.size() > kMaxIdBytes) return fail(Err::InvalidArgument, "invalid id");
+      ids.push_back(id);
+    }
+    if (!store_.get_collection(req->collection(), nullptr))
+      return fail(Err::CollectionNotFound, "collection not found");
+    resp->set_deleted(store_.delete_blobs(req->collection(), kind, ids));
+    log_line("delete_blobs", ids.size(), 0, ms_since(t0));
+  } catch (...) {
+    fill(resp->mutable_error(), classify_current());
+  }
+  return grpc::Status::OK;
+}
 
 namespace {
 
@@ -758,6 +886,21 @@ grpc::Status OmbraService::ReplaceBlock(grpc::ServerContext* ctx,
     v1::ReplaceBlockResponse* resp) {
   return guarded(ctx, Rpc::ReplaceBlock, resp,
                  [&] { return run_ReplaceBlock(ctx, req, resp); });
+}
+
+grpc::Status OmbraService::PutBlob(grpc::ServerContext* ctx,
+    grpc::ServerReader<v1::PutBlobRequest>* req, v1::PutBlobResponse* resp) {
+  return guarded(ctx, Rpc::PutBlob, resp, [&] { return run_PutBlob(ctx, req, resp); });
+}
+
+grpc::Status OmbraService::GetBlob(grpc::ServerContext* ctx, const v1::GetBlobRequest* req,
+    grpc::ServerWriter<v1::GetBlobResponse>* resp) {
+  return guarded(ctx, Rpc::GetBlob, resp, [&] { return run_GetBlob(ctx, req, resp); });
+}
+
+grpc::Status OmbraService::DeleteBlobs(grpc::ServerContext* ctx, const v1::DeleteBlobsRequest* req,
+    v1::DeleteBlobsResponse* resp) {
+  return guarded(ctx, Rpc::DeleteBlobs, resp, [&] { return run_DeleteBlobs(ctx, req, resp); });
 }
 
 }  // namespace ombra::server

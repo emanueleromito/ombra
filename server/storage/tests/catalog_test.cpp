@@ -35,7 +35,7 @@ int main() {
     c.put_key_file("docs", "eval_mult", "k1.env");
     c.put_key_file("docs", "eval_mult", "k2.env");
     CHECK(c.key_files("docs").size() == 1 && c.key_files("docs")[0].second == "k2.env");
-    sqlite3_exec(c.raw(), "UPDATE meta SET value=2 WHERE key='schema_version'", nullptr, nullptr,
+    sqlite3_exec(c.raw(), "UPDATE meta SET value=99 WHERE key='schema_version'", nullptr, nullptr,
                  nullptr);
   }
   CHECK_THROWS(Catalog c(p));
