@@ -556,6 +556,8 @@ def test_9_merge_two_half_deleted_blocks_into_one(dep_c: Deployment) -> None:
         len(victims) + len(evict)
     )
     dep_c.deleted.update(victims)
+    old = [b for b in cl.list_blocks("docs") if b.cluster_id == cluster]  # fresh counts
+    assert len(old) == 2
 
     # The client reads both blocks and merges the live slots into one (its own slot order).
     live_ids: list[bytes] = []
