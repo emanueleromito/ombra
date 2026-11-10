@@ -73,6 +73,24 @@ Search reads whole clusters in big sequential chunks and pushes them to the GPU,
 - **GPU memory cache.** The most-used clusters stay in GPU memory, so popular queries skip the disk entirely.
 - **Backup.** Backups are plain file copies; backup to object storage (S3, MinIO) comes later, mainly for cloud deployments.
 
+#### Durability rules
+
+Implemented in `server/storage/`. Layout under the data root: `catalog.db` (SQLite, WAL mode, `synchronous=FULL`), `wal.log`, `segments/*.oseg`, `keys/*.env`. Every file has a version header (segment container "OSEG" v1 with a CRC32 of the body, log "OWAL" v1 with a CRC32 per record, catalog `schema_version` and `api_version` 1); readers refuse an unknown version, and column envelopes keep their own 0016 version, checked against the collection's preset.
+
+Insert, in this order; each step is durable before the next starts:
+
+1. Append the insert-intent record (collection, cluster, segment name, ids) to `wal.log` and `fsync` it. Why: from now on recovery knows which segment file may be an orphan.
+2. Write the segment to `<name>.tmp`, `fsync` the file, `rename` it to its final name, `fsync` the directory. Why: the file is either absent or complete under its final name; the directory sync makes the rename itself survive power loss.
+3. Update the catalog (segment row and one row per id) in one SQLite transaction. `synchronous=FULL` syncs the catalog log at commit. Why: a vector is visible to search only through the catalog, so the update is all-or-nothing.
+4. Append the insert-commit record and `fsync` the log.
+5. Acknowledge to the client. Never earlier.
+
+Delete: append the delete record and `fsync`; tombstone the ids in the catalog (one transaction); acknowledge. A delete is a mark; segments are not touched.
+
+Recovery on open replays `wal.log` in order: a torn last record (short or bad CRC) is truncated; a delete record is re-applied (idempotent); an intent whose segment is in the catalog is rolled forward (commit appended); an intent with a commit but no catalog row is applied from the segment file; an intent with neither is discarded and its segment and temp files are removed. Then any `.tmp` file and any segment file the catalog does not list is removed, and the log is truncated (checkpoint; the catalog is durable).
+
+Guarantee: an acknowledged write survives a crash or power loss. A write that was not acknowledged is either fully there (segment, all ids, catalog rows) or fully absent, never partial. Tested by killing a writer process at every step (`ctest -R storage_recovery`). Limits: single writer per data directory; the guarantee assumes the disk honours `fsync`. Logs carry sizes, counts and timings only.
+
 ## API and protocol
 
 All data goes over gRPC; a small REST API handles admin and monitoring. Each search runs as one two-way gRPC stream, so the query expanded in the first round stays on the server and is reused in the second round instead of being expanded again.
