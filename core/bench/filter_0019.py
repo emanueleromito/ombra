@@ -78,6 +78,9 @@ P3_NPROBE = 2
 P3_SELS = (0.01, 0.1, 0.5)
 P3_PLACEMENTS = ("independent", "correlated")
 P3_MULTS = (8, 2)
+# (first-round clusters p, max_probe multiplier): p is what an unfiltered query would probe
+# (decision 0019, note of 2026-11-10); the loop never probes fewer, widening only below k matches.
+P3_SETTINGS = ((2, 8), (2, 2), (4, 8))
 P3_WARMUP = 3
 NOISE = 0.7  # mixture noise relative to the unit-length component centers
 
@@ -449,7 +452,13 @@ def placements(rng: np.random.Generator, assign: np.ndarray, sel: float, kind: s
 
 
 def selective_search(
-    env: Env, name: str, q: np.ndarray, cards: list[int], wants: list[int | None], mult: int
+    env: Env,
+    name: str,
+    q: np.ndarray,
+    cards: list[int],
+    wants: list[int | None],
+    mult: int,
+    p: int = P3_NPROBE,
 ) -> dict[str, Any]:
     """Decision 0019 client loop; returns found {row: score}, rounds, strict flag, incomplete."""
     nf = len(cards)
@@ -458,8 +467,8 @@ def selective_search(
     try:
         order = [int(c) for c in np.argsort(-cscore, kind="stable")]
         total = len(order)
-        max_probe = min(mult * P3_NPROBE, total)
-        pos, size, rounds, strict = 0, P3_NPROBE, 0, False
+        max_probe = min(mult * p, total)
+        pos, size, rounds, strict = 0, p, 0, False
         while pos < total:
             if pos < max_probe:
                 n = min(size, max_probe - pos)
@@ -500,6 +509,7 @@ def run_part3(env: Env, data: Data, nq: int) -> dict[str, Any]:
         "n_queries": nq,
         "k": K,
         "initial_nprobe": P3_NPROBE,
+        "settings_p_mult": [list(x) for x in P3_SETTINGS],
         "fields": len(cols),
         "max_probe_multipliers": list(P3_MULTS),
         "results": {},
@@ -511,13 +521,13 @@ def run_part3(env: Env, data: Data, nq: int) -> dict[str, Any]:
         ids_ok = np.nonzero(allowed)[0]
         for _ in range(P3_WARMUP):  # untimed: first touches of the blocks on the GPU
             selective_search(env, "p3", data.queries[0], cards, wants, P3_MULTS[0])
-        for mult in P3_MULTS:
+        for p, mult in P3_SETTINGS:
             recs, rounds, strict, inc, clus, lat = [], [], [], [], [], []
             for i in range(nq):
                 q = data.queries[i]
                 truth = ids_ok[topk((data.db @ q)[ids_ok], K)]
                 t0 = time.perf_counter()
-                r = selective_search(env, "p3", q, cards, wants, mult)
+                r = selective_search(env, "p3", q, cards, wants, mult, p)
                 lat.append(time.perf_counter() - t0)
                 rows = np.array(list(r["found"]), dtype=np.int64)
                 sc = np.array(list(r["found"].values()))
@@ -528,11 +538,12 @@ def run_part3(env: Env, data: Data, nq: int) -> dict[str, Any]:
                 inc.append(float(r["incomplete"]))
                 clus.append(r["clusters"])
             lat_ms = sorted(x * 1000 for x in lat)
-            key = f"sel{sel}_{kind}_mult{mult}"
+            key = f"sel{sel}_{kind}_p{p}_mult{mult}"
             out["results"][key] = {
                 "selectivity": sel,
                 "matching_vectors": int(allowed.sum()),
                 "placement": kind,
+                "first_round_clusters": p,
                 "max_probe_multiplier": mult,
                 "recall_at_10": float(np.mean(recs)),
                 "mean_extra_rounds": float(np.mean(rounds)),
