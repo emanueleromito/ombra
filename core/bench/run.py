@@ -30,6 +30,10 @@ T1.3: end-to-end query latency per step (client encrypt, expansion, stage 1, sta
 decrypt and top-k), see core/bench/e2e.py. Output `<out>/t1.3-a100.json`. Runs only when asked for
 (`--task t1.3`), not as part of `--task all`.
 
+T2.6: GPU cluster cache (`ombra_bench_cache`, built from server/cache): paging bandwidth pinned vs
+pageable, serial vs overlapped search over a collection 3x the GPU budget, hit rate for uniform and
+Zipf access. Output `<out>/t2.6-a100.json`. Runs only when asked for (`--task t2.6`).
+
     python core/bench/run.py --task t0.7 --out <dir>
 """
 
@@ -58,6 +62,7 @@ DEFAULT_ITERS = 10
 DEFAULT_OUT_NAME = "t0.4-a100.json"
 T05_OUT_NAME = "t0.5-a100.json"
 T07_OUT_NAME = "t0.7-a100.json"
+T26_OUT_NAME = "t2.6-a100.json"
 T07_QUERIES = (1, 8, 32, 128)
 # T0.7 stored data: STORED_CTS ciphertexts per d (blocks = STORED_CTS // d), 4 * 1536 * 786,432 B =
 # 4.8 GB. Smaller than T0.4's 19 GB on purpose: expanded queries are 1.2 GB each at d = 1536, so a
@@ -77,7 +82,9 @@ def find_binary(name: str) -> Path:
     candidates = [
         Path(env) / name if env else None,
         Path("/root/ombra-build/core") / name,
+        Path("/root/ombra-build/server/cache") / name,
         REPO_ROOT / "build" / "core" / name,
+        REPO_ROOT / "build" / "server" / "cache" / name,
     ]
     for c in candidates:
         if c is not None and c.is_file():
@@ -242,6 +249,60 @@ def run_t05(
     return out_path
 
 
+def run_t26(
+    out_dir: Path, dims: tuple[int, ...], budget_blocks: int, per_block: int, out_name: str
+) -> Path:
+    """T2.6: GPU cluster cache (`ombra_bench_cache`): paging bandwidth, overlap, hit rate.
+
+    Per d (block size) one run with a collection of 3 * budget_blocks blocks and a GPU budget of
+    budget_blocks blocks. Only the context and the public key are written (no secret key).
+    """
+    import openfhe as ofhe
+    from ombra import params as ombra_params
+
+    binary = find_binary("ombra_bench_cache")
+    _, cc = ombra_params.make_context(PRESET)
+    keys = cc.KeyGen()
+    results = []
+    gpu_name = "unknown"
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        if not ofhe.SerializeToFile(str(tmp_dir / "context.bin"), cc, ofhe.BINARY):
+            raise SystemExit("cannot serialize context")
+        if not ofhe.SerializeToFile(str(tmp_dir / "public_key.bin"), keys.publicKey, ofhe.BINARY):
+            raise SystemExit("cannot serialize public key")
+        for d in dims:
+            part = tmp_dir / f"part_{d}.json"
+            cmd = [
+                str(binary),
+                str(tmp_dir / "context.bin"),
+                str(tmp_dir / "public_key.bin"),
+                str(d),
+                str(budget_blocks),
+                str(per_block),
+                str(part),
+            ]
+            print("$", " ".join(cmd), flush=True)
+            subprocess.run(cmd, check=True)  # noqa: S603
+            entry = json.loads(part.read_text())
+            gpu_name = entry.pop("gpu_name")
+            results.append(entry)
+    record = {
+        "task": "t2.6",
+        "format_version": 1,
+        "preset": PRESET,
+        "openfhe_version": openfhe_version(),
+        "gpu_name": gpu_name,
+        "gpu_memory_clocks": gpu_memory_clock_record(),
+        "results": results,
+    }
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / out_name
+    out_path.write_text(json.dumps(record, indent=2) + "\n")
+    print(f"wrote {out_path}")
+    return out_path
+
+
 def gpu_memory_clock_record() -> dict:
     """Output of `nvidia-smi --query-gpu=clocks.max.memory,memory.total --format=csv`."""
     try:
@@ -384,6 +445,10 @@ def main() -> None:
     parser.add_argument("--name", default=DEFAULT_OUT_NAME, help="output file name for t0.4")
     parser.add_argument("--name-t05", default=T05_OUT_NAME, help="output file name for t0.5")
     parser.add_argument("--name-t07", default=T07_OUT_NAME, help="output file name for t0.7")
+    parser.add_argument("--name-t26", default=T26_OUT_NAME, help="output file name for t2.6")
+    parser.add_argument("--dims-t26", default="16,64,256", help="t2.6: dims = block sizes")
+    parser.add_argument("--budget-blocks", type=int, default=8, help="t2.6: GPU budget in blocks")
+    parser.add_argument("--passes-t26", type=int, default=4, help="t2.6: passes over the data")
     parser.add_argument(
         "--queries",
         default=",".join(map(str, T07_QUERIES)),
@@ -423,13 +488,21 @@ def main() -> None:
     args = parser.parse_args()
 
     task = args.task.lower()
-    if task not in ("all", "t0.4", "t0.5", "t0.7", "t0.11", "t1.3"):
+    if task not in ("all", "t0.4", "t0.5", "t0.7", "t0.11", "t1.3", "t2.6"):
         raise SystemExit(f"unknown task {args.task!r}")
     dims = tuple(int(x) for x in args.dims.split(","))
     if task in ("all", "t0.4"):
         run_t04(args.out, dims, args.blocks, args.warmup, args.iters, args.name)
     if task in ("all", "t0.5"):
         run_t05(args.out, dims, args.warmup, args.iters, args.name_t05, args.profile)
+    if task == "t2.6":
+        run_t26(
+            args.out,
+            tuple(int(x) for x in args.dims_t26.split(",")),
+            args.budget_blocks,
+            args.passes_t26,
+            args.name_t26,
+        )
     if task == "t0.7":
         run_t07(
             args.out,

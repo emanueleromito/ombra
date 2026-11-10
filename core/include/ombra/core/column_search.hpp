@@ -62,6 +62,29 @@ class ColumnSearchDevice {
     std::unique_ptr<Impl> impl_;
 };
 
+// T2.6: scores ONE stored block that lives at an arbitrary device address (e.g. a slot of the
+// server's GPU cluster cache) with the same kernel as ColumnSearchDevice, on a caller-given stream.
+// launch() is asynchronous and does no checks on the data; the caller keeps the pointers alive and
+// ordered (events) until the stream has finished. Layouts: stored shape.block_words() words,
+// query shape.query_words() words, out 3 * shape.poly_words() words ([comp 0..2][tower][coeff]).
+// shape.blocks is ignored (always one block per launch).
+class ColumnSearchLauncher {
+  public:
+    ColumnSearchLauncher(const ColumnSearchShape& shape, const std::vector<std::uint64_t>& moduli);
+    ~ColumnSearchLauncher();
+    ColumnSearchLauncher(const ColumnSearchLauncher&) = delete;
+    ColumnSearchLauncher& operator=(const ColumnSearchLauncher&) = delete;
+
+    // `stream` is a cudaStream_t (nullptr = default stream), passed as void* to keep CUDA out of
+    // this header.
+    void launch(const std::uint64_t* stored_dev, const std::uint64_t* query_dev,
+                std::uint64_t* out_dev, void* stream) const;
+
+  private:
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
+};
+
 // Batched search (T0.7): Q queries scored in one pass over the same stored blocks. Layouts:
 //   queries [q][dim][comp 0..1][tower][coeff]   (each query as in ColumnSearchShape::query_words)
 //   result  [q][block][comp 0..2][tower][coeff]

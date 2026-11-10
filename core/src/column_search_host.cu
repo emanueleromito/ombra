@@ -167,6 +167,46 @@ void ColumnSearchDevice::download_result(std::vector<std::uint64_t>& out) {
 
 const std::uint64_t* ColumnSearchDevice::result_device() const { return impl_->out.get(); }
 
+struct ColumnSearchLauncher::Impl {
+    ColumnSearchShape shape;
+    DeviceBuffer<TowerConst> tc;
+};
+
+ColumnSearchLauncher::ColumnSearchLauncher(const ColumnSearchShape& shape,
+                                           const std::vector<std::uint64_t>& moduli)
+    : impl_(std::make_unique<Impl>()) {
+    ColumnSearchShape one = shape;
+    one.blocks = 1;
+    validate_shape(one, moduli);
+    impl_->shape = one;
+    const std::vector<TowerConst> consts = make_tower_consts(moduli);
+    const auto init = [&]() -> Status {
+        OMBRA_TRY(impl_->tc.allocate(consts.size()));
+        // Synchronous copy: the constants are ready before any launch on any stream.
+        OMBRA_CUDA_CHECK(cudaMemcpy(impl_->tc.get(), consts.data(),
+                                    consts.size() * sizeof(TowerConst), cudaMemcpyHostToDevice));
+        return {};
+    };
+    init().throw_if_error();
+}
+
+ColumnSearchLauncher::~ColumnSearchLauncher() = default;
+
+void ColumnSearchLauncher::launch(const std::uint64_t* stored_dev, const std::uint64_t* query_dev,
+                                  std::uint64_t* out_dev, void* stream) const {
+    if (stored_dev == nullptr || query_dev == nullptr || out_dev == nullptr) {
+        throw std::invalid_argument("column_search: null device pointer");
+    }
+    const ColumnSearchShape& s = impl_->shape;
+    const ColumnSearchDims d{s.dims, 1, s.num_towers, s.ring_dim};
+    const auto go = [&]() -> Status {
+        OMBRA_CUDA_CHECK(launch_column_search(stored_dev, query_dev, out_dev, impl_->tc.get(), d,
+                                              static_cast<cudaStream_t>(stream)));
+        return {};
+    };
+    go().throw_if_error();
+}
+
 struct BatchedColumnSearchDevice::Impl {
     ColumnSearchShape shape;
     std::vector<u64> moduli;
