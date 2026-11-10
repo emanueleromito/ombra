@@ -180,6 +180,16 @@ bool Store::get_key_file(const std::string& collection, const std::string& kind,
   return false;
 }
 
+std::vector<SegmentRow> Store::segments(const std::string& collection) const {
+  std::lock_guard lk(mu_);
+  return catalog_->segments(collection);
+}
+
+std::vector<std::string> Store::tombstones(const std::string& collection) const {
+  std::lock_guard lk(mu_);
+  return catalog_->tombstones(collection);
+}
+
 SegmentData Store::read_segment(const std::string& collection, const std::string& segment) const {
   std::lock_guard lk(mu_);
   CollectionSpec spec;

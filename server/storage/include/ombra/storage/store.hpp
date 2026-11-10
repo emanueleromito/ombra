@@ -58,6 +58,9 @@ class Store {
   // The stored envelope of a key kind (false if none was uploaded).
   bool get_key_file(const std::string& collection, const std::string& kind,
                     std::vector<std::uint8_t>* out) const;
+  // Locked snapshots for the search path (the catalog() accessor is not serialised with writers).
+  std::vector<SegmentRow> segments(const std::string& collection) const;
+  std::vector<std::string> tombstones(const std::string& collection) const;
   const std::string& openfhe_version() const { return ofhe_; }
 
   SegmentData read_segment(const std::string& collection, const std::string& segment) const;
