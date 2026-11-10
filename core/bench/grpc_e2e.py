@@ -41,6 +41,7 @@ check of the pipeline, not the rule's verdict (the rule needs 1,000 queries on 2
 from __future__ import annotations
 
 import json
+import faulthandler
 import math
 import multiprocessing as mp
 import os
@@ -53,6 +54,7 @@ from collections import deque
 from pathlib import Path
 from typing import Any
 
+os.environ.setdefault("GRPC_ENABLE_FORK_SUPPORT", "0")  # the pool forks with a gRPC channel open
 os.environ.setdefault("OMP_NUM_THREADS", "1")  # one thread per forked worker (no oversubscription)
 
 import numpy as np  # noqa: E402
@@ -470,10 +472,12 @@ def _run_case(
     )
     cl = ec.OmbraClient(pb, pbg, server.address, preset, VERSION)
     pool = None
+    faulthandler.dump_traceback_later(900, repeat=True)  # a hang shows where, in the log
     try:
         t = time.perf_counter()
         cl.make_keys(D + sum(CARDS))
         result["keygen_s"] = time.perf_counter() - t
+        print(f"[t2.10 {preset} n={n}] keys generated in {result['keygen_s']:.0f}s", flush=True)
         files = cl.key_files()
         result["key_bytes"] = {str(k): len(v) for k, v in files.items()}
         cl.create_collection(cl.make_spec("bench", D, CARDS, c_count))
@@ -488,6 +492,7 @@ def _run_case(
         n_workers = workers or len(os.sched_getaffinity(0))
         pool = mp.get_context("fork").Pool(n_workers)
         result["client_workers"] = n_workers
+        print(f"[t2.10 {preset} n={n}] pool of {n_workers} workers, {len(blocks) + 1} block tasks", flush=True)
 
         # ---- ingest: encrypt in the pool, upload from this process ----
         tasks = [(c, False, a, b) for c, a, b in blocks] + [(c_count, True, 0, 0)]
@@ -495,6 +500,7 @@ def _run_case(
         t_upload = cpu_enc = 0.0
         sent = 0
         pending: deque = deque()
+        n_up = [0]
 
         def upload(res: tuple) -> None:
             nonlocal t_upload, cpu_enc, sent
@@ -508,6 +514,9 @@ def _run_case(
             t_upload += time.perf_counter() - t1
             cpu_enc += cpu
             sent += sum(len(c) for c in cols)
+            n_up[0] += 1
+            if n_up[0] % 10 == 1:
+                print(f"[t2.10 {preset} n={n}] uploaded {n_up[0]} blocks", flush=True)
 
         for task in tasks:
             while len(pending) >= n_workers + 2:
