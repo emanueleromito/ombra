@@ -14,9 +14,9 @@ and checks the refusals: wrong request key tag, query made under another key, ke
 belong to the collection's key tag, search before the keys are uploaded, wrong filter_leaves.
 
 This test then decrypts the engine's output with the secret key (held only here, never passed to the
-engine) and checks slot = score + 4 * c against numpy (c = number of matching filter fields, decision
-0019), that the band decode recovers c, and that deleted vectors fall below every live slot. The
-tolerances below are sanity bounds; exactness is the driver's job. Data is synthetic; only
+engine) and checks slot = score + 4 * c against numpy (c = number of matching filter fields,
+decision 0019), that the band decode recovers c, and that deleted vectors fall below every live
+slot. The tolerances below are sanity bounds; exactness is the driver's job. Data is synthetic; only
 aggregates are printed.
 """
 
@@ -91,7 +91,8 @@ def test_search_engine_exact_and_correct(tmp_path: Path, preset: str) -> None:
 
     assert ofhe.SerializeToFile(str(tmp_path / "context.bin"), cc, ofhe.BINARY)
     assert cc.SerializeEvalAutomorphismKey(str(tmp_path / "autokeys.bin"), ofhe.BINARY)
-    assert ofhe.CryptoContext.SerializeEvalMultKey(str(tmp_path / "evalmult.bin"), ofhe.BINARY, key_tag)
+    evalmult = str(tmp_path / "evalmult.bin")
+    assert ofhe.CryptoContext.SerializeEvalMultKey(evalmult, ofhe.BINARY, key_tag)
 
     rng = np.random.default_rng(SEED)
     vectors: dict[tuple[int, int], np.ndarray] = {}
@@ -104,7 +105,7 @@ def test_search_engine_exact_and_correct(tmp_path: Path, preset: str) -> None:
             fv[:n_ids, f] = rng.integers(0, card, size=n_ids)
         vectors[(cluster, idx)], fields[(cluster, idx)] = vec, fv
     # Some vectors match the filter, including deleted ones (so the penalty matters).
-    for (cl, idx, slot) in [(0, 0, 0), (0, 0, 1), (0, 1, 2), (1, 0, 2), (2, 0, 0), (2, 0, 3)]:
+    for cl, idx, slot in [(0, 0, 0), (0, 0, 1), (0, 1, 2), (1, 0, 2), (2, 0, 0), (2, 0, 3)]:
         fields[(cl, idx)][slot] = WANT
 
     for cluster, idx, n_ids in BLOCKS:
@@ -217,4 +218,6 @@ def test_search_engine_exact_and_correct(tmp_path: Path, preset: str) -> None:
         if filtered:
             n_live_matches += int((live & (c_true == len(CARDS))).sum())
     assert n_live_matches > 0  # the filter matched some live vectors
-    print(f"preset={preset} max_err_stage2={worst['score']:.3e} max_err_stage1={worst['stage1']:.3e}")
+    print(
+        f"preset={preset} max_err_stage2={worst['score']:.3e} max_err_stage1={worst['stage1']:.3e}"
+    )
