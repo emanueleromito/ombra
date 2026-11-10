@@ -45,6 +45,13 @@ T2.10 (`--task t2.10`): end-to-end over gRPC at 100k and 1M, see grpc_e2e.py.
 
 from __future__ import annotations
 
+import os as _os
+import sys as _sys
+
+# Before openfhe loads: forked client workers can deadlock if the parent has OpenMP threads.
+if "t2.10" in _sys.argv:
+    _os.environ["OMP_NUM_THREADS"] = "1"
+
 import argparse
 import json
 import os

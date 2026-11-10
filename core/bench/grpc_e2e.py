@@ -41,6 +41,7 @@ check of the pipeline, not the rule's verdict (the rule needs 1,000 queries on 2
 from __future__ import annotations
 
 import json
+import faulthandler
 import math
 import multiprocessing as mp
 import os
@@ -53,7 +54,8 @@ from collections import deque
 from pathlib import Path
 from typing import Any
 
-os.environ.setdefault("OMP_NUM_THREADS", "1")  # one thread per forked worker (no oversubscription)
+os.environ.setdefault("GRPC_ENABLE_FORK_SUPPORT", "0")  # the pool forks with a gRPC channel open
+os.environ["OMP_NUM_THREADS"] = "1"  # one thread per forked worker (no oversubscription)
 
 import numpy as np  # noqa: E402
 
@@ -108,6 +110,32 @@ def _ct_envelope(ct: Any) -> bytes:
     finally:
         Path(path).unlink(missing_ok=True)
     return write_envelope(Kind.CIPHERTEXT, st["preset"], VERSION, raw)
+
+
+class _InlinePool:
+    """workers = 1: run in this process (a way to tell a pool hang from an encryption bug)."""
+
+    class _Done:
+        def __init__(self, v: Any) -> None:
+            self._v = v
+
+        def get(self) -> Any:
+            return self._v
+
+    def apply_async(self, fn: Any, args: tuple) -> Any:
+        return self._Done(fn(*args))
+
+    def map(self, fn: Any, items: Any, chunksize: int = 1) -> list:
+        return [fn(x) for x in items]
+
+    def close(self) -> None:
+        pass
+
+    def terminate(self) -> None:
+        pass
+
+    def join(self) -> None:
+        pass
 
 
 def _enc_block(
@@ -465,15 +493,22 @@ def _run_case(
         raise SystemExit("ombra_server not found; build with `make build` (or via modal_app)")
     pb, pbg = ec.load_stubs(tmp / "stubs")
     data_dir = tmp / "data"
-    server = ec.ServerProcess(
-        binary, data_dir, VERSION, tmp / "server.log", GPU_BUDGET_MB, HOST_BUDGET_MB
-    )
+    omp = os.environ.pop("OMP_NUM_THREADS", None)  # the server keeps its own thread default
+    try:
+        server = ec.ServerProcess(
+            binary, data_dir, VERSION, tmp / "server.log", GPU_BUDGET_MB, HOST_BUDGET_MB
+        )
+    finally:
+        if omp is not None:
+            os.environ["OMP_NUM_THREADS"] = omp
     cl = ec.OmbraClient(pb, pbg, server.address, preset, VERSION)
     pool = None
+    faulthandler.dump_traceback_later(900, repeat=True)  # a hang shows where, in the log
     try:
         t = time.perf_counter()
         cl.make_keys(D + sum(CARDS))
         result["keygen_s"] = time.perf_counter() - t
+        print(f"[t2.10 {preset} n={n}] keys generated in {result['keygen_s']:.0f}s", flush=True)
         files = cl.key_files()
         result["key_bytes"] = {str(k): len(v) for k, v in files.items()}
         cl.create_collection(cl.make_spec("bench", D, CARDS, c_count))
@@ -486,8 +521,9 @@ def _run_case(
             db=db, fields=fields, order=order, centers=centers,
         )  # fmt: skip
         n_workers = workers or len(os.sched_getaffinity(0))
-        pool = mp.get_context("fork").Pool(n_workers)
+        pool = _InlinePool() if n_workers == 1 else mp.get_context("fork").Pool(n_workers)
         result["client_workers"] = n_workers
+        print(f"[t2.10 {preset} n={n}] pool of {n_workers} workers, {len(blocks) + 1} block tasks", flush=True)
 
         # ---- ingest: encrypt in the pool, upload from this process ----
         tasks = [(c, False, a, b) for c, a, b in blocks] + [(c_count, True, 0, 0)]
@@ -495,6 +531,7 @@ def _run_case(
         t_upload = cpu_enc = 0.0
         sent = 0
         pending: deque = deque()
+        n_up = [0]
 
         def upload(res: tuple) -> None:
             nonlocal t_upload, cpu_enc, sent
@@ -508,6 +545,9 @@ def _run_case(
             t_upload += time.perf_counter() - t1
             cpu_enc += cpu
             sent += sum(len(c) for c in cols)
+            n_up[0] += 1
+            if n_up[0] % 10 == 1:
+                print(f"[t2.10 {preset} n={n}] uploaded {n_up[0]} blocks", flush=True)
 
         for task in tasks:
             while len(pending) >= n_workers + 2:
