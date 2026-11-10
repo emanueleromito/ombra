@@ -26,7 +26,7 @@ T3.2 and T3.3 can run in parallel after T3.1. T3.6 needs the server API from M2 
 **Depends on:** none
 **Steps:** package `ombra` with `Client` (sync) and `AsyncClient` (async) exposing the same methods; share the logic in a core layer that does no I/O; typed public functions; extras `[local]` and `[langchain]` declared; version number and API version exposed.
 **Done when:** both clients import and expose identical method names and signatures (checked by a test), `make test` and `make lint` pass, and the package builds a wheel.
-**Status:** todo
+**Status:** done
 
 ### T3.2 Key file
 
