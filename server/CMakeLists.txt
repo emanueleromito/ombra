@@ -4,3 +4,5 @@ add_subdirectory(storage)
 add_subdirectory(cache)
 # T2.7 search engine: pure logic on the CPU, the engine with OMBRA_ENABLE_CUDA.
 add_subdirectory(search)
+# T2.7b gRPC server: policy on the CPU, service and executable with CUDA and gRPC for C++.
+add_subdirectory(grpc)
