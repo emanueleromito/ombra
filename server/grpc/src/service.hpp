@@ -46,6 +46,12 @@ class OmbraService final : public ombra::v1::Ombra::Service {
                         grpc::ServerWriter<v1::GetBlockResponse>*) override;
   grpc::Status ReplaceBlock(grpc::ServerContext*, grpc::ServerReader<v1::ReplaceBlockRequest>*,
                             v1::ReplaceBlockResponse*) override;
+  grpc::Status PutBlob(grpc::ServerContext*, grpc::ServerReader<v1::PutBlobRequest>*,
+                       v1::PutBlobResponse*) override;
+  grpc::Status GetBlob(grpc::ServerContext*, const v1::GetBlobRequest*,
+                       grpc::ServerWriter<v1::GetBlobResponse>*) override;
+  grpc::Status DeleteBlobs(grpc::ServerContext*, const v1::DeleteBlobsRequest*,
+                           v1::DeleteBlobsResponse*) override;
 
  private:
   // The RPC bodies; the public overrides check the API key and record metrics around them.
@@ -81,6 +87,12 @@ class OmbraService final : public ombra::v1::Ombra::Service {
   grpc::Status run_ReplaceBlock(grpc::ServerContext*,
       grpc::ServerReader<v1::ReplaceBlockRequest>*,
       v1::ReplaceBlockResponse*);
+  grpc::Status run_PutBlob(grpc::ServerContext*, grpc::ServerReader<v1::PutBlobRequest>*,
+                           v1::PutBlobResponse*);
+  grpc::Status run_GetBlob(grpc::ServerContext*, const v1::GetBlobRequest*,
+                           grpc::ServerWriter<v1::GetBlobResponse>*);
+  grpc::Status run_DeleteBlobs(grpc::ServerContext*, const v1::DeleteBlobsRequest*,
+                               v1::DeleteBlobsResponse*);
   template <class Resp, class Fn>
   grpc::Status guarded(grpc::ServerContext* ctx, Rpc rpc, Resp* resp, Fn&& fn);
 

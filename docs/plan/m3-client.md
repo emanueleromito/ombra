@@ -49,15 +49,14 @@ T3.2 and T3.3 can run in parallel after T3.1. T3.6 needs the server API from M2 
 **Depends on:** T3.2, T2.4
 **Steps:** a fresh AES-256-GCM key per document, wrapped with the document master key; encrypt document text and metadata; store an AES-GCM-encrypted copy of each vector with its document, for exact re-ranking on the client; bind the document id and collection id as associated data; define the stored layout and its version. Pad every encrypted document blob to one of a few fixed size buckets so the server never sees an unpadded document size. Two storage modes per document: the whole file stored as an encrypted blob on the server, or only an encrypted reference (URI and content hash) to the customer's own storage; the reference mode is the default above a size threshold (large files). Server side: the M2 server has no blob store, so add an encrypted blob store with put, fetch-by-ID and delete (gRPC API, versioned format), under the same storage and crash-safety rules as segments (atomic write, fsync, catalog entry, recovery on restart); it stores opaque bytes only.
 **Done when:** tests show a round trip, refusal of a changed ciphertext, refusal of a document moved to another id (associated data), that the stored record holds no plaintext, that stored blob sizes are only bucket sizes, that both storage modes round-trip (reference mode default above the threshold), and that the server blob store survives a crash between write and catalog commit with no partial or orphaned blob visible.
-**Status:** todo
-
+**Status:** done
 ### T3.5 Collection create
 
 **Why:** clustering and encrypted centers are what make the two-stage search possible.
 **Depends on:** T3.2, T3.3, T2.4
 **Steps:** cluster the vectors with faiss k-means; encrypt the cluster centers; generate the evaluation keys and upload them once; create the collection on the server; a re-clustering job that builds a new clustering, swaps it in and repacks blocks as it rewrites them, dropping deleted slots via ReplaceBlock (T2.8); a standalone repack (ListBlocks, GetBlock, decrypt, drop deleted slots, re-encrypt, ReplaceBlock, from T2.8) for any block over 30% deleted slots (threshold configurable).
 **Done when:** a test on a synthetic corpus creates a collection against the server (or the local mode) and the clusters, centers and keys are present; re-clustering keeps search working and the results correct during and after; a block with 30% or more deleted slots is repacked and the stored bytes fall accordingly, with unchanged results.
-**Status:** todo
+**Status:** done
 
 ### T3.6 Insert, delete and search
 

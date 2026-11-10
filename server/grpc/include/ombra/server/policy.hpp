@@ -29,6 +29,7 @@ enum class Err : int {
   Internal = 11,
   BlockNotFound = 12,
   BlockMismatch = 13,
+  BlobNotFound = 14,
 };
 
 struct Status {

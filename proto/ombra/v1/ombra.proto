@@ -21,6 +21,13 @@ enum Limit {
   LIMIT_MAX_FILTER_FIELDS = 16;         // F; the preset's headroom may lower it (see below)
   LIMIT_MAX_FILTER_CARDINALITY = 64;    // values per field (higher cardinality is hashed)
   LIMIT_MAX_CLUSTERS_PER_ROUND = 4096;
+  // Encrypted blob sizes (T3.4): a stored blob is exactly one of these sizes, never another, so
+  // the server learns only the bucket of a document, not its size. Larger files are kept in the
+  // customer's own storage and the blob holds an encrypted reference.
+  LIMIT_BLOB_BUCKET_0 = 16384;
+  LIMIT_BLOB_BUCKET_1 = 262144;
+  LIMIT_BLOB_BUCKET_2 = 2097152;
+  LIMIT_BLOB_BUCKET_3 = 16777216;
 }
 
 enum ErrorCode {
@@ -37,7 +44,8 @@ enum ErrorCode {
   ERROR_BAD_SEQUENCE = 10;          // stream messages out of order
   ERROR_INTERNAL = 11;
   ERROR_BLOCK_NOT_FOUND = 12;       // no such block (segment) in the collection
-  ERROR_BLOCK_MISMATCH = 13;        // ReplaceBlock ids are not exactly the live ids, or cluster/columns differ
+  ERROR_BLOCK_MISMATCH = 13;
+  ERROR_BLOB_NOT_FOUND = 14;        // no blob with this (kind, id) in the collection        // ReplaceBlock ids are not exactly the live ids, or cluster/columns differ
 }
 
 message Error {
@@ -206,6 +214,45 @@ message ReplaceBlockResponse {
   Error error = 3;
 }
 
+// Encrypted blob store (T3.4). Blobs are opaque client ciphertexts (the client's versioned
+// document layout); the server never parses them. Keyed by (collection, kind, id). The size of
+// every blob must be one of the LIMIT_BLOB_BUCKET_* values, else ERROR_SIZE_LIMIT. Same storage
+// and crash-safety rules as segments: a blob is visible only after it is fully written, synced
+// and committed in the catalog; a crash leaves either the old blob or the new one, never a part.
+enum BlobKind {
+  BLOB_KIND_UNSPECIFIED = 0;
+  BLOB_KIND_RECORD = 1;     // per-vector record: encrypted vector copy and metadata
+  BLOB_KIND_DOCUMENT = 2;   // document body, or an encrypted reference to the customer's storage
+}
+message PutBlobHeader {
+  string collection = 1;
+  BlobKind kind = 2;
+  bytes id = 3;              // at most LIMIT_MAX_ID_BYTES
+  uint64 size = 4;           // total bytes that follow; must be a bucket size
+}
+// Client stream: one header, then `data` chunks (each at most LIMIT_MAX_CHUNK_BYTES) whose
+// lengths sum to `size`. An existing blob with the same key is replaced atomically.
+message PutBlobRequest {
+  uint32 api_version = 1;    // must be 1 (the blob is stored)
+  oneof part { PutBlobHeader header = 2; bytes data = 3; }
+}
+message PutBlobResponse { uint32 api_version = 1; Error error = 2; }
+
+message GetBlobRequest { uint32 api_version = 1; string collection = 2; BlobKind kind = 3; bytes id = 4; }
+// Server stream: `size` first, then `data` chunks in order.
+message GetBlobResponse {
+  uint32 api_version = 1;
+  oneof part { uint64 size = 2; bytes data = 3; Error error = 4; }
+}
+
+message DeleteBlobsRequest {
+  uint32 api_version = 1;
+  string collection = 2;
+  BlobKind kind = 3;
+  repeated bytes ids = 4;    // at most LIMIT_MAX_IDS_PER_REQUEST; missing ids are not an error
+}
+message DeleteBlobsResponse { uint64 deleted = 1; Error error = 2; }
+
 service Ombra {
   rpc CreateCollection(CreateCollectionRequest) returns (CreateCollectionResponse);
   rpc GetCollection(GetCollectionRequest) returns (GetCollectionResponse);
@@ -218,4 +265,7 @@ service Ombra {
   rpc ListBlocks(ListBlocksRequest) returns (ListBlocksResponse);
   rpc GetBlock(GetBlockRequest) returns (stream GetBlockResponse);
   rpc ReplaceBlock(stream ReplaceBlockRequest) returns (ReplaceBlockResponse);
+  rpc PutBlob(stream PutBlobRequest) returns (PutBlobResponse);
+  rpc GetBlob(GetBlobRequest) returns (stream GetBlobResponse);
+  rpc DeleteBlobs(DeleteBlobsRequest) returns (DeleteBlobsResponse);
 }

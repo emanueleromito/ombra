@@ -64,6 +64,7 @@ Store::Store(std::string root, std::string openfhe_version)
   make_dir(root_);
   make_dir(segments_dir());
   make_dir(root_ + "/keys");
+  make_dir(blob_dir());
   catalog_ = std::make_unique<Catalog>(root_ + "/catalog.db");
   wal_ = std::make_unique<Wal>(wal_path());
   recover();
@@ -96,9 +97,9 @@ bool Store::is_live_data_id(const std::string& collection, const std::string& id
 bool Store::drop_collection(const std::string& name) {
   std::lock_guard lk(mu_);
   const auto t0 = std::chrono::steady_clock::now();
-  std::vector<std::string> segs, keys;
+  std::vector<std::string> segs, keys, blobs;
   maybe_crash(CrashPoint::DropBeforeCatalog);
-  if (!catalog_->drop_collection(name, &segs, &keys)) return false;
+  if (!catalog_->drop_collection(name, &segs, &keys, &blobs)) return false;
   maybe_crash(CrashPoint::DropAfterCatalog);
   wal_->reset();  // everything in the log is in the (durable) catalog or belongs to this collection
   maybe_crash(CrashPoint::DropAfterWalReset);
@@ -109,9 +110,11 @@ bool Store::drop_collection(const std::string& name) {
     first = false;
   }
   for (const auto& f : keys) ::unlink((root_ + "/keys/" + f).c_str());
+  for (const auto& f : blobs) ::unlink((blob_dir() + "/" + f).c_str());
+  fsync_path(blob_dir());
   fsync_path(segments_dir());
   fsync_path(root_ + "/keys");
-  log_line("drop", segs.size() + keys.size(), 0, ms_since(t0));
+  log_line("drop", segs.size() + keys.size() + blobs.size(), 0, ms_since(t0));
   return true;
 }
 
@@ -370,6 +373,58 @@ void Store::put_key_files(const std::string& collection,
   }
 }
 
+void Store::put_blob(const std::string& collection, std::uint32_t kind, const std::string& id,
+                     const std::vector<std::uint8_t>& payload) {
+  std::lock_guard lk(mu_);
+  const auto t0 = std::chrono::steady_clock::now();
+  if (!is_blob_kind(kind)) throw BlobKindError("unknown blob kind");
+  if (!is_blob_bucket(payload.size())) throw BlobSizeError("blob size is not a bucket size");
+  if (!catalog_->get_collection(collection, nullptr)) throw std::runtime_error("unknown collection");
+  const std::string file = hex_name('b', catalog_->next_segment_id(), ".oblob");
+  const std::string path = blob_dir() + "/" + file;
+  std::string old;
+  bool had = false;
+  try {
+    write_blob_file(path, kind, payload);  // BlobBeforeRename / BlobAfterRename fire inside
+    had = catalog_->put_blob(collection, kind, id, file, payload.size(), &old);
+  } catch (...) {
+    std::string f;
+    if (!catalog_->get_blob(collection, kind, id, &f, nullptr) || f != file) {
+      ::unlink(path.c_str());
+      ::unlink((path + ".tmp").c_str());
+    }
+    throw;
+  }
+  maybe_crash(CrashPoint::BlobAfterCatalog);
+  if (had) ::unlink((blob_dir() + "/" + old).c_str());
+  fsync_path(blob_dir());
+  log_line("put_blob", 1, payload.size(), ms_since(t0));
+}
+
+bool Store::get_blob(const std::string& collection, std::uint32_t kind, const std::string& id,
+                     std::vector<std::uint8_t>* out) const {
+  std::lock_guard lk(mu_);
+  std::string file;
+  if (!catalog_->get_blob(collection, kind, id, &file, nullptr)) return false;
+  auto bytes = read_blob_file(blob_dir() + "/" + file, kind);
+  if (out) *out = std::move(bytes);
+  return true;
+}
+
+std::size_t Store::delete_blobs(const std::string& collection, std::uint32_t kind,
+                                const std::vector<std::string>& ids) {
+  std::lock_guard lk(mu_);
+  const auto t0 = std::chrono::steady_clock::now();
+  if (!is_blob_kind(kind)) throw BlobKindError("unknown blob kind");
+  if (!catalog_->get_collection(collection, nullptr)) throw std::runtime_error("unknown collection");
+  const auto files = catalog_->delete_blobs(collection, kind, ids);
+  maybe_crash(CrashPoint::BlobDeleteAfterCatalog);
+  for (const auto& f : files) ::unlink((blob_dir() + "/" + f).c_str());
+  fsync_path(blob_dir());
+  log_line("delete_blobs", files.size(), 0, ms_since(t0));
+  return files.size();
+}
+
 bool Store::get_key_file(const std::string& collection, const std::string& kind,
                          std::vector<std::uint8_t>* out) const {
   std::lock_guard lk(mu_);
@@ -459,6 +514,17 @@ void Store::recover() {
     for (const auto& n : list_dir(root_ + "/keys"))
       if (ends_with(n, ".tmp") || !known_keys.count(n)) {
         if (::unlink((root_ + "/keys/" + n).c_str()) == 0) ++stats_.orphans_removed;
+      }
+  }
+
+  // Blob files: temp files and files no catalog row points to (aborted put, replaced or deleted
+  // blob whose old file was not yet unlinked, dropped collection).
+  {
+    auto bf = catalog_->all_blob_files();
+    std::set<std::string> known_blobs(bf.begin(), bf.end());
+    for (const auto& n : list_dir(blob_dir()))
+      if (ends_with(n, ".tmp") || !known_blobs.count(n)) {
+        if (::unlink((blob_dir() + "/" + n).c_str()) == 0) ++stats_.orphans_removed;
       }
   }
 
