@@ -79,6 +79,7 @@ image = (
         "openssl",  # T2.9: tests make a self-signed certificate with the CLI
     )
     .pip_install("grpcio", "grpcio-tools")
+    .pip_install("cryptography")  # client key file and document blobs (AES-GCM)
     # Source code last, so code changes don't rebuild OpenFHE.
     # Allowlist, not a blocklist: see modal_upload.py. The callable gets paths relative to ".".
     .add_local_dir(".", remote_path=REPO_DIR, ignore=_upload_ignore)
