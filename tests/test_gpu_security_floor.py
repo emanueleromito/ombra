@@ -65,7 +65,8 @@ def _run(name: str, ctx: Path, tmp: Path, limit: str | None) -> subprocess.Compl
     env = {k: v for k, v in os.environ.items() if k != "OMBRA_TEST_LOG2QP_LIMIT"}
     if limit is not None:
         env["OMBRA_TEST_LOG2QP_LIMIT"] = limit
-    args = [str(ctx)] + [str(tmp / a) if not a.isdigit() and a != "f64" else a for a in DRIVERS[name]]
+    args = [str(ctx)]
+    args += [str(tmp / a) if not a.isdigit() and a != "f64" else a for a in DRIVERS[name]]
     return subprocess.run(
         [str(_driver(name)), *args], capture_output=True, text=True, env=env, timeout=120
     )
@@ -105,7 +106,8 @@ def test_library_entry_points_refuse(preset: str, tmp_path: Path) -> None:
     cc.EvalMultKeyGen(keys.secretKey)
     ctx, evk, ctf = tmp_path / "context.bin", tmp_path / "evalmult.bin", tmp_path / "ct.bin"
     assert ofhe.SerializeToFile(str(ctx), cc, ofhe.BINARY)
-    assert ofhe.CryptoContext.SerializeEvalMultKey(str(evk), ofhe.BINARY, keys.publicKey.GetKeyTag())
+    tag = keys.publicKey.GetKeyTag()
+    assert ofhe.CryptoContext.SerializeEvalMultKey(str(evk), ofhe.BINARY, tag)
     ct = cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext([0.5, 0.25, 0.125]))
     assert ofhe.SerializeToFile(str(ctf), ct, ofhe.BINARY)
 

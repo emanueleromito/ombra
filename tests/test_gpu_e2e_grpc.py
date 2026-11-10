@@ -210,7 +210,7 @@ def dep(request, tmp_path_factory):
 
 @pytest.fixture(scope="module")
 def dep_c(tmp_path_factory):
-    """A second deployment whose server compacts every 200 ms (compact preset only: it is faster)."""
+    """A second deployment whose server compacts every 200 ms (compact preset only, faster)."""
     d = Deployment(
         tmp_path_factory.mktemp("compact"), "m0_compact_n8192", ("--compact-interval-ms", "200")
     )
@@ -617,7 +617,7 @@ def test_9_merge_two_half_deleted_blocks_into_one(dep_c: Deployment) -> None:
     def file_size(ids, cols) -> int:
         return 22 + sum(4 + len(i) for i in ids) + sum(8 + len(c) for c in cols)
 
-    for (sg, ids, cols), size in zip(old_files, sizes_old, strict=True):
+    for (_sg, ids, cols), size in zip(old_files, sizes_old, strict=True):
         assert size == file_size(ids, cols)
     assert _file_size(dep_c, new_segment) == file_size(live_ids, new_cols)
     one_block_columns = sum(8 + len(c) for c in old_files[0][2])

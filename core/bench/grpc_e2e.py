@@ -40,8 +40,8 @@ check of the pipeline, not the rule's verdict (the rule needs 1,000 queries on 2
 
 from __future__ import annotations
 
-import json
 import faulthandler
+import json
 import math
 import multiprocessing as mp
 import os
@@ -523,7 +523,8 @@ def _run_case(
         n_workers = workers or len(os.sched_getaffinity(0))
         pool = _InlinePool() if n_workers == 1 else mp.get_context("fork").Pool(n_workers)
         result["client_workers"] = n_workers
-        print(f"[t2.10 {preset} n={n}] pool of {n_workers} workers, {len(blocks) + 1} block tasks", flush=True)
+        tasks = len(blocks) + 1
+        print(f"[t2.10 {preset} n={n}] pool of {n_workers} workers, {tasks} tasks", flush=True)
 
         # ---- ingest: encrypt in the pool, upload from this process ----
         tasks = [(c, False, a, b) for c, a, b in blocks] + [(c_count, True, 0, 0)]

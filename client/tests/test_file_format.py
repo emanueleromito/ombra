@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from ombra.file_format import EnvelopeError, Kind, read_envelope, write_envelope
 
 FIXTURE = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "envelope_v1_ciphertext.bin"
