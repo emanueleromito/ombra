@@ -33,11 +33,46 @@ A field has V possible values, fixed when the collection is created. Every vecto
 - **Not an access boundary:** the client holds the secret key of the whole collection and decrypts every score in the blocks it searches. Filters shape relevance; they do not protect other tenants' data from a client with the key.
 - **Left out:** ranges (dates, numbers) as such, text search, and substring match. A range can be approximated by one-hot bins (month, price band), where a range is then an OR of bins and costs the bins' columns.
 
+## Headroom: the largest value a filtered score may hold (measured)
+
+A decrypted slot is `score + lambda * c` with |score| <= 1 and c <= F, so |slot| <= 1 + lambda * F (lambda = 4). `client/tests/test_filter_headroom.py` sweeps a value 2^k through 0, 1 and 2 multiply-and-rescale steps and records the largest k that decrypts within a relative error of 1e-3 (Modal, CPU, OpenFHE 1.6.1):
+
+| Preset | first modulus / scale | cliff at level 1 (where B decrypts) | cliff at level 2 (if a path rescales twice) | Allowed value (cliff - margin) | F_max |
+| --- | --- | --- | --- | --- | --- |
+| `m0_depth2` | 60 / 50 bits | 2^56 | 2^21 | 64 = 2^6 | **15** (1 + 4*15 = 61) |
+| `m0_compact_n8192` | 55 / 40 bits | 2^56 | 2^25 | 2048 = 2^11 | **16** (limit `LIMIT_MAX_FILTER_FIELDS`; the headroom alone would allow 511) |
+
+The allowed value is the textbook bound at the lowest level, `2^(first modulus bits - scale bits - 1)` = 2^9 and 2^14, less 3 bits. The measured cliffs are above that bound, so the bound is the safe side; the code does not rely on the measured cliff. The client refuses a schema whose F is above F_max of its preset (`ERROR_INVALID_FILTER_LAYOUT` on the server as well) and a query with d + sum(V) above N/2 (8192 at `m0_depth2`, 4096 at `m0_compact_n8192`), because the expansion tree separates index j from N - j. Noise on the true score also grows by about sqrt(1 + lambda^2 * F) (each of the F one-hot entries has weight lambda): 16x at F = 16. That is an estimate; T2.7 measures it.
+
+## Selective filters
+
+Stage 1 scores cluster centers, and a center block has no filter columns, so it cannot tell which clusters hold matches. A selective filter (few matching vectors) can leave fewer than k matches in the clusters chosen. Client behaviour, required of the client library (M3) and of the T2.7 end-to-end test:
+
+1. After each round, decrypt, decode c and count vectors with c at the required value. If the count is at least k, finish.
+2. If fewer than k, send another `SearchChosen` on the same stream with the next clusters by stage-1 score (the server keeps the expansion), growing the number of clusters per round by 2x, up to `max_probe` clusters (client setting, default 8x the first round).
+3. If still fewer than k after `max_probe` and the security level is Fast or Decoy, fall back to **Strict**: search all clusters, only if the caller allows it (`strict_fallback`, default on); otherwise return what was found and say `incomplete = true`. Strict mode itself needs no fallback.
+4. Never pad silently: a short answer is reported as short.
+
+Each extra round shows the server that the filter matched few vectors in the clusters already searched, and which clusters came next. Strict fallback shows that the filter was very selective. This goes into the threat model (`docs/product-requirements.md`). A caller who cannot accept it sets a fixed probe budget so every query searches the same number of clusters regardless of the filter; that costs the same latency for every query.
+
+## Cost with D = d + sum(V) query entries
+
+Measured constants are `m0_depth2` on an A100 from T0.4/T0.5/T1.4; the compact preset scales with its smaller ciphertexts (T2.2: 0.52x to 0.65x end to end).
+
+- **Query upload:** one ciphertext, unchanged, while D <= N/2. Query entries beyond d are free to send.
+- **Expansion:** `T_expand ~= 0.047 ms * D` (18.33 ms at 384, 35.78 at 768, 70.83 at 1536). Automorphism key bytes `~= 24.5 MB + 4.55 KB * D`. The expansion depth is L = ceil(log2(2D)).
+- **Search per block (stage 2):** reads D columns of 786,432 B each (about 394,000 B at compact), so the kernel time is `T_search(d) * D / d` (memory-bound, T1.4), plus one relinearize and one rescale per block, where A would also pay a ciphertext multiply and a second relinearize and rescale. Stage 1 reads d columns only. Example: d = 768 and 3 fields of 16 values (D = 816): +6.3% search, +2.3 ms expansion.
+- **Storage:** 96 B per vector per column in both presets. Per field: `96 * V` B per vector (8 values 768 B, 32 values 3,072 B, 64 values 6,144 B); per vector in total `96 * D` B.
+
 ## Decision
 
-Proposed: **B**, the additive penalty, folded into the vector query. It stays within depth 2 (it uses 1), removes the AND limit of A and the zero-score ambiguity, and needs no new kernel. A is the fallback if the decode rule in B turns out to hurt recall.
+**B**, the additive penalty folded into the vector query, chosen by the user on 2026-11-10. The record stays **proposed** until T2.7 has the following in it, measured on the compact preset and on `m0_depth2`, with an oracle test for the new device path (hard rule 3):
 
-Not yet checked, and required before this is accepted (T2.7, with an oracle test as for any new path): that the compact preset's score error stays far below the band gap when scores reach lambda * F, and that the decision-0012 recall rule still passes with the filter columns in the sum. Nothing in this record is measured.
+1. The score error with filter columns in the sum, against the band gap (lambda - 2 = 2), at F = 1, 4 and F_max.
+2. The decision-0012 recall rule with the extra columns.
+3. Recall of the filtered top-10 against brute-force filtered ground truth, at filter selectivity of about 1%, 10% and 50%, with the number of extra rounds the fallback needed.
+
+A is the fallback if the decode rule hurts recall.
 
 ## Consequences
 
