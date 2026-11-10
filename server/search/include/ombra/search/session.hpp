@@ -37,6 +37,7 @@ namespace ombra::search {
 
 namespace detail {
 struct EngineCore;  // defined in session.cpp
+struct Coll;
 }
 
 // Error classes the service maps to proto ErrorCode.
@@ -100,6 +101,17 @@ class SearchSession {
   std::unique_ptr<Impl> impl_;
 };
 
+// Keys of one collection that were read and checked (key tag, security floor, layout) but are not
+// installed in the engine yet. Lets the service validate an upload before anything is stored.
+class PreparedKeys {
+ public:
+  PreparedKeys() = default;
+
+ private:
+  friend class SearchEngine;
+  std::shared_ptr<detail::Coll> c_;
+};
+
 class SearchEngine {
  public:
   SearchEngine(storage::Store& store, const EngineConfig& config);
@@ -113,6 +125,13 @@ class SearchEngine {
   // absent), KeyTagMismatch (a key file was made under another key than spec.key_tag),
   // InvalidQuery (layout above the preset's limits).
   void load_collection(const std::string& collection);
+  // The same checks on key files held in memory, without touching the store or the engine's
+  // collections (a refused upload leaves the loaded keys of the collection as they were). Throws
+  // what load_collection throws. install_keys() then makes the result the collection's keys.
+  PreparedKeys prepare_keys(const std::string& collection, const std::vector<std::uint8_t>& context,
+                            const std::vector<std::uint8_t>& eval_mult,
+                            const std::vector<std::uint8_t>& automorphism);
+  void install_keys(PreparedKeys&& prepared);
 
   // Opens a session for one search stream. `key_tag` is the request's tag; `query_envelope` is a
   // 0016 envelope (kind ciphertext) holding the packed query of D = d + sum(V) entries;

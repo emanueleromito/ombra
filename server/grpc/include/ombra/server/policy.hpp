@@ -27,6 +27,8 @@ enum class Err : int {
   KeysMissing = 9,
   BadSequence = 10,
   Internal = 11,
+  BlockNotFound = 12,
+  BlockMismatch = 13,
 };
 
 struct Status {

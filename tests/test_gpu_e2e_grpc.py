@@ -21,9 +21,12 @@ k-th best true score, and that is counted and printed. Data is synthetic; only a
 
 from __future__ import annotations
 
+import threading
+import time
+
 import pytest
 
-np = pytest.importorskip("numpy")
+np =pytest.importorskip("numpy")
 pytest.importorskip("grpc")
 pytest.importorskip("grpc_tools")
 pytest.importorskip("openfhe")
@@ -54,13 +57,16 @@ def _ident(i: int) -> bytes:
 class Deployment:
     """Server process, client, plaintext data (kept for the oracles) and encrypted copies."""
 
-    def __init__(self, tmp, preset: str) -> None:
+    def __init__(self, tmp, preset: str, extra_args: tuple[str, ...] = ()) -> None:
         binary = ec.find_server_binary()
         if binary is None:
             pytest.fail("ombra_server not found; build with `make build` or `make test-gpu`")
         self.preset = preset
         self.pb, pbg = ec.load_stubs(tmp / "stubs")
-        self.server = ec.ServerProcess(binary, tmp / "data", VERSION, tmp / "server.log")
+        self.data_dir = tmp / "data"
+        self.server = ec.ServerProcess(
+            binary, self.data_dir, VERSION, tmp / "server.log", extra_args=extra_args
+        )
         self.client = ec.OmbraClient(self.pb, pbg, self.server.address, preset, VERSION)
         self.tol = TOL[preset]
         self.deleted: set[int] = set()
@@ -198,6 +204,16 @@ class Deployment:
 @pytest.fixture(scope="module", params=PRESETS)
 def dep(request, tmp_path_factory):
     d = Deployment(tmp_path_factory.mktemp(request.param), request.param)
+    yield d
+    d.close()
+
+
+@pytest.fixture(scope="module")
+def dep_c(tmp_path_factory):
+    """A second deployment whose server compacts every 200 ms (compact preset only: it is faster)."""
+    d = Deployment(
+        tmp_path_factory.mktemp("compact"), "m0_compact_n8192", ("--compact-interval-ms", "200")
+    )
     yield d
     d.close()
 
@@ -350,3 +366,156 @@ def test_5_refusals(dep: Deployment) -> None:
     assert code(lambda: cl.get_collection("nokeys")) == pb.ERROR_COLLECTION_NOT_FOUND
     names = [c.spec.name for c in cl.stub.ListCollections(pb.ListCollectionsRequest()).collections]
     assert names == ["docs"]
+
+
+def _segment_files(dep: Deployment) -> set[str]:
+    return {p.name for p in (dep.data_dir / "segments").iterdir()}
+
+
+def _stored_bytes(dep: Deployment) -> int:
+    return sum(p.stat().st_size for p in (dep.data_dir / "segments").iterdir())
+
+
+def _block_of(dep: Deployment, cluster: int):
+    (b,) = [b for b in dep.client.list_blocks("docs") if b.cluster_id == cluster]
+    return b
+
+
+def test_6_bad_key_upload_leaves_nothing(dep: Deployment) -> None:
+    """The key tag is checked before anything is stored: no key file, no catalog row."""
+    import sqlite3
+
+    cl, pb = dep.client, dep.pb
+    keys_dir = dep.data_dir / "keys"
+    before = sorted(p.name for p in keys_dir.iterdir())
+    # The collection claims the other key pair's tag; the uploaded keys belong to the first one.
+    other_tag = cl.other.publicKey.GetKeyTag()
+    cl.create_collection(cl.make_spec("badkeys", D, CARDS, 2, key_tag=other_tag))
+    resp = cl.upload_keys("badkeys", cl.key_files())
+    assert resp.error.code == pb.ERROR_KEY_TAG_MISMATCH
+    assert sorted(p.name for p in keys_dir.iterdir()) == before
+    assert not cl.get_collection("badkeys").keys_uploaded
+    con = sqlite3.connect(f"file:{dep.data_dir / 'catalog.db'}?mode=ro", uri=True)
+    try:
+        n = con.execute("SELECT COUNT(*) FROM key_files WHERE collection='badkeys'").fetchone()[0]
+    finally:
+        con.close()
+    assert n == 0
+    # An upload with fewer than three kinds is refused the same way.
+    part = {k: v for k, v in cl.key_files().items() if k != pb.KEY_KIND_AUTOMORPHISM}
+    assert cl.upload_keys("badkeys", part).error.code == pb.ERROR_INVALID_ARGUMENT
+    assert sorted(p.name for p in keys_dir.iterdir()) == before
+    cl.drop_collection("badkeys")
+    # The loaded keys of the working collection are untouched.
+    res = _search_all(dep, dep.queries[0], [None, None])
+    want, true = dep.brute_force(dep.queries[0], [None, None])
+    dep.assert_same_topk(res.ids, want, true, "after bad upload")
+
+
+def test_7_dead_block_is_dropped_and_search_stays_correct(dep_c: Deployment) -> None:
+    cl, q = dep_c.client, dep_c.queries[0]
+    victim_cluster = 2
+    rows = [int(i) for i in np.nonzero(dep_c.assign == victim_cluster)[0]]
+    blk = _block_of(dep_c, victim_cluster)
+    assert blk.n_vectors == len(rows) and blk.n_deleted == 0
+    assert blk.segment in _segment_files(dep_c)
+    want, true = dep_c.brute_force(q, [None, None])
+    dep_c.assert_same_topk(_search_all(dep_c, q, [None, None]).ids, want, true, "before")
+
+    assert cl.delete("docs", [_ident(i) for i in rows]) == len(rows)
+    dep_c.deleted.update(rows)
+    want, true = dep_c.brute_force(q, [None, None])
+    assert not {_ident(i) for i in rows} & set(want)
+
+    errors: list[BaseException] = []
+    stop = threading.Event()
+
+    def searcher() -> None:
+        try:
+            while not stop.is_set():
+                got = _search_all(dep_c, q, [None, None])
+                dep_c.assert_same_topk(got.ids, want, true, "during compaction")
+                assert not {_ident(i) for i in rows} & set(got.ids)
+        except BaseException as e:  # noqa: BLE001
+            errors.append(e)
+
+    t = threading.Thread(target=searcher)
+    t.start()
+    try:
+        deadline = time.monotonic() + 30
+        while blk.segment in _segment_files(dep_c) and time.monotonic() < deadline:
+            time.sleep(0.1)
+        time.sleep(1.0)  # keep searching a little after the drop
+    finally:
+        stop.set()
+        t.join()
+    assert not errors, errors
+    assert blk.segment not in _segment_files(dep_c), "the dead block was not dropped"
+    assert all(b.cluster_id != victim_cluster for b in cl.list_blocks("docs"))
+    info = cl.get_collection("docs")
+    assert info.vector_count == N - len(rows) and info.deleted_count == 0
+    dep_c.assert_same_topk(_search_all(dep_c, q, [None, None]).ids, want, true, "after")
+    for wants in ([1, None], [None, 2]):
+        w, tr = dep_c.brute_force(q, wants)
+        dep_c.assert_same_topk(_search_all(dep_c, q, wants).ids, w, tr, f"after {wants}")
+
+
+def test_8_client_repack_with_get_and_replace_block(dep_c: Deployment) -> None:
+    cl, pb, q = dep_c.client, dep_c.pb, dep_c.queries[1]
+    cluster = 0
+    rows = [int(i) for i in np.nonzero(dep_c.assign == cluster)[0]]
+    assert len(rows) >= 4
+    victims = rows[::2]  # scattered deletes: every other slot
+    assert cl.delete("docs", [_ident(i) for i in victims]) == len(victims)
+    dep_c.deleted.update(victims)
+    blk = _block_of(dep_c, cluster)
+    assert blk.n_vectors == len(rows) and blk.n_deleted == len(victims)  # counts only
+    bytes_before = _stored_bytes(dep_c)
+
+    # The client repacks: decrypt every column, drop the deleted slots, re-encrypt.
+    header, cols = cl.get_block("docs", blk.segment)
+    ids = [bytes(i) for i in header.ids]
+    dead = list(header.deleted)
+    assert len(ids) == len(dead) == len(rows) and sum(dead) == len(victims)
+    live = [j for j, d in enumerate(dead) if not d][::-1]  # the client picks the slot order
+    new_cols = []
+    for env in cols:
+        vals = cl.decrypt_envelope(env)
+        packed = np.zeros(cl.slots)
+        packed[: len(live)] = vals[live]
+        new_cols.append(cl.ct_envelope(cl.encrypt(packed)))
+
+    live_ids = [ids[j] for j in live]
+    # Refusals first: a dead id kept, a live id missing; the block stays as it was.
+    with pytest.raises(ec.ApiError) as ei:
+        cl.replace_block("docs", blk.segment, ids, new_cols)
+    assert ei.value.code == pb.ERROR_BLOCK_MISMATCH
+    with pytest.raises(ec.ApiError) as ei:
+        cl.replace_block("docs", blk.segment, live_ids[1:], new_cols)
+    assert ei.value.code == pb.ERROR_BLOCK_MISMATCH
+    with pytest.raises(ec.ApiError) as ei:
+        cl.replace_block("docs", "s_missing.oseg", live_ids, new_cols)
+    assert ei.value.code == pb.ERROR_BLOCK_NOT_FOUND
+    assert _block_of(dep_c, cluster).segment == blk.segment
+
+    new_segment = cl.replace_block("docs", blk.segment, live_ids, new_cols)
+    assert new_segment != blk.segment
+    nb = _block_of(dep_c, cluster)
+    assert nb.segment == new_segment and nb.n_vectors == len(live_ids) and nb.n_deleted == 0
+    deadline = time.monotonic() + 10
+    while blk.segment in _segment_files(dep_c) and time.monotonic() < deadline:
+        time.sleep(0.1)
+    assert blk.segment not in _segment_files(dep_c)
+    # A column-packed block always holds full-size ciphertexts, so one repacked block is as big as
+    # before: ReplaceBlock reclaims slots, and bytes are reclaimed when blocks are dropped (test 7).
+    assert _stored_bytes(dep_c) <= bytes_before
+    info = cl.get_collection("docs")
+    data_blocks = [b for b in cl.list_blocks("docs") if b.cluster_id != CLUSTERS]
+    assert info.deleted_count == sum(b.n_deleted for b in data_blocks) == 0
+    assert info.vector_count == sum(b.n_vectors for b in data_blocks)
+
+    for wants in ([None, None], [1, None], [None, 2]):
+        got = _search_all(dep_c, q, wants)
+        w, tr = dep_c.brute_force(q, wants)
+        dep_c.assert_same_topk(got.ids, w, tr, f"after repack {wants}")
+        assert not {_ident(i) for i in victims} & set(got.ids)
