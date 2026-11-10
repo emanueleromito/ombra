@@ -67,6 +67,16 @@ image = (
     # T0.8: reads the Hugging Face parquet embedding shards. A layer after the OpenFHE build, so
     # OpenFHE is not rebuilt. (ann-benchmarks.com does not host the dbpedia hdf5, so no h5py.)
     .pip_install("pyarrow==17.0.0")
+    # T2.7b: gRPC for C++ (the server) and Python (tests/e2e_client.py). Layers after the OpenFHE
+    # build, so OpenFHE is not rebuilt.
+    .apt_install(
+        "libgrpc++-dev",
+        "libprotobuf-dev",
+        "protobuf-compiler",
+        "protobuf-compiler-grpc",
+        "pkg-config",
+    )
+    .pip_install("grpcio", "grpcio-tools")
     # Source code last, so code changes don't rebuild OpenFHE.
     # Allowlist, not a blocklist: see modal_upload.py. The callable gets paths relative to ".".
     .add_local_dir(".", remote_path=REPO_DIR, ignore=_upload_ignore)
