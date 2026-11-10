@@ -37,6 +37,13 @@ struct SegmentRow {
   std::uint32_t n_vectors = 0, n_columns = 0, crc = 0;
 };
 
+// Counts per stored block (segment); no ids. n_vectors includes tombstoned slots.
+struct BlockStat {
+  std::string segment;
+  std::uint32_t cluster = 0;
+  std::uint64_t n_vectors = 0, n_deleted = 0;
+};
+
 class Catalog {
  public:
   explicit Catalog(const std::string& path);
@@ -73,8 +80,25 @@ class Catalog {
   bool is_live_in_other_cluster(const std::string& collection, const std::string& id,
                                 std::uint32_t excluded_cluster) const;
 
+  // One row per block of the collection, ordered by segment name.
+  std::vector<BlockStat> block_stats(const std::string& collection) const;
+  // Segment row by file name (false if the collection has no such segment).
+  bool segment_row(const std::string& collection, const std::string& file, SegmentRow* out) const;
+  // Ids of the vectors stored in `file` that are not tombstoned.
+  std::vector<std::string> live_ids(const std::string& collection, const std::string& file) const;
+  // One transaction: removes the segment rows `files` with their vectors and tombstone rows.
+  void drop_segments(const std::string& collection, const std::vector<std::string>& files);
+  // One transaction: adds `neu`, moves the vectors rows of `old_file` that are live to it, removes
+  // the dead ones (vectors and tombstones) and the old segment row. Throws if the live ids of
+  // old_file differ from `live_ids` (as a set) or old_file is unknown; rolls back then.
+  void replace_segment(const std::string& collection, const std::string& old_file,
+                       const SegmentRow& neu, const std::vector<std::string>& live_ids);
+
   void put_key_file(const std::string& collection, const std::string& kind,
                     const std::string& file);
+  // One transaction for several kinds (kind, file).
+  void put_key_files(const std::string& collection,
+                     const std::vector<std::pair<std::string, std::string>>& kind_file);
   std::vector<std::pair<std::string, std::string>> key_files(const std::string& collection) const;
   std::vector<std::string> all_key_files() const;
 

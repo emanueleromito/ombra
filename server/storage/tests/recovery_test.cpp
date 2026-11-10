@@ -114,6 +114,63 @@ static void delete_case(CrashPoint p, bool expect_deleted, bool expect_crash) {
   }
 }
 
+static std::string segment_of(const std::string& root, std::uint32_t cluster) {
+  Store s(root, kOfhe);
+  for (auto& r : s.catalog().segments("docs"))
+    if (r.cluster == cluster) return r.file;
+  CHECK(false);
+  return {};
+}
+
+// drop_dead_blocks with a crash at p: block B is fully deleted, block A is partly deleted.
+static void drop_case(CrashPoint p, bool expect_dropped, bool expect_crash) {
+  TempDir d;
+  setup(d.path, true);
+  {
+    Store s(d.path, kOfhe);
+    s.remove("docs", {"b1", "b2", "a1"});
+  }
+  int code = run_child(d.path, p, [](Store& s) { CHECK(s.drop_dead_blocks("docs") == 1); });
+  CHECK(code == (expect_crash ? kCrashExitCode : 0));
+  for (int round = 0; round < 2; ++round) {
+    std::set<std::string> t;
+    auto have = check_consistent(d.path, &t);
+    CHECK(has_all(have, {"a1", "a2", "a3"}));  // the partly deleted block is never touched
+    if (expect_dropped) CHECK(has_none(have, kIdsB) && t == std::set<std::string>({"a1"}));
+    else CHECK(has_all(have, kIdsB) && t == std::set<std::string>({"a1", "b1", "b2"}));
+  }
+  Store s(d.path, kOfhe);  // idempotent: a second run finds the work done or does it now
+  s.drop_dead_blocks("docs");
+  CHECK(has_none(check_consistent(d.path, nullptr), kIdsB));
+}
+
+// replace_segment with a crash at p: block A lost a2; the client repacks to {a3, a1}.
+static void replace_case(CrashPoint p, bool expect_new, bool expect_crash) {
+  TempDir d;
+  setup(d.path, true);
+  {
+    Store s(d.path, kOfhe);
+    s.remove("docs", {"a2"});
+  }
+  const std::string old_file = segment_of(d.path, 0);
+  int code = run_child(d.path, p, [&](Store& s) {
+    s.replace_segment("docs", old_file, SegmentData{0, {"a3", "a1"}, cols(9)});
+  });
+  CHECK(code == (expect_crash ? kCrashExitCode : 0));
+  for (int round = 0; round < 2; ++round) {
+    std::set<std::string> t;
+    auto have = check_consistent(d.path, &t);
+    CHECK(has_all(have, {"a1", "a3"}) && has_all(have, kIdsB));  // no live id lost
+    if (expect_new) CHECK(!have.count("a2") && t.empty());
+    else CHECK(have.count("a2") && t == std::set<std::string>({"a2"}));
+    Store s(d.path, kOfhe);
+    const std::string f = segment_of(d.path, 0);
+    CHECK((f == old_file) == !expect_new);
+    auto sd = s.read_segment("docs", f);
+    CHECK(sd.ids.size() == (expect_new ? 2u : 3u));
+  }
+}
+
 int main() {
   std::fprintf(stderr, "[test] insert matrix\n");
   insert_case(CrashPoint::None, true, false);
@@ -130,6 +187,93 @@ int main() {
   delete_case(CrashPoint::DeleteAfterRecord, true, true);
   delete_case(CrashPoint::DeleteAfterCatalog, true, true);
 
+  std::fprintf(stderr, "[test] dead-block drop matrix\n");
+  drop_case(CrashPoint::None, true, false);
+  drop_case(CrashPoint::CompactBeforeCatalog, false, true);
+  drop_case(CrashPoint::CompactAfterCatalog, true, true);
+  drop_case(CrashPoint::CompactAfterUnlink, true, true);
+
+  std::fprintf(stderr, "[test] replace matrix\n");
+  replace_case(CrashPoint::None, true, false);
+  replace_case(CrashPoint::ReplaceBeforeNewFile, false, true);
+  replace_case(CrashPoint::ReplaceAfterNewFile, false, true);
+  replace_case(CrashPoint::ReplaceAfterCatalog, true, true);
+  replace_case(CrashPoint::ReplaceAfterUnlink, true, true);
+
+  {  // Stats, refusals, pins.
+    TempDir d;
+    setup(d.path, true);
+    Store s(d.path, kOfhe);
+    s.insert("docs", 4, {"ctr0"}, cols(1));  // a center block
+    s.remove("docs", {"a2", "b1", "b2"});
+    auto bs = s.block_stats("docs");
+    CHECK(bs.size() == 3);
+    for (auto& b : bs) {
+      if (b.cluster == 0) CHECK(b.n_vectors == 3 && b.n_deleted == 1);
+      else if (b.cluster == 1) CHECK(b.n_vectors == 2 && b.n_deleted == 2);
+      else CHECK(b.cluster == 4 && b.n_vectors == 1 && b.n_deleted == 0);
+    }
+    const std::string a = segment_of(d.path, 0), b = segment_of(d.path, 1), c = segment_of(d.path, 4);
+    // Refusals, each leaving the block as it was.
+    CHECK_THROWS(s.replace_segment("docs", "s_nope.oseg", SegmentData{0, {"a1", "a3"}, cols(9)}));
+    CHECK_THROWS(s.replace_segment("docs", a, SegmentData{0, {"a1", "a2", "a3"}, cols(9)}));  // dead id kept
+    CHECK_THROWS(s.replace_segment("docs", a, SegmentData{0, {"a1"}, cols(9)}));              // live id lost
+    CHECK_THROWS(s.replace_segment("docs", a, SegmentData{0, {"a1", "a3", "zz"}, cols(9)}));  // foreign id
+    CHECK_THROWS(s.replace_segment("docs", a, SegmentData{0, {"a1", "a1"}, cols(9)}));        // duplicate
+    CHECK_THROWS(s.replace_segment("docs", a, SegmentData{1, {"a1", "a3"}, cols(9)}));        // cluster
+    CHECK_THROWS(s.replace_segment("docs", a, SegmentData{0, {"a1", "a3"}, {column(9)}}));     // columns
+    CHECK_THROWS(s.replace_segment("docs", a, SegmentData{0, {"a1", "a3"}, {column(9, 8, "m0_depth2"), column(9)}}));
+    CHECK_THROWS(s.replace_segment("docs", c, SegmentData{4, {"ctr0"}, cols(2)}));  // center block
+    CHECK_THROWS(s.replace_segment("docs", b, SegmentData{1, {}, cols(9)}));        // nothing live
+    CHECK(s.block_stats("docs").size() == 3 && fs::exists(s.segment_path(a)));
+    bool typed = false;
+    try {
+      s.replace_segment("docs", "s_nope.oseg", SegmentData{0, {"a1"}, cols(9)});
+    } catch (const BlockNotFound&) {
+      typed = true;
+    }
+    CHECK(typed);
+    try {
+      s.replace_segment("docs", a, SegmentData{0, {"a1"}, cols(9)});
+      CHECK(false);
+    } catch (const BlockMismatch&) {
+    }
+    // A pinned snapshot keeps the files of a removed block until it is released.
+    {
+      Snapshot snap = s.snapshot("docs");
+      CHECK(snap.segments.size() == 3 && snap.tombstones.size() == 3);
+      CHECK(s.drop_dead_blocks("docs") == 1);
+      CHECK(fs::exists(s.segment_path(b)));  // deferred
+      const std::string a2 = s.replace_segment("docs", a, SegmentData{0, {"a3", "a1"}, cols(9)});
+      CHECK(fs::exists(s.segment_path(a)) && fs::exists(s.segment_path(a2)));
+      CHECK(s.read_segment("docs", a).ids.size() == 3);  // old block still readable
+    }
+    CHECK(!fs::exists(s.segment_path(b)) && !fs::exists(s.segment_path(a)));
+    auto after = s.block_stats("docs");
+    CHECK(after.size() == 2);
+    for (auto& x : after) CHECK(x.n_deleted == 0);
+  }
+  {  // Key files are stored all or nothing.
+    TempDir d;
+    Store s(d.path, kOfhe);
+    s.create_collection(spec());
+    using ombra::core::Envelope;
+    using ombra::core::EnvelopeKind;
+    Envelope ctx{EnvelopeKind::Context, kPreset, kOfhe, {1}};
+    Envelope key{EnvelopeKind::PublicEvalKey, kPreset, kOfhe, {2}};
+    Envelope bad{EnvelopeKind::PublicEvalKey, "m0_depth2", kOfhe, {3}};
+    auto w = [](const Envelope& e) { return ombra::core::write_envelope(e); };
+    CHECK_THROWS(s.put_key_files("docs", {{kKeyContext, w(ctx)}, {kKeyEvalMult, w(key)}, {kKeyAutomorphism, w(bad)}}));
+    CHECK(s.catalog().key_files("docs").empty());
+    CHECK(fs::is_empty(d.path + "/keys"));
+    s.put_key_files("docs", {{kKeyContext, w(ctx)}, {kKeyEvalMult, w(key)}, {kKeyAutomorphism, w(key)}});
+    CHECK(s.catalog().key_files("docs").size() == 3);
+    s.put_key_files("docs", {{kKeyContext, w(ctx)}, {kKeyEvalMult, w(key)}, {kKeyAutomorphism, w(key)}});
+    CHECK(s.catalog().key_files("docs").size() == 3);
+    std::size_t n = 0;
+    for (auto& e : fs::directory_iterator(d.path + "/keys")) { (void)e; ++n; }
+    CHECK(n == 3);  // the replaced files are gone
+  }
   {  // Torn log record: crash after the intent, then tear the log tail. The insert is absent.
     TempDir d;
     setup(d.path, false);
