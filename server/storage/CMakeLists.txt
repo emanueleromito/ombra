@@ -18,12 +18,12 @@ find_package(Threads REQUIRED)
 target_link_libraries(ombra_sqlite PUBLIC Threads::Threads ${CMAKE_DL_LIBS})
 
 add_library(ombra_storage STATIC src/segment.cpp src/wal.cpp src/catalog.cpp src/store.cpp
-                                 src/fsutil.cpp)
+                                 src/fsutil.cpp src/blob.cpp)
 target_include_directories(ombra_storage PUBLIC include
                            ${CMAKE_CURRENT_SOURCE_DIR}/../../core/include)
 target_link_libraries(ombra_storage PUBLIC ombra_sqlite)
 
-foreach(t segment wal catalog recovery)
+foreach(t segment wal catalog recovery blob)
   add_executable(ombra_storage_${t}_test tests/${t}_test.cpp)
   target_link_libraries(ombra_storage_${t}_test PRIVATE ombra_storage)
   add_test(NAME storage_${t} COMMAND ombra_storage_${t}_test)

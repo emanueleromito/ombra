@@ -1,6 +1,6 @@
 // Storage engine: segments + write-ahead log + catalog, with crash recovery.
 //
-// Layout under root: catalog.db, wal.log, segments/<name>.oseg, keys/<name>.
+// Layout under root: catalog.db, wal.log, segments/<name>.oseg, keys/<name>, blobs/<name>.oblob.
 //
 // Guarantee: an acknowledged write (insert() or remove() returned) survives a crash or power
 // loss. A write that was not acknowledged is either fully there (segment, all its ids, catalog
@@ -25,6 +25,7 @@
 #include <utility>
 #include <vector>
 
+#include "ombra/storage/blob.hpp"
 #include "ombra/storage/catalog.hpp"
 #include "ombra/storage/segment.hpp"
 #include "ombra/storage/wal.hpp"
@@ -42,6 +43,15 @@ class BlockNotFound : public std::runtime_error {  // the collection has no such
   using std::runtime_error::runtime_error;
 };
 class BlockMismatch : public std::runtime_error {  // replacement does not satisfy the precondition
+ public:
+  using std::runtime_error::runtime_error;
+};
+
+class BlobSizeError : public std::runtime_error {  // blob size is not a bucket size
+ public:
+  using std::runtime_error::runtime_error;
+};
+class BlobKindError : public std::runtime_error {  // blob kind is not a known kind
  public:
   using std::runtime_error::runtime_error;
 };
@@ -163,6 +173,21 @@ class Store {
   std::string replace_segments(const std::string& collection,
                                const std::vector<std::string>& old_segments, const SegmentData& neu);
 
+  // ---- Blobs (T3.4): opaque encrypted bytes keyed by (collection, kind, id) --------------------
+  // put_blob: payload size must be a bucket size (BlobSizeError) and kind a known kind
+  // (BlobKindError); unknown collection throws "unknown collection". Order: write the file
+  // durably (temp, fsync, rename), one catalog transaction inserts or replaces the row, then the
+  // replaced file is unlinked. A crash leaves the old blob or the new one, never a part; files
+  // without a catalog row are swept at recovery. Blobs are removed with their collection.
+  void put_blob(const std::string& collection, std::uint32_t kind, const std::string& id,
+                const std::vector<std::uint8_t>& payload);
+  // False if there is no such blob. Throws on a corrupt file.
+  bool get_blob(const std::string& collection, std::uint32_t kind, const std::string& id,
+                std::vector<std::uint8_t>* out) const;
+  // Removes the blobs that exist (missing ids are ignored); returns how many were removed.
+  std::size_t delete_blobs(const std::string& collection, std::uint32_t kind,
+                           const std::vector<std::string>& ids);
+
   const std::string& openfhe_version() const { return ofhe_; }
 
   SegmentData read_segment(const std::string& collection, const std::string& segment) const;
@@ -178,6 +203,7 @@ class Store {
   // Unlinks `file` now, or when the last pin on it is released. Caller holds mu_.
   void unlink_or_defer(const std::string& file);
   void unpin(const std::vector<std::string>& files) const;
+  std::string blob_dir() const { return root_ + "/blobs"; }
   std::string key_dir() const { return root_ + "/keys"; }
   std::string root_, ofhe_;
   std::unique_ptr<Catalog> catalog_;

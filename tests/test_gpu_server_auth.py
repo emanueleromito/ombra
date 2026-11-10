@@ -59,6 +59,9 @@ RPC_NAMES = {
     "ListBlocks",
     "GetBlock",
     "ReplaceBlock",
+    "PutBlob",
+    "GetBlob",
+    "DeleteBlobs",
 }
 RPC_KEYS = {"requests", "errors", "latency_ms"}
 LATENCY_KEYS = {"sum", "count", "max"}

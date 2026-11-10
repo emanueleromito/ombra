@@ -106,7 +106,11 @@ CREATE TABLE tombstones(
 CREATE TABLE key_files(
   collection TEXT NOT NULL REFERENCES collections(name), kind TEXT NOT NULL,
   file TEXT NOT NULL, PRIMARY KEY(collection, kind));
-INSERT INTO meta VALUES('schema_version', 1), ('api_version', 1), ('next_segment', 1);
+CREATE TABLE blobs(
+  collection TEXT NOT NULL REFERENCES collections(name), kind INTEGER NOT NULL,
+  id BLOB NOT NULL, file TEXT NOT NULL, size INTEGER NOT NULL,
+  PRIMARY KEY(collection, kind, id));
+INSERT INTO meta VALUES('schema_version', 2), ('api_version', 1), ('next_segment', 1);
 )sql";
 
 std::string encode_filters(const std::vector<FilterField>& f) {
@@ -156,6 +160,20 @@ Catalog::Catalog(const std::string& path) {
       Tx tx(db_);
       exec(db_, kSchema);
       tx.commit();
+    }
+    {
+      // Schema 1 -> 2 (T3.4): add the blob table. A stored version above 2 is refused below.
+      Stmt v(db_, "SELECT value FROM meta WHERE key='schema_version'");
+      if (v.step() && v.col_num(0) == 1) {
+        Tx tx(db_);
+        exec(db_,
+             "CREATE TABLE IF NOT EXISTS blobs("
+             "collection TEXT NOT NULL REFERENCES collections(name), kind INTEGER NOT NULL,"
+             "id BLOB NOT NULL, file TEXT NOT NULL, size INTEGER NOT NULL,"
+             "PRIMARY KEY(collection, kind, id))");
+        exec(db_, "UPDATE meta SET value=2 WHERE key='schema_version'");
+        tx.commit();
+      }
     }
     Stmt q(db_, "SELECT value FROM meta WHERE key=?");
     auto get = [&](const char* k) {
@@ -222,7 +240,8 @@ std::vector<std::string> Catalog::list_collections() const {
 }
 
 bool Catalog::drop_collection(const std::string& name, std::vector<std::string>* segment_files,
-                              std::vector<std::string>* key_files) {
+                              std::vector<std::string>* key_files,
+                              std::vector<std::string>* blob_files) {
   Tx tx(db_);
   if (!get_collection(name, nullptr)) return false;
   if (segment_files) {
@@ -233,12 +252,19 @@ bool Catalog::drop_collection(const std::string& name, std::vector<std::string>*
     key_files->clear();
     for (const auto& kv : this->key_files(name)) key_files->push_back(kv.second);
   }
+  if (blob_files) {
+    blob_files->clear();
+    Stmt q(db_, "SELECT file FROM blobs WHERE collection=?");
+    q.text(1, name);
+    while (q.step()) blob_files->push_back(q.col_text(0));
+  }
   // Children first (foreign keys are on).
   for (const char* sql : {"DELETE FROM tombstones WHERE collection=?",
                           "DELETE FROM vectors WHERE collection=?",
                           "DELETE FROM segments WHERE collection=?",
                           "DELETE FROM clusters WHERE collection=?",
                           "DELETE FROM key_files WHERE collection=?",
+                          "DELETE FROM blobs WHERE collection=?",
                           "DELETE FROM collections WHERE name=?"})
     Stmt(db_, sql).text(1, name).run();
   tx.commit();
@@ -469,6 +495,60 @@ std::vector<std::pair<std::string, std::string>> Catalog::key_files(
 
 std::vector<std::string> Catalog::all_key_files() const {
   Stmt q(db_, "SELECT file FROM key_files");
+  std::vector<std::string> v;
+  while (q.step()) v.push_back(q.col_text(0));
+  return v;
+}
+
+bool Catalog::put_blob(const std::string& collection, std::uint32_t kind, const std::string& id,
+                      const std::string& file, std::uint64_t size, std::string* old_file) {
+  Tx tx(db_);
+  bool had = false;
+  {
+    Stmt q(db_, "SELECT file FROM blobs WHERE collection=? AND kind=? AND id=?");
+    q.text(1, collection).num(2, kind).blob(3, id);
+    if (q.step()) {
+      had = true;
+      if (old_file) *old_file = q.col_text(0);
+    }
+  }
+  Stmt(db_, "INSERT OR REPLACE INTO blobs VALUES(?,?,?,?,?)")
+      .text(1, collection).num(2, kind).blob(3, id).text(4, file)
+      .num(5, static_cast<std::int64_t>(size)).run();
+  tx.commit();
+  return had;
+}
+
+bool Catalog::get_blob(const std::string& collection, std::uint32_t kind, const std::string& id,
+                       std::string* file, std::uint64_t* size) const {
+  Stmt q(db_, "SELECT file,size FROM blobs WHERE collection=? AND kind=? AND id=?");
+  q.text(1, collection).num(2, kind).blob(3, id);
+  if (!q.step()) return false;
+  if (file) *file = q.col_text(0);
+  if (size) *size = static_cast<std::uint64_t>(q.col_num(1));
+  return true;
+}
+
+std::vector<std::string> Catalog::delete_blobs(const std::string& collection, std::uint32_t kind,
+                                               const std::vector<std::string>& ids) {
+  Tx tx(db_);
+  std::vector<std::string> files;
+  for (const auto& id : ids) {
+    {
+      Stmt q(db_, "SELECT file FROM blobs WHERE collection=? AND kind=? AND id=?");
+      q.text(1, collection).num(2, kind).blob(3, id);
+      if (!q.step()) continue;
+      files.push_back(q.col_text(0));
+    }
+    Stmt(db_, "DELETE FROM blobs WHERE collection=? AND kind=? AND id=?")
+        .text(1, collection).num(2, kind).blob(3, id).run();
+  }
+  tx.commit();
+  return files;
+}
+
+std::vector<std::string> Catalog::all_blob_files() const {
+  Stmt q(db_, "SELECT file FROM blobs");
   std::vector<std::string> v;
   while (q.step()) v.push_back(q.col_text(0));
   return v;

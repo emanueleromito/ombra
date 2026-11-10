@@ -171,6 +171,9 @@ const char* rpc_name(Rpc r) {
     case Rpc::ListBlocks: return "ListBlocks";
     case Rpc::GetBlock: return "GetBlock";
     case Rpc::ReplaceBlock: return "ReplaceBlock";
+    case Rpc::PutBlob: return "PutBlob";
+    case Rpc::GetBlob: return "GetBlob";
+    case Rpc::DeleteBlobs: return "DeleteBlobs";
     case Rpc::kCount: break;
   }
   return "?";
@@ -182,6 +185,7 @@ Scope required_scope(Rpc r) {
     case Rpc::ListCollections:
     case Rpc::ListBlocks:
     case Rpc::GetBlock:
+    case Rpc::GetBlob:
     case Rpc::Search:
       return Scope::Read;
     case Rpc::CreateCollection:
@@ -189,6 +193,8 @@ Scope required_scope(Rpc r) {
     case Rpc::Insert:
     case Rpc::Delete:
     case Rpc::ReplaceBlock:
+    case Rpc::PutBlob:
+    case Rpc::DeleteBlobs:
       return Scope::Write;
     case Rpc::DropCollection:
     case Rpc::kCount:

@@ -1,4 +1,4 @@
-// SQLite catalog (schema_version 1, api_version 1). journal_mode=WAL, synchronous=FULL,
+// SQLite catalog (schema_version 2, api_version 1 (schema 1 catalogs are migrated: T3.4 adds the blob table)). journal_mode=WAL, synchronous=FULL,
 // foreign_keys=ON. Opening a catalog with another stored api_version or schema_version is refused.
 #pragma once
 
@@ -11,7 +11,7 @@ struct sqlite3;
 
 namespace ombra::storage {
 
-inline constexpr int kCatalogSchemaVersion = 1;
+inline constexpr int kCatalogSchemaVersion = 2;
 inline constexpr int kCatalogApiVersion = 1;
 
 struct FilterField {
@@ -58,7 +58,8 @@ class Catalog {
   // segments, clusters, key file rows). Returns the segment and key file names that were
   // registered, for the caller to unlink after the commit. False if the collection is unknown.
   bool drop_collection(const std::string& name, std::vector<std::string>* segment_files,
-                       std::vector<std::string>* key_files);
+                       std::vector<std::string>* key_files,
+                       std::vector<std::string>* blob_files = nullptr);
 
   std::uint64_t next_segment_id();  // durable counter
   bool has_segment(const std::string& file) const;
@@ -101,6 +102,17 @@ class Catalog {
                      const std::vector<std::pair<std::string, std::string>>& kind_file);
   std::vector<std::pair<std::string, std::string>> key_files(const std::string& collection) const;
   std::vector<std::string> all_key_files() const;
+
+  // Blob rows (T3.4), keyed by (collection, kind, id). put_blob is one transaction that inserts or
+  // replaces the row; returns true and sets *old_file if a row was replaced. delete_blobs removes
+  // the rows that exist (one transaction) and returns their files. Ids are opaque bytes.
+  bool put_blob(const std::string& collection, std::uint32_t kind, const std::string& id,
+                const std::string& file, std::uint64_t size, std::string* old_file);
+  bool get_blob(const std::string& collection, std::uint32_t kind, const std::string& id,
+                std::string* file, std::uint64_t* size) const;
+  std::vector<std::string> delete_blobs(const std::string& collection, std::uint32_t kind,
+                                        const std::vector<std::string>& ids);
+  std::vector<std::string> all_blob_files() const;
 
   sqlite3* raw() const { return db_; }  // for tests that tamper with versions
 

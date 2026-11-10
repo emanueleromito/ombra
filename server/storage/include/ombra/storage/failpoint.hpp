@@ -34,6 +34,11 @@ enum class CrashPoint : int {
   CompactBeforeCatalog,
   CompactAfterCatalog,   // rows gone, files still on disk
   CompactAfterUnlink,
+  // Blob store (put_blob / delete_blobs), in order.
+  BlobBeforeRename,   // temp file durable, not renamed
+  BlobAfterRename,    // blob file durable under its final name, catalog untouched
+  BlobAfterCatalog,   // catalog switched, a replaced old file still on disk
+  BlobDeleteAfterCatalog,  // rows gone, files still on disk
 };
 
 inline constexpr int kCrashExitCode = 42;
