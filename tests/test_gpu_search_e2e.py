@@ -148,7 +148,7 @@ def test_insert_search_delete(tmp_path, backend) -> None:
         for q in queries:
             unf = col.search(q, K, n_probe=2)
             for v in (0, 1):
-                fil = col.search(q, K, filter={0: v}, n_probe=2)
+                fil = col.search(q, K, filter={0: v}, n_probe=2, probe="basic")
                 _check(fil, _plain(x, fields, live, q, v))
                 assert set(unf.probed) <= set(fil.probed)
                 assert fil.rounds == 1 and fil.probed == unf.probed  # K matches: no widening
@@ -160,10 +160,14 @@ def test_insert_search_delete(tmp_path, backend) -> None:
         # a selective filter (4 matches, K = 5) widens 2x per round up to max_probe, then stops
         q = queries[0]
         rare_want = _plain(x, fields, live, q, 2)
-        res = col.search(q, K, filter={0: 2}, n_probe=1, max_probe_factor=2, strict_fallback=False)
+        res = col.search(
+            q, K, filter={0: 2}, n_probe=1, max_probe_factor=2, probe="basic", strict_fallback=False
+        )
         assert res.incomplete and len(res.probed) == 2 and res.rounds == 2
         assert not res.strict_fallback and all(fields[int(h.id[1:]), 0] == 2 for h in res.hits)
-        res = col.search(q, K, filter={0: 2}, n_probe=1, max_probe_factor=2)  # Strict fallback
+        res = col.search(
+            q, K, filter={0: 2}, n_probe=1, max_probe_factor=2, probe="basic"
+        )  # Strict fallback
         assert res.strict_fallback and res.incomplete and sorted(res.probed) == list(range(6))
         assert [h.id for h in res.hits] == rare_want[0] and len(res.hits) == 4
 
