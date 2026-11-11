@@ -5,10 +5,12 @@ deserialized, decrypted, and reduced to its local top-k with global indices; the
 are then merged. Both paths use the same order (score descending, global index ascending), so their
 results are identical, ties included.
 
-Parallel path: worker processes are forked (start method "fork"), so they inherit the crypto
-context and the secret key from the parent's memory. The key is never pickled, passed as an
-argument or written to disk. Only block indices go in, and (scores, indices) of at most k entries
-per block come out. Nothing here logs scores.
+Parallel path: worker processes are started with "spawn", not "fork": a fork after OpenMP or other
+threads have started can deadlock the children (seen in local mode, T3.7). Each worker gets the
+crypto context and the secret key once, serialized in memory and sent through the pool's pipe to
+a child process of this client on the same machine; they are never written to disk, logged, or
+sent anywhere else (hard rule 2). Only block paths go in, and (scores, indices) of at most k
+entries per block come out. Nothing here logs scores.
 """
 
 from __future__ import annotations
@@ -20,20 +22,27 @@ from typing import Any
 
 import numpy as np
 
-# Set in the parent before the pool forks; children read their copy. Never sent through pickle.
+# The crypto context and secret key of a worker process (set by _worker_init); empty in the parent.
 _STATE: dict[str, Any] = {}
 
 
-def _worker_init() -> None:
-    """One OpenMP thread in a forked worker: OpenMP's thread pool does not survive a fork (a
-    parallel region in the child would wait for threads that do not exist), and the workers are
-    the parallelism already."""
+def _worker_init(cc_bytes: bytes, sk_bytes: bytes) -> None:
+    """Load the context and secret key in a spawned worker, with one OpenMP thread (the workers
+    are the parallelism already)."""
+    os.environ["OMP_NUM_THREADS"] = "1"
     import ctypes
 
     try:
         ctypes.CDLL("libgomp.so.1").omp_set_num_threads(1)
     except (OSError, AttributeError):  # another OpenMP runtime, or none
         pass
+    import openfhe as ofhe
+
+    cc = ofhe.DeserializeCryptoContextString(cc_bytes, ofhe.BINARY)
+    sk = ofhe.DeserializePrivateKeyString(sk_bytes, ofhe.BINARY)
+    if cc is None or sk is None:
+        raise RuntimeError("worker could not load the crypto context or the key")
+    _STATE.update(cc=cc, sk=sk)
 
 
 def _order(scores: np.ndarray, indices: np.ndarray, k: int) -> tuple[np.ndarray, np.ndarray]:
@@ -102,21 +111,21 @@ def serial_topk(
 
 
 class ParallelTopk:
-    """A pool of forked workers that inherit `cc` and `sk` from this process's memory.
+    """A pool of spawned workers, each loaded once with `cc` and `sk` (see the module docstring).
 
-    Create it once (the fork costs about as much as a few blocks) and call `run` per query. The
-    workers hold the secret key in their own memory only for the pool's lifetime; use `close()` or
-    a `with` block.
+    Create it once (starting workers costs about as much as a few blocks) and call `run` per
+    query. The workers hold the secret key in their own memory only for the pool's lifetime; use
+    `close()` or a `with` block.
     """
 
     def __init__(self, cc: Any, sk: Any, workers: int | None = None) -> None:
-        _STATE.update(cc=cc, sk=sk)
-        try:
-            self._pool = mp.get_context("fork").Pool(
-                workers or len(os.sched_getaffinity(0)), initializer=_worker_init
-            )
-        finally:
-            _STATE.clear()  # the children keep their copy; the parent's registry is emptied
+        import openfhe as ofhe
+
+        init = (ofhe.Serialize(cc, ofhe.BINARY), ofhe.Serialize(sk, ofhe.BINARY))
+        self._pool = mp.get_context("spawn").Pool(
+            workers or len(os.sched_getaffinity(0)), initializer=_worker_init, initargs=init
+        )
+        del init
 
     def run(
         self, files: list[Path | str], slots: int, valid_last: int, k: int
@@ -149,7 +158,7 @@ def parallel_topk(
     k: int,
     workers: int | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Same result as serial_topk, with blocks decrypted by forked worker processes."""
+    """Same result as serial_topk, with blocks decrypted by spawned worker processes."""
     n = max(1, min(workers or len(os.sched_getaffinity(0)), len(files)))
     with ParallelTopk(cc, sk, n) as pool:
         return pool.run(files, slots, valid_last, k)
