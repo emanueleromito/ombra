@@ -30,6 +30,7 @@ import numpy as np
 from ombra.blobstore import KIND_RECORD
 from ombra.file_format import Kind, read_envelope
 from ombra.presets import FILTER_LAMBDA
+from ombra.probe import FIELDS_KEY, POLICIES, ProbePlanner
 from ombra.topk import ParallelTopk
 
 API_VERSION = 1
@@ -152,6 +153,8 @@ def run_search(
     decoys: int | None = None,
     n_probe: int | None = None,
     max_probe_factor: int = 8,
+    probe: str = "e_a",
+    max_rounds: int = 4,
     strict_fallback: bool = True,
     rerank_factor: int = 3,
     workers: int = 1,
@@ -166,11 +169,20 @@ def run_search(
     level, `decoys` random clusters are added to each round (default: as many as the real ones;
     0 is refused, since it would make Decoy the same as Fast). `rerank_factor * k` record blobs
     are fetched for re-ranking (default 3, the 2-3x k of the requirements).
+
+    `probe` selects the cluster policy of a filtered query (ombra.probe): "e_a" (default) uses the
+    client's per-cluster value counts to skip clusters with no matches, probes until about 3k
+    matches are expected, then widens while an unsearched cluster could still beat the k-th match
+    (at most `max_rounds` rounds); "e" is the same without the stopping check; "basic" is the
+    original 0019 rule (stop at k matches). Unfiltered queries, and collections without stored
+    statistics, always use "basic".
     """
     pb = col.pb
     level = level or col.security_level
     if level not in LEVELS:
         raise ValueError(f"security level must be one of {list(LEVELS)}")
+    if probe not in POLICIES:
+        raise ValueError(f"probe must be one of {list(POLICIES)}")
     if k < 1 or rerank_factor < 1 or max_probe_factor < 1:
         raise ValueError("k, rerank_factor and max_probe_factor must be positive")
     if decoys is not None and (decoys < 1 if level == "decoy" else decoys < 0):
@@ -240,31 +252,49 @@ def run_search(
         order = [int(i) for i in np.argsort(-cs, kind="stable")]
         first = max(1, math.ceil(math.sqrt(total))) if n_probe is None else max(1, n_probe)
         first = min(first, total)
-        cap = min(total, math.ceil(first * max_probe_factor))
         if level == "strict":
             for part in _chunks(order):
                 run_round(part)
             probed = list(order)
         else:
-            size, pos = first, 0
-            while True:
-                real = order[pos : min(pos + size, cap)]
-                pos += len(real)
-                probed += real
-                extra: list[int] = []
-                if level == "decoy":
-                    rest = [c for c in range(total) if c not in asked_all and c not in set(real)]
-                    n_decoys = len(real) if decoys is None else decoys
-                    extra = rng.sample(rest, min(n_decoys, len(rest)))
-                run_round(real + extra)  # decoy results are valid candidates too
-                if len(cand) >= k or pos >= cap:
-                    break
-                size *= 2
-            if len(cand) < k and strict_fallback and pos < total:
-                for part in _chunks(order[pos:]):
+            policy = probe if (filter and col.stats is not None) else "basic"
+            plan = ProbePlanner(
+                order,
+                policy,
+                k,
+                first,
+                stats=col.stats,
+                filter=filter,
+                center_scores=cs,
+                max_rounds=max_rounds,
+                max_probe_factor=max_probe_factor,
+            )
+            real = plan.first_round()
+            if real is None:  # expected selectivity too low: a full scan is the better plan
+                for part in _chunks(order):
                     run_round(part)
-                probed += order[pos:]
-                fell_back = True
+                probed = list(order)
+            else:
+                while real:
+                    probed += real
+                    extra: list[int] = []
+                    if level == "decoy":
+                        rest = [
+                            c for c in range(total) if c not in asked_all and c not in set(real)
+                        ]
+                        n_decoys = len(real) if decoys is None else decoys
+                        extra = rng.sample(rest, min(n_decoys, len(rest)))
+                    run_round(real + extra)  # decoy results are valid candidates too
+                    kth = (
+                        sorted(cand.values(), reverse=True)[k - 1] if len(cand) >= k else -math.inf
+                    )
+                    real = plan.next_round(kth, len(cand), asked_all)
+                if len(cand) < k and strict_fallback and len(set(probed)) < total:
+                    rest_all = [c for c in order if c not in set(probed)]
+                    for part in _chunks(rest_all):
+                        run_round(part)
+                    probed += rest_all
+                    fell_back = True
     finally:
         stream.close()
 
@@ -284,6 +314,7 @@ def _rerank(col: Any, q: np.ndarray, top: list[tuple[bytes, float]], k: int) -> 
     for ident, _ in top:
         rec = col.codec.open_record(ident, col.blobs.get(col.name, KIND_RECORD, ident))
         v = np.frombuffer(rec.vector, dtype="<f4").astype(np.float64)
-        scored.append(Hit(ident, float(v @ q), rec.metadata))
+        meta = {k: m for k, m in rec.metadata.items() if k != FIELDS_KEY}
+        scored.append(Hit(ident, float(v @ q), meta))
     scored.sort(key=lambda h: (-h.score, h.id))
     return scored[:k]

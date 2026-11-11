@@ -39,6 +39,7 @@ import gzip
 import io
 import json
 import math
+import os
 import re
 import statistics
 import sys
@@ -54,9 +55,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "client"))
 sys.path.insert(0, str(REPO_ROOT / "tests"))
 
-import e2e_client as ec  # noqa: E402
 from ombra.clustering import assign  # noqa: E402
-from ombra.collection import Collection  # noqa: E402
 
 K = 10
 VERSION = "test-openfhe"
@@ -82,7 +81,7 @@ def _download(url: str, path: Path) -> None:
 def embed(texts: list[str]) -> np.ndarray:
     from sentence_transformers import SentenceTransformer
 
-    model = SentenceTransformer(MODEL, device="cuda")
+    model = SentenceTransformer(MODEL, device=os.environ.get("OMBRA_EMBED_DEVICE", "cuda"))
     model.max_seq_length = 128
     v = model.encode(texts, batch_size=256, normalize_embeddings=True, show_progress_bar=False)
     return _flush(np.asarray(v, dtype=np.float64))
@@ -325,6 +324,9 @@ def run_cell(
 
 
 def run_dataset(ds: dict[str, Any], preset: str, n_queries: int, tmp: Path) -> dict[str, Any]:
+    import e2e_client as ec  # lazy: the plaintext simulation reuses this module without gRPC
+    from ombra.collection import Collection
+
     x, fields, q = ds["x"], ds["fields"], ds["queries"][:n_queries]
     for m in (x, q):
         assert np.isfinite(m).all() and np.allclose(np.linalg.norm(m, axis=1), 1.0, atol=1e-6)
