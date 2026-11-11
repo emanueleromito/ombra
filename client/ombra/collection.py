@@ -39,16 +39,18 @@ import numpy as np
 
 from ombra import presets
 from ombra import query as oq
-from ombra.blobstore import KIND_DOCUMENT, KIND_RECORD, BlobStore, GrpcBlobStore
+from ombra.blobstore import KIND_DOCUMENT, KIND_RECORD, BlobStore, BlobStoreError, GrpcBlobStore
 from ombra.clustering import assign, cluster_vectors
 from ombra.documents import DocumentCodec
 from ombra.file_format import Kind, read_envelope, write_envelope
 from ombra.keyfile import DEFAULT_SCRYPT, KeyMaterial, export_key_file, import_key_file
 from ombra.params import make_ckks_params
+from ombra.probe import FIELDS_KEY, STATS_ID, ClusterStats, check_user_id
 from ombra.repack import DEFAULT_THRESHOLD, BlockStat, plan_repack
 
 KEY_CHUNK = 4_000_000  # below LIMIT_MAX_CHUNK_BYTES (4 MiB)
 API_VERSION = 1
+FLUSH = 1e-9  # OpenFHE refuses to encode denormal-sized values ("Scaling factor too small")
 _LEVELS = {
     "fast": "SECURITY_LEVEL_FAST",
     "decoy": "SECURITY_LEVEL_DECOY",
@@ -224,6 +226,7 @@ class KeyKit:
 
         padded = np.zeros(self.slots)
         padded[: len(values)] = values
+        padded[np.abs(padded) < FLUSH] = 0.0
         ct = self.cc.Encrypt(
             self._keys.publicKey, self.cc.MakeCKKSPackedPlaintext([float(v) for v in padded])
         )
@@ -281,6 +284,8 @@ class Collection:
         self.derived, self.cards, self.kit = derived, tuple(cards), kit
         self.centers = centers
         self.slots = derived.batch_size
+        # cluster counts and radii for the probe policy; None if the blob is missing (old data)
+        self.stats: ClusterStats | None = None
 
     @property
     def name(self) -> str:
@@ -334,7 +339,11 @@ class Collection:
         k = n_clusters or max(1, round(len(x) / derived.batch_size))
         if k > derived.batch_size:
             raise ValueError("more clusters than slots: the centers must fit in one block")
+        for ident in ids:
+            check_user_id(ident)
         clustering = cluster_vectors(x, k, seed=seed)
+        # k-means from faiss can leave denormal-sized center entries; OpenFHE cannot encode them
+        centers = np.where(np.abs(clustering.centers) < FLUSH, 0.0, clustering.centers)
         if openfhe_version is None:
             import openfhe as ofhe
 
@@ -352,7 +361,7 @@ class Collection:
             derived=derived,
             cards=cards,
             kit=kit,
-            centers=clustering.centers,
+            centers=centers,
             blobs=blobs,
             security_level=security_level,
         )
@@ -377,7 +386,9 @@ class Collection:
                 rows = np.nonzero(clustering.labels == c)[0]
                 self._insert_cluster(c, x[rows], f[rows], [ids[i] for i in rows])
             if store_records:
-                self._put_records(x, ids, metadata, documents)
+                self._put_records(x, ids, metadata, documents, f)
+            self.stats = ClusterStats.build(x, clustering.labels, centers, f, cards)
+            self._save_stats()
         except Exception:
             stub.DropCollection(pb.DropCollectionRequest(name=self.name))
             raise
@@ -423,6 +434,12 @@ class Collection:
         n = spec.cluster_count
         c = np.stack([kit.decrypt_column(col)[:n] for col in cols], axis=1)
         self.centers = c / np.maximum(np.linalg.norm(c, axis=1, keepdims=True), 1e-12)
+        try:
+            self.stats = ClusterStats.unseal(
+                self.codec, self.blobs.get(self.name, KIND_RECORD, STATS_ID)
+            )
+        except BlobStoreError:
+            self.stats = None  # an older collection: searches use the basic probe rule
         return self
 
     def search(self, query: np.ndarray, k: int = 10, **options: Any) -> Any:
@@ -517,12 +534,17 @@ class Collection:
             raise ValueError("one id per vector")
         if not np.allclose(np.linalg.norm(x, axis=1), 1.0, atol=1e-6):
             raise ValueError("vectors must be normalized before they are encrypted")
+        for ident in ids:
+            check_user_id(ident)
         f = _fields(fields, len(x), self.cards)
         labels = assign(x, self.centers)
         for c in np.unique(labels):
             rows = np.nonzero(labels == c)[0]
             self._insert_cluster(int(c), x[rows], f[rows], [ids[i] for i in rows])
-        self._put_records(x, ids, metadata, documents)
+        self._put_records(x, ids, metadata, documents, f)
+        if self.stats is not None:
+            self.stats.add(x, labels, self.centers, f)
+            self._save_stats()
 
     def _put_records(
         self,
@@ -530,13 +552,16 @@ class Collection:
         ids: Sequence[bytes],
         metadata: Sequence[dict[str, Any]] | None,
         documents: Sequence[str | bytes | None] | None,
+        fields: np.ndarray | None = None,
     ) -> None:
         for name, seq in (("metadata", metadata), ("documents", documents)):
             if seq is not None and len(seq) != len(ids):
                 raise ValueError(f"one {name} entry per vector")
         v32 = np.asarray(x, dtype="<f4")
         for i, blob_id in enumerate(ids):
-            meta = metadata[i] if metadata is not None else {}
+            meta = dict(metadata[i]) if metadata is not None else {}
+            if fields is not None and fields.shape[1]:
+                meta[FIELDS_KEY] = [int(v) for v in fields[i]]  # lets delete() update the stats
             sealed = self.codec.seal_record(blob_id, v32[i].tobytes(), meta)
             self.blobs.put(self.name, KIND_RECORD, blob_id, sealed)
             if documents is not None and documents[i] is not None:
@@ -545,6 +570,7 @@ class Collection:
 
     def delete(self, ids: Sequence[bytes]) -> int:
         """Delete vectors (tombstones on the server) and their record and document blobs."""
+        self._stats_for_delete(ids)
         r = self.stub.Delete(
             self.pb.DeleteRequest(api_version=API_VERSION, collection=self.name, ids=list(ids))
         )
@@ -552,6 +578,34 @@ class Collection:
         for kind in (KIND_RECORD, KIND_DOCUMENT):
             self.blobs.delete(self.name, kind, ids)
         return r.deleted
+
+    def _save_stats(self) -> None:
+        """Store the cluster statistics as an encrypted blob under the reserved id (never plain)."""
+        if self.stats is not None:
+            self.blobs.put(self.name, KIND_RECORD, STATS_ID, self.stats.seal(self.codec))
+
+    def _stats_for_delete(self, ids: Sequence[bytes]) -> None:
+        """Lower the cluster counts for vectors about to be deleted (found via their records)."""
+        if self.stats is None:
+            return
+        vecs, fields = [], []
+        for ident in ids:
+            try:
+                rec = self.codec.open_record(ident, self.blobs.get(self.name, KIND_RECORD, ident))
+            except (BlobStoreError, ValueError):
+                continue  # no record: the vector was never stored through this client
+            vecs.append(np.frombuffer(rec.vector, dtype="<f4").astype(np.float64))
+            fields.append(rec.metadata.get(FIELDS_KEY))
+        if not vecs:
+            return
+        labels = assign(np.stack(vecs), self.centers)
+        known = all(f is not None for f in fields) and (
+            fields[0] is None or len(fields[0]) == len(self.cards)
+        )
+        self.stats.remove(
+            labels, np.asarray(fields, dtype=np.int64) if known and self.cards else None
+        )
+        self._save_stats()
 
     def retire(self) -> None:
         """Drop this collection from the server (after the caller switched to a newer one)."""
