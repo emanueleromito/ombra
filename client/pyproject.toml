@@ -10,8 +10,12 @@ requires-python = ">=3.11"
 dependencies = ["numpy", "cryptography", "faiss-cpu"]
 
 [project.optional-dependencies]
-local = ["openfhe"]
+local = ["openfhe", "protobuf", "grpcio-tools"]
+grpc = ["grpcio", "grpcio-tools"]
 langchain = ["langchain-core"]
 
 [tool.setuptools]
 packages = ["ombra"]
+
+[tool.setuptools.package-data]
+ombra = ["resources/*"]

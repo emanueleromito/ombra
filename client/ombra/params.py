@@ -11,6 +11,9 @@ from pathlib import Path
 from typing import Any
 
 PRESETS_PATH = Path(__file__).resolve().parents[2] / "core" / "params" / "ckks_presets.json"
+# An installed package has no repository next to it: it carries a copy (a test checks that the
+# copy equals core/params/ckks_presets.json, which stays the only place parameters are defined).
+PACKAGED_PRESETS_PATH = Path(__file__).resolve().parent / "resources" / "ckks_presets.json"
 SUPPORTED_FORMAT_VERSION = 1
 
 # Names of OpenFHE security levels that are at least 128-bit. Anything else (HEStd_NotSet, a
@@ -44,7 +47,8 @@ class ParamsError(ValueError):
 
 def load_presets(path: Path | None = None) -> dict[str, dict[str, Any]]:
     """Read the preset file and check its format version."""
-    data = json.loads((path or PRESETS_PATH).read_text(encoding="utf-8"))
+    chosen = path or (PRESETS_PATH if PRESETS_PATH.is_file() else PACKAGED_PRESETS_PATH)
+    data = json.loads(chosen.read_text(encoding="utf-8"))
     if data.get("version") != SUPPORTED_FORMAT_VERSION:
         raise ParamsError(f"unsupported preset file version: {data.get('version')!r}")
     return data["presets"]

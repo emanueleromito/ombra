@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "presets": {
+    "m0_depth2": {
+      "security_level": "HEStd_128_classic",
+      "ring_dim": 16384,
+      "multiplicative_depth": 2,
+      "scaling_mod_size": 50,
+      "first_mod_size": 60,
+      "batch_size": 8192,
+      "scaling_technique": "FIXEDMANUAL",
+      "key_switch_technique": "HYBRID"
+    },
+    "m0_compact_n8192": {
+      "security_level": "HEStd_128_classic",
+      "ring_dim": 8192,
+      "multiplicative_depth": 2,
+      "scaling_mod_size": 40,
+      "first_mod_size": 55,
+      "batch_size": 4096,
+      "scaling_technique": "FIXEDMANUAL",
+      "key_switch_technique": "HYBRID",
+      "num_large_digits": 3
+    }
+  }
+}
