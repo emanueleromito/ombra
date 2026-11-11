@@ -206,7 +206,7 @@ def load_arxiv(cache: Path, small: bool, n_queries: int) -> dict[str, Any]:
             "license": "CC0-1.0",
             "database": f"{n_db} abstracts, every {stride}th row of the file",
             "queries": "other abstracts from the same sample",
-            "attribute": "primary arXiv category (top 63 + other), year of the arXiv id, 2-year bins",
+            "attribute": "primary arXiv category (top 63 + other); arXiv id year, 2-year bins",
         },
     }
 
