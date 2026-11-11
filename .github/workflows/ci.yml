@@ -1,11 +1,13 @@
-# T1.19: the oracle tests run on every PR. Make "CPU tests" and "GPU oracles" required checks on
-# main. Secrets MODAL_TOKEN_ID and MODAL_TOKEN_SECRET are repository secrets; they are not available
-# to PRs from forks, so "GPU oracles" fails there when the PR touches the code it covers.
+# CPU tests run on every PR. The GPU oracles (Modal) run only when triggered by hand
+# (workflow_dispatch, "Run workflow" on the Actions tab, choosing the branch), to limit Modal cost;
+# on PRs the job is skipped, which a required check treats as passing. Secrets MODAL_TOKEN_ID and
+# MODAL_TOKEN_SECRET are repository secrets.
 name: CI
 
 on:
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -26,42 +28,29 @@ jobs:
       - run: make test
 
   gpu:
-    # Always runs, so the required check reports on every PR; the work is skipped if nothing relevant
-    # changed. tests/ and the Modal files count, since changing them can weaken an oracle.
+    # Manual only (workflow_dispatch). Run it on a branch before merging any change to core/,
+    # tests/, client/ or the Modal files, since those can weaken an oracle.
     name: GPU oracles
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     concurrency:
-      group: gpu-${{ github.event.pull_request.number }}
+      group: gpu-${{ github.ref }}
       cancel-in-progress: true
     env:
       MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
       MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
-      BASE_SHA: ${{ github.event.pull_request.base.sha }}
-      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - id: changes
-        run: |
-          if git diff --name-only "$BASE_SHA...$HEAD_SHA" | grep -qE '^(core/|tests/|client/|modal_app\.py|modal_upload\.py|CMakeLists\.txt)'; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "No change to the code the GPU oracles cover; skipping."
-          fi
-      - if: steps.changes.outputs.run == 'true'
-        run: |
+      - run: |
           if [ -z "$MODAL_TOKEN_ID" ] || [ -z "$MODAL_TOKEN_SECRET" ]; then
             echo "::error::MODAL_TOKEN_ID and MODAL_TOKEN_SECRET are not set for this run."
             exit 1
           fi
-      - if: steps.changes.outputs.run == 'true'
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - if: steps.changes.outputs.run == 'true'
-        run: python -m pip install --quiet modal==1.6.3
-      - if: steps.changes.outputs.run == 'true'
-        run: make test-gpu
+      - run: python -m pip install --quiet modal==1.6.3
+      - run: make test-gpu
