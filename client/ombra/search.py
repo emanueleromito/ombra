@@ -149,11 +149,11 @@ def run_search(
     *,
     filter: Mapping[int, int | Sequence[int]] | None = None,
     level: str | None = None,
-    decoys: int = 0,
+    decoys: int | None = None,
     n_probe: int | None = None,
     max_probe_factor: int = 8,
     strict_fallback: bool = True,
-    rerank_factor: int = 4,
+    rerank_factor: int = 3,
     workers: int = 1,
     seed: int | None = None,
 ) -> SearchResult:
@@ -162,14 +162,19 @@ def run_search(
     `filter` maps a field index to one allowed value or a list of them (OR inside a field, AND
     across fields). `level` overrides the collection's security level for this query. `n_probe`
     is the first round's cluster count (default ceil(sqrt(clusters))); a filtered query starts
-    with the same count, so it probes at least what the unfiltered query would.
+    with the same count, so it probes at least what the unfiltered query would. At the Decoy
+    level, `decoys` random clusters are added to each round (default: as many as the real ones;
+    0 is refused, since it would make Decoy the same as Fast). `rerank_factor * k` record blobs
+    are fetched for re-ranking (default 3, the 2-3x k of the requirements).
     """
     pb = col.pb
     level = level or col.security_level
     if level not in LEVELS:
         raise ValueError(f"security level must be one of {list(LEVELS)}")
-    if k < 1 or rerank_factor < 1 or max_probe_factor < 1 or decoys < 0:
+    if k < 1 or rerank_factor < 1 or max_probe_factor < 1:
         raise ValueError("k, rerank_factor and max_probe_factor must be positive")
+    if decoys is not None and (decoys < 1 if level == "decoy" else decoys < 0):
+        raise ValueError("the Decoy level needs at least one decoy per round")
     q = np.asarray(query, dtype=np.float64)
     if q.shape != (col.derived.dimension,):
         raise ValueError("query has the wrong dimension")
@@ -196,11 +201,18 @@ def run_search(
     stream = _Stream(col.stub, pb.SearchRequest(start=start))
     cand: dict[bytes, float] = {}
     probed: list[int] = []
+    asked_all: set[int] = set()  # every cluster requested on this stream, real or decoy
     rounds = 0
 
     def run_round(chosen: list[int]) -> None:
         nonlocal rounds
-        asked = list(dict.fromkeys(chosen))
+        # A cluster is never requested twice on one stream: a repeat would tell the server which
+        # earlier choices were decoys. Results of a cluster asked earlier are already in `cand`.
+        asked = [c for c in dict.fromkeys(chosen) if c not in asked_all]
+        asked_all.update(asked)
+        if not asked:
+            rounds += 1
+            return
         stream.send(pb.SearchRequest(chosen=pb.SearchChosen(cluster_ids=asked)))
         msgs = [stream.next().scores for _ in asked]
         envs, counts, owners = [], [], []
@@ -240,10 +252,10 @@ def run_search(
                 pos += len(real)
                 probed += real
                 extra: list[int] = []
-                if level == "decoy" and decoys:
-                    taken = set(real)
-                    rest = [c for c in range(total) if c not in taken]
-                    extra = rng.sample(rest, min(decoys, len(rest)))
+                if level == "decoy":
+                    rest = [c for c in range(total) if c not in asked_all and c not in set(real)]
+                    n_decoys = len(real) if decoys is None else decoys
+                    extra = rng.sample(rest, min(n_decoys, len(rest)))
                 run_round(real + extra)  # decoy results are valid candidates too
                 if len(cand) >= k or pos >= cap:
                     break
