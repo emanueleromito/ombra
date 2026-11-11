@@ -64,8 +64,7 @@ T3.2 and T3.3 can run in parallel after T3.1. T3.6 needs the server API from M2 
 **Depends on:** T3.4, T3.5, T2.7
 **Steps:** insert (assign to a cluster, encrypt, upload with the encrypted document and vector copy); delete; search with security levels Fast, Decoy and Strict, filters as decided in 0019 (one-hot filter columns folded into the query, lambda = 4, band decode on the client; refuse a schema whose field count is above F_max of the preset; always probe at least the clusters an unfiltered query would, and widen only if fewer than k matches, with the 0019 round, max_probe and Strict-fallback rules), top-k, and re-ranking with the exact vectors; decrypt in parallel (T2.1). The search never sends a decrypted value to the server beyond the cluster and id choices the threat model names.
 **Done when:** an end-to-end test shows that top-k with re-ranking matches a plaintext search on the same data at each security level and with a filter, that a schema above F_max is refused, that a filtered query probes at least the unfiltered clusters and widens only below k matches, and that deleted vectors are not returned.
-**Status:** todo
-
+**Status:** done
 ### T3.7 Local mode
 
 **Why:** a user should be able to try Ombra without a GPU server.
