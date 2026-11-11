@@ -87,3 +87,31 @@ All three conditions are measured, on synthetic data, in `docs/plan/results/2026
 Also: a tombstoned slot reaches 1 + lambda * (F + 1), which lowers F_max at `m0_depth2` from 15 to 14.
 
 Note (user, 2026-11-10): 0019 stays accepted. Filtered recall on a real dataset is due before release (T3.11). The client probes at least the clusters an unfiltered query probes and widens only if fewer than k matches are found.
+
+## Amendment 1: filter-aware cluster choice (proposed, 2026-11-11)
+
+**Status of this amendment:** proposed. Decision B above stands; this replaces the "Selective filters" probe rule.
+
+**Why:** on real data (T3.11, `results/2026-11-11-t3.11-filtered-recall.md`: arXiv CC0 40k, banking77 CC-BY 10k, fast preset) recall@10 at about 1% selectivity was 0.76 to 0.81, because the rule stops at k matches in the first round, and those are usually not the true nearest matches. Encryption costs nothing (encrypted recall equals plaintext recall under the same cluster choices in all 21 cells), so policies were compared in plaintext on the same data, clusters and queries (`results/2026-11-11-t3.11-probe-policies.md`).
+
+**Rule (E with check A):**
+1. The client keeps per-cluster counts of each filter value and per-cluster radii, as an encrypted blob on the server (never plaintext there), updated on insert and delete, rebuilt by re-clustering.
+2. Clusters are taken in centre-score order, skipping clusters with zero expected matches, until the expected match count reaches 3k; the first round is never smaller than an unfiltered query's.
+3. Below 0.5% expected selectivity the client does a Strict full scan.
+4. Check A: keep widening while centre score + cluster radius of the next cluster exceeds the current k-th match score, capped at 2 rounds (default).
+
+**Measured (plaintext, 19 filtered cells, 6 at about 1%):**
+
+| policy | min recall@10 at ~1% | clusters searched at ~1% (of 20 / 6) |
+| --- | --- | --- |
+| 0019 rule (stop at k) | 0.755 | 6.1 |
+| B: stop at 3k | 0.830 | 7.1 |
+| E alone | 0.768 | 4.1 |
+| E + A, max 2 rounds (default) | 0.991 | 9.8 |
+| E + A, max 3-4 rounds | 1.000 | 11.2 |
+
+With max 2 rounds no filtered cell falls more than 0.01 below the unfiltered recall. Check A's radius bound is loose on 384-d text (quantiles from max down to p75 gave the same numbers): the gain comes from the capped second round over clusters that can hold matches, not from pruning. Filtered queries therefore search about twice the clusters of an unfiltered one; latency was modelled, not measured.
+
+**Leakage:** Fast mode's chosen clusters can hint at the filter value; Decoy hides it; the number of rounds, and a Strict scan below 0.5%, hint at selectivity (threat model updated).
+
+**Still to do:** one small encrypted confirmation run on an A10 (asked of the user before running), then the user accepts or rejects this amendment.
