@@ -505,6 +505,53 @@ def profile_search(ncu: bool = True, micro: bool = True) -> None:
 # the data is downloaded to the volume's dataset cache and never committed. The server holds the
 # encrypted collection (about 20 blocks of about 180 MB), so host memory is large.
 #   modal run modal_app.py::filtered_recall --dry-run     (tiny sizes, 5 queries)
+# One A10 run for two checks, so the image build and startup are paid once (user-approved budget:
+# under $1; the 40-minute timeout caps it): the T3.7 parity test (local mode vs the server, same
+# top-k) and the encrypted confirmation of the 0019 amendment on banking77 (all cells, 200 queries).
+#   modal run modal_app.py::confirm_a10
+@app.function(gpu="A10", cpu=4.0, memory=16384, timeout=2400, volumes={DATA_DIR: volume})
+def confirm_a10(queries: int = 200) -> None:
+    """Release build; T3.7 local/server parity and the e2e test, then T3.11 on banking77."""
+    _build("Release")
+    _build_native()
+    _run(
+        [
+            "python",
+            "-m",
+            "pytest",
+            "-m",
+            "gpu or openfhe",
+            "-v",
+            "-s",
+            "tests/test_gpu_local_parity.py",
+            "tests/test_gpu_search_e2e.py",
+        ],
+        ok_codes=(0,),
+    )
+    _run(["pip", "install", "--quiet", "sentence-transformers"])
+    out_dir = Path(DATA_DIR) / "results"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    bench = str(Path(REPO_DIR) / "core" / "bench" / "filtered_recall.py")
+    data = str(Path(DATA_DIR) / "datasets" / "t3.11")
+    try:
+        _run(
+            [
+                "python",
+                bench,
+                "--out",
+                str(out_dir),
+                "--datasets",
+                data,
+                "--queries",
+                str(queries),
+                "--dataset",
+                "banking77",
+            ]
+        )
+    finally:
+        volume.commit()
+
+
 @app.function(gpu="A100-40GB", cpu=8.0, memory=65536, timeout=43200, volumes={DATA_DIR: volume})
 def filtered_recall(dry_run: bool = False, queries: int = 1000, dataset: str = "") -> None:
     """Release build; T3.11 filtered recall@10 on two real datasets, preset fast."""
