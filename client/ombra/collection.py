@@ -284,7 +284,7 @@ class Collection:
         self.derived, self.cards, self.kit = derived, tuple(cards), kit
         self.centers = centers
         self.slots = derived.batch_size
-        # cluster counts and radii for the probe policy; None if the blob is missing (old data)
+        # cluster and value counts for the probe policy; None if missing or old version
         self.stats: ClusterStats | None = None
 
     @property
@@ -387,7 +387,7 @@ class Collection:
                 self._insert_cluster(c, x[rows], f[rows], [ids[i] for i in rows])
             if store_records:
                 self._put_records(x, ids, metadata, documents, f)
-            self.stats = ClusterStats.build(x, clustering.labels, centers, f, cards)
+            self.stats = ClusterStats.build(clustering.labels, len(centers), f, cards)
             self._save_stats()
         except Exception:
             stub.DropCollection(pb.DropCollectionRequest(name=self.name))
@@ -438,8 +438,8 @@ class Collection:
             self.stats = ClusterStats.unseal(
                 self.codec, self.blobs.get(self.name, KIND_RECORD, STATS_ID)
             )
-        except BlobStoreError:
-            self.stats = None  # an older collection: searches use the basic probe rule
+        except (BlobStoreError, ValueError):
+            self.stats = None  # an older collection or stats version: no filter-aware probing
         return self
 
     def search(self, query: np.ndarray, k: int = 10, **options: Any) -> Any:
@@ -543,7 +543,7 @@ class Collection:
             self._insert_cluster(int(c), x[rows], f[rows], [ids[i] for i in rows])
         self._put_records(x, ids, metadata, documents, f)
         if self.stats is not None:
-            self.stats.add(x, labels, self.centers, f)
+            self.stats.add(labels, f)
             self._save_stats()
 
     def _put_records(
