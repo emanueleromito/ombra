@@ -71,8 +71,7 @@ T3.2 and T3.3 can run in parallel after T3.1. T3.6 needs the server API from M2 
 **Depends on:** T3.6
 **Steps:** the `[local]` extra runs the CPU (OpenFHE) server in a child process behind the same API, receiving only ciphertexts and public keys; query expansion uses the server's exact C++ OpenFHE method compiled into the client (decision 0022), so local mode uses the same levels as the server; default preset `m0_compact_n8192` ("fast"); OpenFHE pinned to the server's 1.6.1, envelopes of another version refused; client `requires-python` 3.12 until T4.1; the same client code works in both modes; there is no plaintext mode. `ombra.testing.FakeClient` is an in-memory test double with the same API for users' unit tests only (no persistence, no network, never documented as a mode).
 **Done when:** the end-to-end test from T3.6 runs in local mode and gives the same results; a parity test gives the same top-k through local mode and the server on the same data; search time at 10k vectors for d = 384 and 768 on 4 and 8 CPUs is in `results/`, under 5 s at d = 768 on 4 CPUs; installing the extra on a machine without a GPU works; FakeClient passes the client API signature test.
-**Status:** todo
-
+**Status:** done (parity and e2e on an A10, `results/2026-11-11-t3.11-a10-confirmation.md`; timings `results/2026-11-11-t3.7-local-mode.md`, local WSL, 2.71 s at d = 768 on 4 CPUs; install checked on a CPU-only machine from source with OpenFHE 1.6.1, wheels are T4.1)
 ### T3.8 `langchain-ombra`
 
 **Why:** most users reach a vector database through LangChain.
