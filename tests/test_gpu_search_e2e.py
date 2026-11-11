@@ -23,7 +23,10 @@ from ombra.blobstore import KIND_DOCUMENT, KIND_RECORD, BlobStoreError  # noqa: 
 from ombra.collection import Collection, KeyKit  # noqa: E402
 from ombra.params import ParamsError  # noqa: E402
 
-pytestmark = pytest.mark.gpu
+BACKENDS = [
+    pytest.param("server", marks=pytest.mark.gpu),
+    pytest.param("local", marks=pytest.mark.openfhe),  # the in-process CPU server (T3.7)
+]
 
 VERSION = "test-openfhe"
 D = 384
@@ -55,14 +58,23 @@ def _check(res, want):
     assert np.allclose([h.score for h in res.hits], scores, atol=SCORE_TOL)
 
 
-def test_insert_search_delete(tmp_path) -> None:
-    binary = ec.find_server_binary()
-    if binary is None:
-        pytest.fail("ombra_server not found")
-    pb, pbg = ec.load_stubs(tmp_path / "stubs")
-    server = ec.ServerProcess(binary, tmp_path / "data", VERSION, tmp_path / "server.log")
-    api = ec.OmbraClient(pb, pbg, server.address, "m0_compact_n8192", VERSION)
-    stub = api.stub
+@pytest.mark.parametrize("backend", BACKENDS)
+def test_insert_search_delete(tmp_path, backend) -> None:
+    version = VERSION
+    if backend == "server":
+        binary = ec.find_server_binary()
+        if binary is None:
+            pytest.fail("ombra_server not found")
+        pb, pbg = ec.load_stubs(tmp_path / "stubs")
+        server = ec.ServerProcess(binary, tmp_path / "data", version, tmp_path / "server.log")
+        api = ec.OmbraClient(pb, pbg, server.address, "m0_compact_n8192", version)
+        stub, stop = api.stub, lambda: (api.close(), server.stop())
+    else:
+        from ombra._local import LocalTransport
+
+        transport = LocalTransport(tmp_path / "local")
+        pb, stub, version = transport.pb, transport.stub, transport.openfhe_version
+        stop = transport.close
     col = None
     try:
         rng = np.random.default_rng(11)
@@ -87,7 +99,7 @@ def test_insert_search_delete(tmp_path) -> None:
                 preset="fast",
                 fields=np.zeros((1, 17)),
                 cards=[2] * 17,
-                openfhe_version=VERSION,
+                openfhe_version=version,
             )
         with pytest.raises(ParamsError):
             Collection.create(
@@ -99,7 +111,7 @@ def test_insert_search_delete(tmp_path) -> None:
                 preset="balanced",
                 fields=np.zeros((1, 15)),
                 cards=[2] * 15,
-                openfhe_version=VERSION,
+                openfhe_version=version,
             )
 
         col = Collection.create(
@@ -112,7 +124,7 @@ def test_insert_search_delete(tmp_path) -> None:
             fields=fields[: n - 30],
             cards=CARDS,
             n_clusters=CLUSTERS,
-            openfhe_version=VERSION,
+            openfhe_version=version,
             metadata=[{"i": i} for i in range(n - 30)],
             documents=[f"doc {i}" for i in range(n - 30)],
         )
@@ -178,7 +190,7 @@ def test_insert_search_delete(tmp_path) -> None:
         # the keys come back from the key file: a collection can be reopened
         key_path = tmp_path / "docs.key"
         col.kit.save(key_path, "pw", scrypt_params=(2**4, 8, 1))
-        kit2 = KeyKit.load(key_path, "pw", presets.derive("fast", D), VERSION, col.kit.n_leaves)
+        kit2 = KeyKit.load(key_path, "pw", presets.derive("fast", D), version, col.kit.n_leaves)
         again = Collection.open(pb, stub, col.name, kit2)
         assert again.cards == CARDS and again.cluster_count == CLUSTERS
         assert np.allclose(again.centers, col.centers, atol=1e-2)
@@ -188,5 +200,4 @@ def test_insert_search_delete(tmp_path) -> None:
     finally:
         if col is not None:
             col.close()
-        api.close()
-        server.stop()
+        stop()

@@ -89,3 +89,15 @@ def test_matches_cpp_source() -> None:
         assert raw[core]["ring_dim"] == ring
         assert raw[core]["batch_size"] == batch
         assert presets.derive(core, 384).values == raw[core]
+
+
+def test_packaged_resources_equal_the_sources() -> None:
+    """The wheel carries copies of the preset file and the proto; they must not drift."""
+    root = Path(__file__).resolve().parents[2]
+    res = root / "client" / "ombra" / "resources"
+    assert (res / "ckks_presets.json").read_bytes() == (
+        root / "core" / "params" / "ckks_presets.json"
+    ).read_bytes()
+    assert (res / "ombra.proto").read_bytes() == (
+        root / "proto" / "ombra" / "v1" / "ombra.proto"
+    ).read_bytes()

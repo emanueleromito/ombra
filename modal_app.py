@@ -232,6 +232,44 @@ def bench_e2e(extra: str = "") -> None:
     volume.commit()
 
 
+@app.function(cpu=4.0, memory=16384, timeout=3600)
+def cpu_run(cmd: str) -> None:
+    """Run one command in the repo on CPU in the pinned image, without building C++ (T3.7)."""
+    import os
+
+    env = {**os.environ, "PYTHONPATH": f"{REPO_DIR}/client:{REPO_DIR}/tests"}
+    print("$", cmd, flush=True)
+    code = subprocess.run(cmd.split(), cwd=REPO_DIR, env=env).returncode
+    if code != 0:
+        raise SystemExit(f"command failed with exit code {code}: {cmd}")
+
+
+# T3.7: a machine WITHOUT a GPU and without our OpenFHE build: a plain Python image, `pip install
+# ./client[local]` (openfhe comes from PyPI, a wheel built for CPython 3.12), then a tiny search.
+# Only the client folder and the check script are uploaded.
+local_install_image = (
+    modal.Image.from_registry("ubuntu:24.04", add_python="3.12")  # libstdc++ of GCC 13+
+    .apt_install("libgomp1")  # the openfhe wheel needs OpenMP from the system
+    .add_local_dir(
+        "client",
+        remote_path="/work/client",
+        copy=True,
+        ignore=lambda p: any(
+            s in str(p) for s in ("__pycache__", ".pytest_cache", "tests", ".ruff_cache")
+        ),
+    )
+    .add_local_file("tests/local_install_check.py", "/work/local_install_check.py", copy=True)
+    .run_commands("pip install '/work/client[local]'")
+)
+
+
+@app.function(image=local_install_image, cpu=4.0, memory=8192, timeout=1800)
+def test_local_install() -> None:
+    """`pip install ./client[local]` on a CPU-only machine, then a tiny encrypted search."""
+    # Run from /tmp so the installed package is imported, not a source tree.
+    _run(["python", "/work/local_install_check.py"], cwd="/tmp")  # noqa: S108
+
+
 @app.function(gpu="A10", memory=16384, timeout=3600, volumes={DATA_DIR: volume})
 def profile_expand(dims: str = "1536") -> None:
     """Release build; time the stages of one expansion split on an A10 (T0.5b profiling)."""
