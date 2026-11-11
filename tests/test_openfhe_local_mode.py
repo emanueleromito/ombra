@@ -138,7 +138,6 @@ def test_search_result_level_and_no_plaintext_in_the_child(tmp_path) -> None:
             openfhe_version=transport.openfhe_version,
         )
         start = pb.SearchStart(
-            api_version=1,
             collection="lv",
             key_tag=col.kit.key_tag,
             query=col.kit.encrypt_query(x[2]),

@@ -146,11 +146,11 @@ public:
         const auto drop_foreign = [&] {
             std::vector<std::string> foreign;
             for (const auto& kv : Impl::GetAllEvalMultKeys())
-                if (!mult_before.count(kv.first)) foreign.push_back(kv.first);
+                if (kv.first != tag && !mult_before.count(kv.first)) foreign.push_back(kv.first);
             for (const auto& t : foreign) Impl::ClearEvalMultKeys(t);
             foreign.clear();
             for (const auto& kv : Impl::GetAllEvalAutomorphismKeys())
-                if (!auto_before.count(kv.first)) foreign.push_back(kv.first);
+                if (kv.first != tag && !auto_before.count(kv.first)) foreign.push_back(kv.first);
             for (const auto& t : foreign) Impl::ClearEvalAutomorphismKeys(t);
         };
         try {

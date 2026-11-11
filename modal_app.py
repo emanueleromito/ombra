@@ -278,9 +278,17 @@ def _cpu_run(cmd: str) -> None:
     import os
 
     _build_native()
-    env = {**os.environ, "PYTHONPATH": f"{REPO_DIR}/client:{REPO_DIR}/tests"}
-    print("$", cmd, flush=True)
-    code = subprocess.run(cmd.split(), cwd=REPO_DIR, env=env).returncode
+    env = {
+        **os.environ,
+        "PYTHONPATH": f"{REPO_DIR}/client:{REPO_DIR}/tests",
+        "OMBRA_LOCAL_DEBUG": "1",
+    }
+    words = cmd.split()
+    while words and "=" in words[0] and not words[0].startswith("-"):
+        key, _, value = words.pop(0).partition("=")  # leading KEY=VALUE words are environment
+        env[key] = value
+    print("$", " ".join(words), flush=True)
+    code = subprocess.run(words, cwd=REPO_DIR, env=env).returncode
     if code != 0:
         raise SystemExit(f"command failed with exit code {code}: {cmd}")
 

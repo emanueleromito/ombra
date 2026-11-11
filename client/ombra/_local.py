@@ -266,6 +266,12 @@ class LocalTransport:
 def _child_main(path: str, sock: str, authkey: bytes, parent_pid: int) -> None:
     """Entry point of the child process: serve `LocalServer` on a local socket until told to stop,
     or until the client process is gone."""
+    if os.environ.get("OMBRA_LOCAL_THREADS"):  # threads of the server's OpenFHE work (before load)
+        os.environ["OMP_NUM_THREADS"] = os.environ["OMBRA_LOCAL_THREADS"]
+    if os.environ.get("OMBRA_LOCAL_DEBUG") == "1":
+        import faulthandler
+
+        faulthandler.dump_traceback_later(240, repeat=True, file=sys.stderr)
     pb, _ = load_stubs(grpc_module=False)
     server = LocalServer(path, pb, _native().openfhe_version())
     listener = mpc.Listener(sock, family="AF_UNIX", authkey=authkey)
@@ -342,8 +348,14 @@ def _serve_call(server: LocalServer, pb: Any, conn: Any, method: str, body: byte
         conn.send_bytes(b"E")
     except (EOFError, OSError):
         raise
-    except Exception:
-        # No details: a message could carry data. The client sees "the local server failed".
+    except Exception as exc:
+        # No details by default: a message could carry data. The client sees "the local server
+        # failed". OMBRA_LOCAL_DEBUG=1 prints the exception type and traceback (for developers).
+        if os.environ.get("OMBRA_LOCAL_DEBUG") == "1":
+            import traceback
+
+            print("local server error:", type(exc).__name__, file=sys.stderr)
+            traceback.print_exc()
         conn.send_bytes(b"X")
 
 

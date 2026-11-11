@@ -38,7 +38,6 @@ def _level(col, pb, stub, query, version) -> int:
     import openfhe as ofhe
 
     start = pb.SearchStart(
-        api_version=1,
         collection=col.name,
         key_tag=col.kit.key_tag,
         query=col.kit.encrypt_query(query),
