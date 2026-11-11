@@ -30,5 +30,18 @@ def test_async_methods_are_coroutines() -> None:
 def test_versions_and_stubs() -> None:
     assert ombra.API_VERSION == "ombra.v1"
     assert ombra.__version__
-    with pytest.raises(NotImplementedError):
-        Client("localhost:1").list_collections()
+
+
+def test_local_constructor_on_both() -> None:
+    for cls in (Client, AsyncClient):
+        sig = inspect.signature(cls.local)
+        assert list(sig.parameters) == ["path"]
+
+
+def test_secure_by_default() -> None:
+    """A remote address needs TLS (or an explicit insecure=True); an API key never goes plain."""
+    pytest.importorskip("grpc")
+    pytest.importorskip("grpc_tools")
+    pytest.importorskip("openfhe")
+    with pytest.raises(ValueError):
+        Client("localhost:1", api_key="x", insecure=True)

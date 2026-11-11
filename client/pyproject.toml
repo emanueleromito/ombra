@@ -11,7 +11,7 @@ dependencies = ["numpy", "cryptography", "faiss-cpu"]
 
 [project.optional-dependencies]
 local = ["openfhe", "protobuf", "grpcio-tools"]
-grpc = ["grpcio", "grpcio-tools"]
+grpc = ["openfhe", "grpcio", "grpcio-tools"]
 langchain = ["langchain-core"]
 
 [tool.setuptools]
