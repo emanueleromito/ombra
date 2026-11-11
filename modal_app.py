@@ -248,7 +248,8 @@ def cpu_run(cmd: str) -> None:
 # ./client[local]` (openfhe comes from PyPI, a wheel built for CPython 3.12), then a tiny search.
 # Only the client folder and the check script are uploaded.
 local_install_image = (
-    modal.Image.debian_slim(python_version="3.12")
+    modal.Image.from_registry("ubuntu:24.04", add_python="3.12")  # libstdc++ of GCC 13+
+    .apt_install("libgomp1")  # the openfhe wheel needs OpenMP from the system
     .add_local_dir(
         "client",
         remote_path="/work/client",
@@ -266,7 +267,7 @@ local_install_image = (
 def test_local_install() -> None:
     """`pip install ./client[local]` on a CPU-only machine, then a tiny encrypted search."""
     # Run from /tmp so the installed package is imported, not a source tree.
-    _run(["python", "/work/local_install_check.py"], cwd="/tmp")
+    _run(["python", "/work/local_install_check.py"], cwd="/tmp")  # noqa: S108
 
 
 @app.function(gpu="A10", memory=16384, timeout=3600, volumes={DATA_DIR: volume})

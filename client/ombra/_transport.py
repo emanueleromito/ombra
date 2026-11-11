@@ -21,7 +21,9 @@ class GrpcTransport:
         ]
         if insecure:
             if api_key is not None:
-                raise ValueError("an API key is only sent over TLS; do not combine it with insecure")
+                raise ValueError(
+                    "an API key is only sent over TLS; do not combine it with insecure"
+                )
             self.channel = grpc.insecure_channel(address, options=options)
         else:
             creds: Any = grpc.ssl_channel_credentials(root_certificates=root_certificates)

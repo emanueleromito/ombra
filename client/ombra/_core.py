@@ -74,7 +74,10 @@ class ClientCore:
 
     @staticmethod
     def _field_values(
-        names: Sequence[str], cards: Sequence[int], metadata: Sequence[dict[str, Any]] | None, n: int
+        names: Sequence[str],
+        cards: Sequence[int],
+        metadata: Sequence[dict[str, Any]] | None,
+        n: int,
     ) -> np.ndarray | None:
         if not names:
             return None
@@ -244,8 +247,13 @@ class ClientCore:
             if fname not in names:
                 raise ValueError(f"unknown filter field {fname!r}; known: {list(names)}")
             fidx[names.index(fname)] = want
-        res = col.search(np.asarray(query, dtype=np.float64), k, filter=fidx or None, level=level,
-                         n_probe=n_probe)
+        res = col.search(
+            np.asarray(query, dtype=np.float64),
+            k,
+            filter=fidx or None,
+            level=level,
+            n_probe=n_probe,
+        )
         hits: list[Hit] = res.hits
         return [SearchHit(h.id.decode(), h.score, h.metadata) for h in hits]
 

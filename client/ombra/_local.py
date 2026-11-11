@@ -177,7 +177,9 @@ class LocalServer:
         except EnvelopeError as ex:
             msg = str(ex)
             if "unknown format version" in msg:
-                raise Refuse(self.pb.ERROR_UNSUPPORTED_VERSION, "unsupported envelope version")
+                raise Refuse(
+                    self.pb.ERROR_UNSUPPORTED_VERSION, "unsupported envelope version"
+                ) from None
             if "preset mismatch" in msg:
                 raise Refuse(self.pb.ERROR_PRESET_MISMATCH, "envelope preset differs") from None
             raise Refuse(self.pb.ERROR_INVALID_ARGUMENT, "invalid envelope") from None
@@ -228,9 +230,7 @@ class LocalServer:
         return self.pb.CreateCollectionResponse(spec=req.spec)
 
     def _info(self, c: _Coll) -> Any:
-        n = sum(
-            len(b.ids) for b in c.segments.values() if b.cluster_id != c.spec.cluster_count
-        )
+        n = sum(len(b.ids) for b in c.segments.values() if b.cluster_id != c.spec.cluster_count)
         return self.pb.CollectionInfo(
             spec=c.spec,
             vector_count=n,
@@ -534,7 +534,9 @@ class LocalServer:
                 live += [bytes(i) for i in b.ids if i not in c.tombstones]
             ids = [bytes(i) for i in header.ids]
             if not ids:
-                raise Refuse(pb.ERROR_BLOCK_MISMATCH, "no ids: a block with no live vector is dropped")
+                raise Refuse(
+                    pb.ERROR_BLOCK_MISMATCH, "no ids: a block with no live vector is dropped"
+                )
             if len(set(ids)) != len(ids) or set(ids) != set(live) or len(ids) != len(live):
                 raise Refuse(pb.ERROR_BLOCK_MISMATCH, "ids are not exactly the live ids")
             for col in cols:

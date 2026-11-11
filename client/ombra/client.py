@@ -242,6 +242,3 @@ class AsyncClient:
 
     async def close(self) -> None:
         self._core.close()
-
-
-

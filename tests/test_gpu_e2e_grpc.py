@@ -26,7 +26,7 @@ import time
 
 import pytest
 
-np =pytest.importorskip("numpy")
+np = pytest.importorskip("numpy")
 pytest.importorskip("grpc")
 pytest.importorskip("grpc_tools")
 pytest.importorskip("openfhe")

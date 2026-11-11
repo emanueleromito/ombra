@@ -21,7 +21,7 @@ with tempfile.TemporaryDirectory() as t:
         x,
         [f"v{i}" for i in range(12)],
         key_file=Path(t) / "tiny.key",
-        passphrase="pw",
+        passphrase="pw",  # noqa: S106
         preset="fast",
         scrypt_params=(2**4, 8, 1),
     )
