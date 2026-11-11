@@ -24,6 +24,18 @@ import numpy as np
 _STATE: dict[str, Any] = {}
 
 
+def _worker_init() -> None:
+    """One OpenMP thread in a forked worker: OpenMP's thread pool does not survive a fork (a
+    parallel region in the child would wait for threads that do not exist), and the workers are
+    the parallelism already."""
+    import ctypes
+
+    try:
+        ctypes.CDLL("libgomp.so.1").omp_set_num_threads(1)
+    except (OSError, AttributeError):  # another OpenMP runtime, or none
+        pass
+
+
 def _order(scores: np.ndarray, indices: np.ndarray, k: int) -> tuple[np.ndarray, np.ndarray]:
     """The k best entries, ordered by score descending then index ascending."""
     o = np.lexsort((indices, -scores))[:k]
@@ -100,7 +112,9 @@ class ParallelTopk:
     def __init__(self, cc: Any, sk: Any, workers: int | None = None) -> None:
         _STATE.update(cc=cc, sk=sk)
         try:
-            self._pool = mp.get_context("fork").Pool(workers or len(os.sched_getaffinity(0)))
+            self._pool = mp.get_context("fork").Pool(
+                workers or len(os.sched_getaffinity(0)), initializer=_worker_init
+            )
         finally:
             _STATE.clear()  # the children keep their copy; the parent's registry is emptied
 

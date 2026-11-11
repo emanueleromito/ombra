@@ -48,7 +48,7 @@ class Client:
 
     @classmethod
     def local(cls, path: str | Path) -> Client:
-        """An in-process CPU (OpenFHE) server that keeps its files under `path`."""
+        """A CPU (OpenFHE) server in a child process that keeps its files under `path`."""
         self = cls.__new__(cls)
         self._core = ClientCore(_local_transport(path))
         return self
@@ -61,8 +61,9 @@ class Client:
         *,
         key_file: str | Path,
         passphrase: str,
-        preset: str = "balanced",
+        preset: str | None = None,
         metadata: Sequence[dict[str, Any]] | None = None,
+        documents: Sequence[str | bytes | None] | None = None,
         filter_fields: Mapping[str, int] | None = None,
         security_level: str = "fast",
         n_clusters: int | None = None,
@@ -70,6 +71,7 @@ class Client:
     ) -> str:
         """Cluster and encrypt `vectors` (unit length), write the key file, create the collection.
 
+        `preset` defaults to "fast" in local mode and to "balanced" against a server.
         `filter_fields` maps a field name to its number of values; every metadata dict then needs
         an integer in range under that name. Back up the key file: without it the data is lost.
         """
@@ -81,6 +83,7 @@ class Client:
             passphrase=passphrase,
             preset=preset,
             metadata=metadata,
+            documents=documents,
             filter_fields=filter_fields,
             security_level=security_level,
             n_clusters=n_clusters,
@@ -115,8 +118,10 @@ class Client:
         vectors: Sequence[Sequence[float]],
         ids: Sequence[str] | None = None,
         metadata: Sequence[dict[str, Any]] | None = None,
+        documents: Sequence[str | bytes | None] | None = None,
     ) -> list[str]:
-        return self._core.insert(collection, vectors, ids, metadata)
+        """Add vectors; their documents and metadata are stored encrypted (T3.4)."""
+        return self._core.insert(collection, vectors, ids, metadata, documents)
 
     def delete(self, collection: str, ids: Sequence[str]) -> None:
         return self._core.delete(collection, ids)
@@ -154,7 +159,7 @@ class AsyncClient:
 
     @classmethod
     def local(cls, path: str | Path) -> AsyncClient:
-        """An in-process CPU (OpenFHE) server that keeps its files under `path`."""
+        """A CPU (OpenFHE) server in a child process that keeps its files under `path`."""
         self = cls.__new__(cls)
         self._core = ClientCore(_local_transport(path))
         return self
@@ -167,8 +172,9 @@ class AsyncClient:
         *,
         key_file: str | Path,
         passphrase: str,
-        preset: str = "balanced",
+        preset: str | None = None,
         metadata: Sequence[dict[str, Any]] | None = None,
+        documents: Sequence[str | bytes | None] | None = None,
         filter_fields: Mapping[str, int] | None = None,
         security_level: str = "fast",
         n_clusters: int | None = None,
@@ -176,6 +182,7 @@ class AsyncClient:
     ) -> str:
         """Cluster and encrypt `vectors` (unit length), write the key file, create the collection.
 
+        `preset` defaults to "fast" in local mode and to "balanced" against a server.
         `filter_fields` maps a field name to its number of values; every metadata dict then needs
         an integer in range under that name. Back up the key file: without it the data is lost.
         """
@@ -187,6 +194,7 @@ class AsyncClient:
             passphrase=passphrase,
             preset=preset,
             metadata=metadata,
+            documents=documents,
             filter_fields=filter_fields,
             security_level=security_level,
             n_clusters=n_clusters,
@@ -221,8 +229,10 @@ class AsyncClient:
         vectors: Sequence[Sequence[float]],
         ids: Sequence[str] | None = None,
         metadata: Sequence[dict[str, Any]] | None = None,
+        documents: Sequence[str | bytes | None] | None = None,
     ) -> list[str]:
-        return self._core.insert(collection, vectors, ids, metadata)
+        """Add vectors; their documents and metadata are stored encrypted (T3.4)."""
+        return self._core.insert(collection, vectors, ids, metadata, documents)
 
     async def delete(self, collection: str, ids: Sequence[str]) -> None:
         return self._core.delete(collection, ids)

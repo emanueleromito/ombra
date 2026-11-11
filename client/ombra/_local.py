@@ -1,49 +1,56 @@
-"""Local mode: an in-process CPU server behind the same API as the gRPC server (T3.7).
+"""Local mode: a CPU server in a child process behind the same API as the gRPC server (T3.7).
 
-`LocalServer` has the method names and message types of the gRPC stub of service ombra.v1.Ombra
-(streams are Python iterators), so `Collection`, `run_search` and `GrpcBlobStore` run on it
-unchanged. It is the CPU twin of the C++ server in server/: every computation on ciphertexts is
-OpenFHE (openfhe-python), no CUDA and no kernel of ours. It never sees a secret key: like the real
-server it gets a context, the EvalMult key and the automorphism keys, as bytes in 0016 envelopes.
-It refuses what the real server refuses (api version, name and id sizes, preset and key tag,
-filter layout above F_max, sizes of blobs, block layouts); the error codes are the same.
+`LocalTransport` (client process) starts the child with the `spawn` method and talks to it over a
+local socket. The child runs `LocalServer`, which has the method names and message types of the gRPC
+stub of service ombra.v1.Ombra (streams are Python iterators), so `Collection`, `run_search` and
+`GrpcBlobStore` run on it unchanged, in both modes. It is the CPU twin of the C++ server in
+server/. The child receives only the API messages: ciphertexts, the crypto context and public
+evaluation keys, as bytes in 0016 envelopes (hard rule 2: it never gets the secret key, and its
+code has no way to ask for one). It deserializes the context and the keys itself.
+
+All OpenFHE work of the child is C++: `ombra._native` (client/native/, built against OpenFHE 1.6.1)
+holds the context and keys of a collection, runs the server's exact expansion tree (decision 0010,
+core/include/ombra/core/expansion_tree.hpp with the CPU operations of
+core/src/openfhe_expand_ops.hpp; decision 0022) and the column dot product, so local mode uses the
+same levels as the server. The child never imports openfhe-python: the client process holds one
+OpenFHE copy (the wheel, for keys, encryption and decryption), the child another, never both in one
+process. The child refuses envelopes whose OpenFHE version is not 1.6.1, and checks the key tag
+against the keys it deserialized.
 
 Search, as in the C++ server (decisions 0010 and 0019): expand the query ciphertext into one
 ciphertext per entry (the same constants q_j in every slot), then for each block the dot product
 sum_j leaf_j * column_j (EvalMultNoRelin, one relinearization, one rescale), and for a tombstoned
 slot add the plaintext penalty -lambda * (F + 1).
 
-Expansion. openfhe-python has no exact multiplication by X^-k, which the SealPIR-style tree of the
-C++ server needs. The same leaf is obtained from the symmetric query polynomial p with a real
-plaintext: with C_r = X^r + X^-r, the coefficients of p * C_r at the multiples of 2^L (L =
-ceil(log2(2 * leaves))) are 2 q_r, and the subgroup trace prod_l (1 + tau_l), tau_l = the
-automorphism with Galois element N / 2^l + 1, keeps exactly those and multiplies them by 2^L (the
-client pre-scaled the query by 2^-L). So leaf_r = trace(p * cos-plaintext_r), using the same
-automorphism keys. It costs L key switches per leaf instead of about two per leaf for the tree, one
-extra level for the plaintext product, and the same results to about 1e-6.
-
-Speed limits (CPU, one thread of Python, measured on Modal, 4 vCPU): see docs/local-mode.md.
+It refuses what the real server refuses (api version, name and id sizes, preset and key tag,
+filter layout above F_max, sizes of blobs, block layouts); the error codes are the same.
 Files are kept under the directory given to `Client.local(path)` (format "ombra-local 1").
 """
 
 from __future__ import annotations
 
+import atexit
+import multiprocessing
+import multiprocessing.connection as mpc
 import os
+import secrets
 import shutil
+import sys
 import tempfile
+import threading
+import time
+from collections import OrderedDict
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
-import numpy as np
-
 from ombra import params as oparams
 from ombra import presets
-from ombra import query as oq
 from ombra._proto import load_stubs
 from ombra.file_format import EnvelopeError, Kind, read_envelope, write_envelope
 
 FORMAT = b"ombra-local 1\n"
+OPENFHE_VERSION = "1.6.1"  # the server's OpenFHE; envelopes of another version are refused
 API = 1
 MAX_CHUNK = 4194304
 MAX_NAME = 128
@@ -55,7 +62,7 @@ MAX_KEY_FILE = 1 << 30
 BUCKETS = (16384, 262144, 2097152, 16777216)
 LAMBDA = 4.0
 KEY_KINDS = {1: "context", 2: "evalmult", 3: "automorphism"}
-CACHE_BLOCKS = 16
+CACHE_BYTES = 4 << 30  # deserialized columns kept between searches (least recently used out)
 
 
 class Refuse(Exception):
@@ -64,22 +71,292 @@ class Refuse(Exception):
         self.code, self.message = code, message
 
 
+def _native() -> Any:
+    try:
+        from ombra import _native
+    except ImportError as exc:
+        raise ImportError(
+            "local mode needs the compiled extension ombra._native (OpenFHE 1.6.1 C++, Linux "
+            "x86-64, Python 3.12): install a wheel of ombra, or build client/ with OpenFHE "
+            "1.6.1 installed (docs/local-mode.md)"
+        ) from exc
+    return _native
+
+
+# ---- the client side: start the child, speak the API to it ---------------------------------------
+class ChildError(RuntimeError):
+    """The local server process failed (no data is included in the message)."""
+
+
+def _method(pb: Any, name: str) -> tuple[bool, bool, Any, Any]:
+    """(client streams, server streams, request class, response class) from the service."""
+    from google.protobuf import message_factory
+
+    m = pb.DESCRIPTOR.services_by_name["Ombra"].methods_by_name[name]
+    return (
+        m.client_streaming,
+        m.server_streaming,
+        message_factory.GetMessageClass(m.input_type),
+        message_factory.GetMessageClass(m.output_type),
+    )
+
+
+class _Channel:
+    """One connection to the child; a call owns it until its response is fully read."""
+
+    def __init__(self, conn: Any) -> None:
+        self.conn, self.ok = conn, True
+
+
+class _Stub:
+    """Method names of the gRPC stub; each call runs on its own connection to the child."""
+
+    def __init__(self, owner: LocalTransport) -> None:
+        self._o = owner
+
+    def __getattr__(self, method: str) -> Any:
+        if (
+            method.startswith("_")
+            or method not in self._o.pb.DESCRIPTOR.services_by_name["Ombra"].methods_by_name
+        ):
+            raise AttributeError(method)
+        return lambda request: self._o._call(method, request)
+
+
 class LocalTransport:
     """What `ClientCore` needs: pb, stub, openfhe_version, close()."""
+
+    default_preset = "fast"  # m0_compact_n8192: the preset local mode is sized for
 
     def __init__(self, path: str | os.PathLike[str]) -> None:
         import openfhe
 
+        if ".".join(openfhe.__version__.split(".")[:3]) != OPENFHE_VERSION:
+            raise RuntimeError(
+                f"local mode needs openfhe-python {OPENFHE_VERSION}, found {openfhe.__version__}"
+            )
         self.pb, _ = load_stubs(grpc_module=False)
-        self.openfhe_version = openfhe.__version__
-        self.server = LocalServer(path, self.pb, self.openfhe_version)
-        self.stub = self.server
+        self._lock = threading.Lock()
+        self._free: list[_Channel] = []
+        self.closed = False
+        self._authkey = secrets.token_bytes(32)
+        self._sock = os.path.join(tempfile.mkdtemp(prefix="ombra-local-sock-"), "s")
+        ctx = multiprocessing.get_context("spawn")
+        self._proc = ctx.Process(
+            target=_child_main,
+            args=(str(Path(path)), self._sock, self._authkey, os.getpid()),
+            daemon=True,
+        )
+        self._proc.start()
+        atexit.register(self.close)
+        deadline = time.monotonic() + 120
+        while not os.path.exists(self._sock):
+            if not self._proc.is_alive() or time.monotonic() > deadline:
+                raise ChildError("the local server process did not start")
+            time.sleep(0.02)
+        self.stub = _Stub(self)
+        self.openfhe_version = self._control("hello")["openfhe_version"]
+        if self.openfhe_version != OPENFHE_VERSION:
+            self.close()
+            raise RuntimeError(
+                f"ombra._native is built against OpenFHE {self.openfhe_version}, not "
+                f"{OPENFHE_VERSION}"
+            )
 
     def __repr__(self) -> str:
         return "LocalTransport()"
 
+    # connections
+    def _acquire(self) -> _Channel:
+        with self._lock:
+            if self._free:
+                return self._free.pop()
+        return _Channel(mpc.Client(self._sock, family="AF_UNIX", authkey=self._authkey))
+
+    def _release(self, ch: _Channel) -> None:
+        if ch.ok and not self.closed:
+            with self._lock:
+                self._free.append(ch)
+        else:
+            ch.conn.close()
+
+    def _control(self, what: str) -> dict[str, Any]:
+        ch = self._acquire()
+        try:
+            ch.conn.send(("control", what))
+            out: dict[str, Any] = ch.conn.recv()
+            return out
+        except BaseException:
+            ch.ok = False
+            raise
+        finally:
+            self._release(ch)
+
+    def modules_loaded(self) -> dict[str, Any]:
+        """For tests: what the child process has imported (never the openfhe-python wheel)."""
+        return self._control("modules")
+
+    def _call(self, method: str, request: Any) -> Any:
+        streams_in, streams_out, _, resp_cls = _method(self.pb, method)
+        ch = self._acquire()
+        try:
+            if streams_in:
+                ch.conn.send(("call", method, None))
+                requests = iter(request)
+            else:
+                ch.conn.send(("call", method, request.SerializeToString()))
+                requests = iter(())
+        except BaseException:
+            ch.ok = False
+            self._release(ch)
+            raise
+        gen = self._drive(ch, requests, resp_cls)
+        if streams_out and method == "Search":
+            return gen  # interactive: the caller's next request depends on the last response
+        out = list(gen)
+        if streams_out:
+            return iter(out)
+        if len(out) != 1:
+            raise ChildError("the local server gave no single response")
+        return out[0]
+
+    def _drive(self, ch: _Channel, requests: Iterator[Any], resp_cls: Any) -> Iterator[Any]:
+        done = False
+        try:
+            while True:
+                frame = ch.conn.recv_bytes()
+                tag, body = frame[:1], frame[1:]
+                if tag == b"R":
+                    yield resp_cls.FromString(body)
+                elif tag == b"N":
+                    try:
+                        msg = next(requests)
+                    except StopIteration:
+                        ch.conn.send_bytes(b"E")
+                    else:
+                        ch.conn.send_bytes(b"D" + msg.SerializeToString())
+                elif tag == b"E":
+                    done = True
+                    return
+                else:
+                    raise ChildError("the local server process failed")
+        finally:
+            if not done:
+                ch.ok = False  # abandoned or failed: do not reuse the connection
+            self._release(ch)
+
     def close(self) -> None:
-        self.server.close()
+        if self.closed:
+            return
+        try:
+            self._control("shutdown")
+        except Exception:  # noqa: S110 - the child may be gone already
+            pass
+        self.closed = True
+        for ch in self._free:
+            ch.conn.close()
+        self._free.clear()
+        self._proc.join(10)
+        if self._proc.is_alive():
+            self._proc.kill()
+        shutil.rmtree(os.path.dirname(self._sock), ignore_errors=True)
+
+
+# ---- the child side ------------------------------------------------------------------------------
+def _child_main(path: str, sock: str, authkey: bytes, parent_pid: int) -> None:
+    """Entry point of the child process: serve `LocalServer` on a local socket until told to stop,
+    or until the client process is gone."""
+    if os.environ.get("OMBRA_LOCAL_THREADS"):  # threads of the server's OpenFHE work (before load)
+        os.environ["OMP_NUM_THREADS"] = os.environ["OMBRA_LOCAL_THREADS"]
+    if os.environ.get("OMBRA_LOCAL_DEBUG") == "1":
+        import faulthandler
+
+        faulthandler.dump_traceback_later(240, repeat=True, file=sys.stderr)
+    pb, _ = load_stubs(grpc_module=False)
+    server = LocalServer(path, pb, _native().openfhe_version())
+    listener = mpc.Listener(sock, family="AF_UNIX", authkey=authkey)
+    stop = threading.Event()
+
+    def watch_parent() -> None:
+        while not stop.wait(1.0):
+            if os.getppid() != parent_pid:
+                os._exit(0)
+
+    threading.Thread(target=watch_parent, daemon=True).start()
+
+    def handle(conn: Any) -> None:
+        try:
+            while True:
+                try:
+                    msg = conn.recv()
+                except (EOFError, OSError):
+                    return
+                if msg[0] == "control":
+                    if msg[1] == "hello":
+                        conn.send({"openfhe_version": server.version})
+                    elif msg[1] == "modules":
+                        conn.send(
+                            {
+                                "openfhe_loaded": "openfhe" in sys.modules,
+                                "native_loaded": "ombra._native" in sys.modules,
+                            }
+                        )
+                    else:  # shutdown
+                        conn.send({})
+                        stop.set()
+                        return
+                    continue
+                _serve_call(server, pb, conn, msg[1], msg[2])
+        except (EOFError, OSError):
+            return
+        finally:
+            conn.close()
+
+    def accept_loop() -> None:
+        while not stop.is_set():
+            try:
+                conn = listener.accept()
+            except (OSError, EOFError, mpc.AuthenticationError):
+                continue
+            threading.Thread(target=handle, args=(conn,), daemon=True).start()
+
+    threading.Thread(target=accept_loop, daemon=True).start()
+    stop.wait()
+    server.close()
+    os._exit(0)
+
+
+def _serve_call(server: LocalServer, pb: Any, conn: Any, method: str, body: bytes | None) -> None:
+    streams_in, streams_out, req_cls, _ = _method(pb, method)
+    fn = getattr(server, method)
+
+    def requests() -> Iterator[Any]:
+        while True:
+            conn.send_bytes(b"N")
+            frame = conn.recv_bytes()
+            if frame[:1] != b"D":
+                return
+            yield req_cls.FromString(frame[1:])
+
+    try:
+        result = fn(requests()) if streams_in else fn(req_cls.FromString(body or b""))
+        if streams_out:
+            for r in result:
+                conn.send_bytes(b"R" + r.SerializeToString())
+        else:
+            conn.send_bytes(b"R" + result.SerializeToString())
+        conn.send_bytes(b"E")
+    except (EOFError, OSError):
+        raise
+    except Exception as exc:
+        # No details by default: a message could carry data. The client sees "the local server
+        # failed". OMBRA_LOCAL_DEBUG=1 prints the exception type and traceback (for developers).
+        if os.environ.get("OMBRA_LOCAL_DEBUG") == "1":
+            import traceback
+
+            print("local server error:", type(exc).__name__, file=sys.stderr)
+            traceback.print_exc()
+        conn.send_bytes(b"X")
 
 
 def _atomic(path: Path, data: bytes) -> None:
@@ -87,16 +364,6 @@ def _atomic(path: Path, data: bytes) -> None:
     tmp = path.with_name(path.name + ".tmp")
     tmp.write_bytes(data)
     os.replace(tmp, path)
-
-
-def dlog5(galois: int, ring: int) -> int:
-    """r with 5^r = galois mod 2N (rotation index of an automorphism of the slots)."""
-    e = 1
-    for r in range(ring // 2):
-        if e == galois:
-            return r
-        e = (e * 5) % (2 * ring)
-    raise ValueError("Galois element is not a slot rotation")
 
 
 class _Coll:
@@ -107,7 +374,7 @@ class _Coll:
         self.order: list[str] = []
         self.tombstones: set[bytes] = set()
         self.next_seg = 0
-        self.ctx: Any = None  # (cc, ring, batch) after keys are installed
+        self.ctx: Any = None  # the ombra._native.Engine once the keys are installed
 
 
 class LocalServer:
@@ -121,21 +388,27 @@ class LocalServer:
                 raise ValueError("unknown local store format or version")
         else:
             _atomic(marker, FORMAT)
-        self._tmp = Path(tempfile.mkdtemp(prefix="ombra-local-"))
-        self._cols: dict[tuple[str, str], list[Any]] = {}  # (collection, segment) -> ciphertexts
+        self.lock = threading.RLock()  # one operation at a time, except between search steps
+        self._cols: OrderedDict[tuple[str, str], Any] = OrderedDict()  # -> native Columns
+        self._cols_bytes = 0
         self._colls: dict[str, _Coll] = {}
         for d in sorted((self.root / "c").glob("*")) if (self.root / "c").exists() else []:
             spec = pb.CollectionSpec.FromString((d / "spec.pb").read_bytes())
             self._colls[spec.name] = self._load(spec, d)
 
     def close(self) -> None:
-        shutil.rmtree(self._tmp, ignore_errors=True)
         self._cols.clear()
+        self._cols_bytes = 0
 
     def __repr__(self) -> str:
         return "LocalServer()"
 
     # ---- storage ----------------------------------------------------------------------------
+    def _uncache(self, key: tuple[str, str]) -> None:
+        old = self._cols.pop(key, None)
+        if old is not None:
+            self._cols_bytes -= old.nbytes
+
     def _dir(self, name: str) -> Path:
         return self.root / "c" / name.encode().hex()
 
@@ -152,7 +425,7 @@ class LocalServer:
         if (d / "tombstones").exists():
             c.tombstones = {bytes.fromhex(x) for x in (d / "tombstones").read_text().split()}
         if len(c.keys) == 3:
-            self._install(c)
+            c.ctx = self._engine(c, c.keys)
         return c
 
     def _save_tombstones(self, c: _Coll) -> None:
@@ -182,6 +455,12 @@ class LocalServer:
                 ) from None
             if "preset mismatch" in msg:
                 raise Refuse(self.pb.ERROR_PRESET_MISMATCH, "envelope preset differs") from None
+            if "OpenFHE version mismatch" in msg:
+                raise Refuse(
+                    self.pb.ERROR_INVALID_ARGUMENT,
+                    f"envelope was made with another OpenFHE version than the server's "
+                    f"({OPENFHE_VERSION})",
+                ) from None
             raise Refuse(self.pb.ERROR_INVALID_ARGUMENT, "invalid envelope") from None
 
     # ---- collections ------------------------------------------------------------------------
@@ -258,7 +537,7 @@ class LocalServer:
         shutil.rmtree(c.root, ignore_errors=True)
         del self._colls[req.name]
         for k in [k for k in self._cols if k[0] == req.name]:
-            del self._cols[k]
+            self._uncache(k)
         return self.pb.DropCollectionResponse()
 
     # ---- keys -------------------------------------------------------------------------------
@@ -303,53 +582,29 @@ class LocalServer:
             if set(staged) != set(KEY_KINDS.values()):
                 raise Refuse(pb.ERROR_INVALID_ARGUMENT, "an upload needs all three key kinds")
             c = self._coll(name)
-            self._check_keys(c, staged)
+            engine = self._engine(c, staged)
             for k, v in staged.items():
                 _atomic(c.root / "keys" / k, v)
-            c.keys = staged
-            self._install(c)
+            c.keys, c.ctx = staged, engine
         except Refuse as e:
             return pb.UploadKeysResponse(error=self._err(e))
         return pb.UploadKeysResponse()
 
-    def _check_keys(self, c: _Coll, files: dict[str, bytes]) -> None:
-        self._envelope(c, files["context"], Kind.CONTEXT)
-        tag = c.spec.key_tag.encode()
-        for k in ("evalmult", "automorphism"):
-            payload = self._envelope(c, files[k], Kind.PUBLIC_EVAL_KEY)
-            if tag not in payload:  # the key tag is stored in every evaluation key
-                raise Refuse(
-                    self.pb.ERROR_KEY_TAG_MISMATCH,
-                    "evaluation keys were made under another key than the collection's",
-                )
-
-    def _file(self, payload: bytes, name: str = "x.bin") -> str:
-        p = self._tmp / name
-        p.write_bytes(payload)
-        return str(p)
-
-    def _install(self, c: _Coll) -> None:
-        import openfhe as ofhe
-
-        pl = self._envelope(c, c.keys["context"], Kind.CONTEXT)
-        cc, ok = ofhe.DeserializeCryptoContext(self._file(pl), ofhe.BINARY)
-        if not ok:
-            raise Refuse(self.pb.ERROR_INVALID_ARGUMENT, "cannot read the context")
-        mult = self._file(self._envelope(c, c.keys["evalmult"], Kind.PUBLIC_EVAL_KEY))
-        auto = self._file(
-            self._envelope(c, c.keys["automorphism"], Kind.PUBLIC_EVAL_KEY), "auto.bin"
-        )
+    def _engine(self, c: _Coll, files: dict[str, bytes]) -> Any:
+        """Open the three envelopes and deserialize the keys in C++; the key tag is checked from
+        the keys that were really deserialized."""
+        native = _native()
+        ctx = self._envelope(c, files["context"], Kind.CONTEXT)
+        mult = self._envelope(c, files["evalmult"], Kind.PUBLIC_EVAL_KEY)
+        auto = self._envelope(c, files["automorphism"], Kind.PUBLIC_EVAL_KEY)
         try:
-            ok_mult = cc.DeserializeEvalMultKey(mult, ofhe.BINARY)
-        except RuntimeError as ex:
-            # OpenFHE's key store is process-wide: when the client lives in this process, its own
-            # (identical, same key tag) public keys are already there.
-            if "there is a key vector for the given keyTag" not in str(ex):
-                raise
-            ok_mult = True
-        if not ok_mult or not cc.DeserializeEvalAutomorphismKey(auto, ofhe.BINARY):
-            raise Refuse(self.pb.ERROR_INVALID_ARGUMENT, "cannot read the evaluation keys")
-        c.ctx = (cc, cc.GetRingDimension(), cc.GetEncodingParams().GetBatchSize())
+            return native.Engine(ctx, mult, auto, c.spec.key_tag)
+        except native.KeyTagError as ex:
+            raise Refuse(self.pb.ERROR_KEY_TAG_MISMATCH, str(ex)) from None
+        except ValueError:
+            raise Refuse(
+                self.pb.ERROR_INVALID_ARGUMENT, "cannot read the context or keys"
+            ) from None
 
     # ---- insert, delete ---------------------------------------------------------------------
     def Insert(self, blocks: Iterable[Any]) -> Any:
@@ -373,7 +628,7 @@ class LocalServer:
                     raise Refuse(pb.ERROR_INVALID_ARGUMENT, "is_center must match the center id")
                 if len(b.ids) == 0:
                     raise Refuse(pb.ERROR_INVALID_ARGUMENT, "block has no ids")
-                if len(b.ids) > c.ctx[2]:
+                if len(b.ids) > c.ctx.batch_size:
                     raise Refuse(pb.ERROR_SIZE_LIMIT, "block has more ids than slots")
                 known = {i for s in c.segments.values() for i in s.ids}
                 seen: set[bytes] = set()
@@ -412,7 +667,7 @@ class LocalServer:
         (c.root / "blocks" / f"{seg}.pb").unlink(missing_ok=True)
         c.segments.pop(seg, None)
         c.order.remove(seg)
-        self._cols.pop((c.spec.name, seg), None)
+        self._uncache((c.spec.name, seg))
 
     def _purge(self, c: _Coll) -> None:
         """Drop blocks whose vectors are all deleted, and tombstones of ids no block holds."""
@@ -514,7 +769,7 @@ class LocalServer:
             if header is None:
                 raise Refuse(pb.ERROR_BAD_SEQUENCE, "no header")
             c = self._coll(header.collection)
-            if len(header.ids) > c.ctx[2] if c.ctx else False:
+            if len(header.ids) > c.ctx.batch_size if c.ctx else False:
                 raise Refuse(pb.ERROR_SIZE_LIMIT, "block has more ids than slots")
             segs = list(header.segments)
             if any(s not in c.segments for s in segs):
@@ -637,65 +892,37 @@ class LocalServer:
             return pb.DeleteBlobsResponse(error=self._err(e))
 
     # ---- search -----------------------------------------------------------------------------
-    def _ct(self, payload: bytes) -> Any:
-        import openfhe as ofhe
-
-        ct, ok = ofhe.DeserializeCiphertext(self._file(payload, "ct.bin"), ofhe.BINARY)
-        if not ok:
-            raise Refuse(self.pb.ERROR_INVALID_ARGUMENT, "cannot read a ciphertext")
-        return ct
-
-    def _expand(self, c: _Coll, query: Any, n_leaves: int) -> list[Any]:
-        """leaf_r = trace(p * plaintext_r) for r < n_leaves; see the module docstring."""
-        cc, ring, _ = c.ctx
-        depth = oq.expansion_depth(n_leaves)
-        rots = [dlog5(g, ring) for g in oq.automorphism_indices(ring, n_leaves)]
-        leaves = []
-        for r in range(n_leaves):
-            e = np.zeros(n_leaves)
-            e[r] = 1.0 if r == 0 else 0.5
-            slots = oq.symmetric_slots(e, ring)  # C_r / 2 (1 for r = 0)
-            acc = cc.EvalMult(query, cc.MakeCKKSPackedPlaintext(slots.tolist()))
-            for rot in rots[:depth]:
-                acc = cc.EvalAdd(acc, cc.EvalAtIndex(acc, rot))
-            leaves.append(cc.Rescale(acc))
-        return leaves
-
-    def _columns(self, c: _Coll, seg: str) -> list[Any]:
+    def _columns(self, c: _Coll, seg: str) -> Any:
         key = (c.spec.name, seg)
         cols = self._cols.get(key)
-        if cols is None:
-            b = c.segments[seg]
-            cols = [self._ct(self._envelope(c, col, Kind.CIPHERTEXT)) for col in b.columns]
-            if len(self._cols) >= CACHE_BLOCKS:
-                self._cols.pop(next(iter(self._cols)))
-            self._cols[key] = cols
+        if cols is not None:
+            self._cols.move_to_end(key)
+            return cols
+        b = c.segments[seg]
+        payloads = [self._envelope(c, col, Kind.CIPHERTEXT) for col in b.columns]
+        try:
+            cols = c.ctx.load_columns(payloads)
+        except _native().KeyTagError as ex:
+            raise Refuse(self.pb.ERROR_KEY_TAG_MISMATCH, str(ex)) from None
+        self._cols[key] = cols
+        self._cols_bytes += cols.nbytes
+        while self._cols_bytes > CACHE_BYTES and len(self._cols) > 1:
+            _, old = self._cols.popitem(last=False)
+            self._cols_bytes -= old.nbytes
         return cols
 
-    def _score(self, c: _Coll, seg: str, leaves: list[Any], tomb: bool) -> bytes:
-        import openfhe as ofhe
-
-        cc, _, batch = c.ctx
+    def _score(self, c: _Coll, seg: str, leaves: Any, tomb: bool) -> bytes:
         b = c.segments[seg]
-        cols = self._columns(c, seg)
-        acc = None
-        for leaf, col in zip(leaves, cols, strict=True):
-            t = cc.EvalMultNoRelin(leaf, col)
-            acc = t if acc is None else cc.EvalAdd(acc, t)
-        res = cc.Rescale(cc.Relinearize(acc))
+        penalty: list[float] = []
         if tomb:
             n_fields = len(c.spec.filter_fields)
-            pen = np.zeros(batch)
-            hit = False
+            pen = [0.0] * c.ctx.batch_size
             for i, ident in enumerate(b.ids):
                 if ident in c.tombstones:
-                    pen[i], hit = -LAMBDA * (n_fields + 1), True
-            if hit:
-                res = cc.EvalAdd(res, cc.MakeCKKSPackedPlaintext(pen.tolist(), 1, res.GetLevel()))
-        p = self._tmp / "out.bin"
-        if not ofhe.SerializeToFile(str(p), res, ofhe.BINARY):
-            raise Refuse(self.pb.ERROR_INTERNAL, "internal error")
-        return write_envelope(Kind.CIPHERTEXT, c.spec.preset, self.version, p.read_bytes())
+                    pen[i] = -LAMBDA * (n_fields + 1)
+                    penalty = pen
+        res = c.ctx.score(leaves, self._columns(c, seg), penalty)
+        return write_envelope(Kind.CIPHERTEXT, c.spec.preset, self.version, res)
 
     def Search(self, requests: Iterable[Any]) -> Iterator[Any]:
         pb = self.pb
@@ -711,28 +938,30 @@ class LocalServer:
             if first.WhichOneof("step") != "start":
                 raise Refuse(pb.ERROR_BAD_SEQUENCE, "the first message must be SearchStart")
             st = first.start
-            c = self._coll(st.collection)
-            if st.key_tag != c.spec.key_tag:
-                raise Refuse(pb.ERROR_KEY_TAG_MISMATCH, "request key tag differs")
-            if c.ctx is None:
-                raise Refuse(pb.ERROR_KEYS_MISSING, "evaluation keys are not uploaded")
-            if st.filter_leaves != sum(f.cardinality for f in c.spec.filter_fields):
-                raise Refuse(pb.ERROR_INVALID_FILTER_LAYOUT, "filter_leaves differs")
-            if not st.query:
-                raise Refuse(pb.ERROR_INVALID_ARGUMENT, "query is empty")
-            query = self._ct(self._envelope(c, st.query, Kind.CIPHERTEXT))
-            if query.GetKeyTag() != c.spec.key_tag:
-                raise Refuse(pb.ERROR_KEY_TAG_MISMATCH, "query made under another key")
-            if query.GetLevel() != 0 or query.GetNoiseScaleDeg() != 1:
-                raise Refuse(pb.ERROR_INVALID_ARGUMENT, "query has an unexpected level or scale")
-            d = c.spec.dimension
-            leaves = self._expand(c, query, d + st.filter_leaves)
-            center = c.spec.cluster_count
-            out = pb.SearchCenterScores()
-            for seg in c.order:
-                if c.segments[seg].cluster_id == center:
-                    out.score_blocks.append(self._score(c, seg, leaves[:d], False))
-                    out.center_count += len(c.segments[seg].ids)
+            with self.lock:
+                c = self._coll(st.collection)
+                if st.key_tag != c.spec.key_tag:
+                    raise Refuse(pb.ERROR_KEY_TAG_MISMATCH, "request key tag differs")
+                if c.ctx is None:
+                    raise Refuse(pb.ERROR_KEYS_MISSING, "evaluation keys are not uploaded")
+                if st.filter_leaves != sum(f.cardinality for f in c.spec.filter_fields):
+                    raise Refuse(pb.ERROR_INVALID_FILTER_LAYOUT, "filter_leaves differs")
+                if not st.query:
+                    raise Refuse(pb.ERROR_INVALID_ARGUMENT, "query is empty")
+                payload = self._envelope(c, st.query, Kind.CIPHERTEXT)
+                d = c.spec.dimension
+                try:
+                    leaves = c.ctx.expand(payload, d + st.filter_leaves)
+                except _native().KeyTagError as ex:
+                    raise Refuse(pb.ERROR_KEY_TAG_MISMATCH, str(ex)) from None
+                except ValueError as ex:
+                    raise Refuse(pb.ERROR_INVALID_ARGUMENT, str(ex)) from None
+                center = c.spec.cluster_count
+                out = pb.SearchCenterScores()
+                for seg in c.order:
+                    if c.segments[seg].cluster_id == center:
+                        out.score_blocks.append(self._score(c, seg, leaves, False))
+                        out.center_count += len(c.segments[seg].ids)
             yield pb.SearchResponse(centers=out)
             for req in it:
                 if req.WhichOneof("step") != "chosen":
@@ -747,11 +976,42 @@ class LocalServer:
                 clusters = list(dict.fromkeys(ids))
                 for n, cl in enumerate(clusters):
                     msg = pb.SearchScores(cluster_id=cl, last=n + 1 == len(clusters))
-                    for seg in c.order:
-                        b = c.segments[seg]
-                        if b.cluster_id == cl:
-                            msg.score_blocks.append(self._score(c, seg, leaves, True))
-                            msg.ids.extend(b.ids)
+                    with self.lock:
+                        for seg in c.order:
+                            b = c.segments[seg]
+                            if b.cluster_id == cl:
+                                msg.score_blocks.append(self._score(c, seg, leaves, True))
+                                msg.ids.extend(b.ids)
                     yield pb.SearchResponse(scores=msg)
         except Refuse as e:
             yield error(e)
+
+
+def _locked(fn: Any) -> Any:
+    """Run a server method under the server lock; streams are produced fully inside the lock."""
+    import functools
+    import inspect
+
+    if inspect.isgeneratorfunction(fn):
+
+        @functools.wraps(fn)
+        def gen(self: LocalServer, *a: Any) -> Iterator[Any]:
+            with self.lock:
+                items = list(fn(self, *a))
+            return iter(items)
+
+        return gen
+
+    @functools.wraps(fn)
+    def run(self: LocalServer, *a: Any) -> Any:
+        with self.lock:
+            return fn(self, *a)
+
+    return run
+
+
+for _name in (
+    "CreateCollection GetCollection ListCollections DropCollection UploadKeys Insert Delete "
+    "ListBlocks GetBlock ReplaceBlock PutBlob GetBlob DeleteBlobs"
+).split():
+    setattr(LocalServer, _name, _locked(getattr(LocalServer, _name)))

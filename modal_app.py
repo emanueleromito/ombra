@@ -118,6 +118,46 @@ def _build(build_type: str, targets: tuple[str, ...] = ()) -> None:
     _run(build_cmd)
 
 
+NATIVE_BUILD_DIR = "/root/ombra-native-build"
+
+
+def _build_native() -> None:
+    """T3.7: build ombra._native (client/CMakeLists.txt) against OpenFHE in /usr/local and put it
+    next to the client sources (tests import the client from source). CPU only, no CUDA."""
+    import glob
+    import os
+    import shutil
+
+    pybind = subprocess.run(
+        ["python", "-m", "pybind11", "--cmakedir"], check=True, capture_output=True, text=True
+    ).stdout.strip()
+    env_backup = os.environ.get("OMBRA_REQUIRE_NATIVE")
+    os.environ["OMBRA_REQUIRE_NATIVE"] = "1"
+    try:
+        _run(
+            [
+                "cmake",
+                "-S",
+                f"{REPO_DIR}/client",
+                "-B",
+                NATIVE_BUILD_DIR,
+                "-G",
+                "Ninja",
+                "-DCMAKE_BUILD_TYPE=Release",
+                f"-Dpybind11_DIR={pybind}",
+                f"-DPython_EXECUTABLE={shutil.which('python')}",
+            ]
+        )
+        _run(["cmake", "--build", NATIVE_BUILD_DIR, "-j"])
+    finally:
+        if env_backup is None:
+            os.environ.pop("OMBRA_REQUIRE_NATIVE", None)
+        else:
+            os.environ["OMBRA_REQUIRE_NATIVE"] = env_backup
+    for so in glob.glob(f"{NATIVE_BUILD_DIR}/_native*.so"):
+        shutil.copy(so, f"{REPO_DIR}/client/ombra/")
+
+
 @app.function(gpu="A10", timeout=600)
 def gpu_info() -> None:
     """Print GPU, CUDA and OpenFHE versions, to check the image."""
@@ -153,6 +193,7 @@ def gpu_info() -> None:
 def test_gpu(pytest_args: str = "") -> None:
     """Build in Debug and run C++ (ctest) and Python GPU tests on an A10."""
     _build("Debug")
+    _build_native()  # the parity test (T3.7) also runs local mode
     _run(["ctest", "--test-dir", BUILD_DIR, "--output-on-failure", "--no-tests=ignore"])
     # Zero collected tests (pytest exit code 5) is a failure: GPU tests exist now (T0.3). The
     # driver for tests/test_gpu_ciphertext_roundtrip.py is built into BUILD_DIR above.
@@ -174,6 +215,7 @@ def test_openfhe(pytest_args: str = "") -> None:
     Release build, so the CPU timings are meaningful.
     """
     _build("Release", targets=("ombra_expand", "ombra_encoding_check"))
+    _build_native()  # T3.7: local mode runs the compiled expansion in a child process
     cmd = ["python", "-m", "pytest", "-m", "openfhe", "-v", "-s", *pytest_args.split()]
     _run(cmd, ok_codes=(0,))
     volume.commit()
@@ -232,34 +274,78 @@ def bench_e2e(extra: str = "") -> None:
     volume.commit()
 
 
-@app.function(cpu=4.0, memory=16384, timeout=3600)
-def cpu_run(cmd: str) -> None:
-    """Run one command in the repo on CPU in the pinned image, without building C++ (T3.7)."""
+def _cpu_run(cmd: str) -> None:
     import os
 
-    env = {**os.environ, "PYTHONPATH": f"{REPO_DIR}/client:{REPO_DIR}/tests"}
-    print("$", cmd, flush=True)
-    code = subprocess.run(cmd.split(), cwd=REPO_DIR, env=env).returncode
+    _build_native()
+    env = {
+        **os.environ,
+        "PYTHONPATH": f"{REPO_DIR}/client:{REPO_DIR}/tests",
+        "OMBRA_LOCAL_DEBUG": "1",
+    }
+    words = cmd.split()
+    while words and "=" in words[0] and not words[0].startswith("-"):
+        key, _, value = words.pop(0).partition("=")  # leading KEY=VALUE words are environment
+        env[key] = value
+    print("$", " ".join(words), flush=True)
+    code = subprocess.run(words, cwd=REPO_DIR, env=env).returncode
     if code != 0:
         raise SystemExit(f"command failed with exit code {code}: {cmd}")
 
 
-# T3.7: a machine WITHOUT a GPU and without our OpenFHE build: a plain Python image, `pip install
-# ./client[local]` (openfhe comes from PyPI, a wheel built for CPython 3.12), then a tiny search.
-# Only the client folder and the check script are uploaded.
+@app.function(cpu=4.0, memory=32768, timeout=7200)
+def cpu_run(cmd: str) -> None:
+    """Run one command in the repo on 4 CPUs in the pinned image, after building ombra._native."""
+    _cpu_run(cmd)
+
+
+@app.function(cpu=8.0, memory=32768, timeout=7200)
+def cpu_run8(cmd: str) -> None:
+    """Same as cpu_run on 8 CPUs (T3.7 timings)."""
+    _cpu_run(cmd)
+
+
+# T3.7: a machine WITHOUT a GPU: a plain Python 3.12 image, OpenFHE 1.6.1 (C++) installed the way
+# the docs describe, then `pip install ./client[local]`: openfhe-python comes from PyPI (a wheel for
+# CPython 3.12), and ombra._native is compiled by pip against the OpenFHE above (T4.1 will ship
+# wheels, then no compiler is needed). Only the client folder, the headers of core/ the extension
+# shares with the server, and the check script are uploaded.
+_CORE_FILES = ("src/security_floor.cpp", "src/openfhe_expand_ops.hpp")
+
+
+def _skip_core(p: Path) -> bool:
+    s = str(p)
+    keep = s in ("include", "src") or s.startswith("include/") or s in _CORE_FILES
+    return not keep
+
+
 local_install_image = (
     modal.Image.from_registry("ubuntu:24.04", add_python="3.12")  # libstdc++ of GCC 13+
-    .apt_install("libgomp1")  # the openfhe wheel needs OpenMP from the system
+    .apt_install("git", "build-essential", "cmake", "ninja-build", "libomp-dev")
+    .run_commands(
+        f"git clone --depth 1 --branch {OPENFHE_TAG} "
+        "https://github.com/openfheorg/openfhe-development /opt/openfhe-src",
+        "cmake -S /opt/openfhe-src -B /opt/openfhe-build -G Ninja "
+        "-DCMAKE_BUILD_TYPE=Release -DBUILD_UNITTESTS=OFF -DBUILD_EXAMPLES=OFF "
+        "-DBUILD_BENCHMARKS=OFF -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++",
+        "cmake --build /opt/openfhe-build -j",
+        "cmake --install /opt/openfhe-build",
+        "ldconfig",
+    )
+    .add_local_dir("core", remote_path="/work/core", copy=True, ignore=_skip_core)
     .add_local_dir(
         "client",
         remote_path="/work/client",
         copy=True,
         ignore=lambda p: any(
-            s in str(p) for s in ("__pycache__", ".pytest_cache", "tests", ".ruff_cache")
+            s in str(p)
+            for s in ("__pycache__", ".pytest_cache", "tests", ".ruff_cache", "_native.cpython")
         ),
     )
     .add_local_file("tests/local_install_check.py", "/work/local_install_check.py", copy=True)
-    .run_commands("pip install '/work/client[local]'")
+    .run_commands(
+        "CC=gcc CXX=g++ OMBRA_REQUIRE_NATIVE=1 pip install '/work/client[local]'",
+    )
 )
 
 
