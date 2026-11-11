@@ -94,24 +94,27 @@ Note (user, 2026-11-10): 0019 stays accepted. Filtered recall on a real dataset 
 
 **Why:** on real data (T3.11, `results/2026-11-11-t3.11-filtered-recall.md`: arXiv CC0 40k, banking77 CC-BY 10k, fast preset) recall@10 at about 1% selectivity was 0.76 to 0.81, because the rule stops at k matches in the first round, and those are usually not the true nearest matches. Encryption costs nothing (encrypted recall equals plaintext recall under the same cluster choices in all 21 cells), so policies were compared in plaintext on the same data, clusters and queries (`results/2026-11-11-t3.11-probe-policies.md`).
 
-**Rule (E with check A):**
-1. The client keeps per-cluster counts of each filter value and per-cluster radii, as an encrypted blob on the server (never plaintext there), updated on insert and delete, rebuilt by re-clustering.
-2. Clusters are taken in centre-score order, skipping clusters with zero expected matches, until the expected match count reaches 3k; the first round is never smaller than an unfiltered query's.
-3. Below 0.5% expected selectivity the client does a Strict full scan.
-4. Check A: keep widening while centre score + cluster radius of the next cluster exceeds the current k-th match score, capped at 2 rounds (default).
+**Rule: E plus one capped widening round.**
+1. The client keeps per-cluster counts of each filter value as an encrypted blob on the server (never plaintext there), updated on insert and delete, rebuilt by re-clustering.
+2. Round 1: clusters in centre-score order, skipping clusters with zero expected matches, until the expected match count reaches 3k; never fewer clusters than an unfiltered query's first round.
+3. Round 2: always exactly one widening round over the next clusters with nonzero expected matches (twice round 1's real clusters, capped by what is left).
+4. Below 0.5% expected selectivity: a Strict full scan in two rounds.
+5. Round count fixed per level: every filtered query does exactly 2 rounds. In Decoy and Strict, unfiltered queries also do 2 rounds, so the server cannot tell whether a filter was used; Fast keeps 1 round for unfiltered queries. Strict splits all clusters into two halves by cluster id. Decoy pads each round with decoys to a fixed requested count, min(C, 2f) then min(C - round 1, 4f) with f = n_probe, and never requests a cluster twice.
 
-**Measured (plaintext, 19 filtered cells, 6 at about 1%):**
+A radius-based stopping check (centre score + cluster radius against the k-th match score) was tried and dropped: on 384-d text the bound is about 1 for every cluster, so it never stopped the search.
 
-| policy | min recall@10 at ~1% | clusters searched at ~1% (of 20 / 6) |
+**Measured (plaintext, both datasets, same cells as T3.11; `results/2026-11-11-t3.11-probe-policies.md`):**
+
+| policy | min recall@10 at ~1% | clusters searched |
 | --- | --- | --- |
-| 0019 rule (stop at k) | 0.755 | 6.1 |
-| B: stop at 3k | 0.830 | 7.1 |
-| E alone | 0.768 | 4.1 |
-| E + A, max 2 rounds (default) | 0.991 | 9.8 |
-| E + A, max 3-4 rounds | 1.000 | 11.2 |
+| 0019 rule (stop at k) | 0.755 | 6.1 at ~1% |
+| B: stop at 3k | 0.830 | 7.1 at ~1% |
+| this rule, Fast | 0.991 | 9.8 mean; worst filtered cell 0.0085 below unfiltered |
+| this rule, Decoy | 1.000 | 15.3 mean (fixed by the padding rule) |
+| this rule, Strict | exact | all clusters, 2 rounds |
 
-With max 2 rounds no filtered cell falls more than 0.01 below the unfiltered recall. Check A's radius bound is loose on 384-d text (quantiles from max down to p75 gave the same numbers): the gain comes from the capped second round over clusters that can hold matches, not from pruning. Filtered queries therefore search about twice the clusters of an unfiltered one; latency was modelled, not measured.
+Filtered queries therefore search about twice the clusters of an unfiltered one in Fast; latency was modelled, not measured.
 
-**Leakage:** Fast mode's chosen clusters can hint at the filter value; Decoy hides it; the number of rounds, and a Strict scan below 0.5%, hint at selectivity (threat model updated).
+**Leakage:** in Fast mode the chosen clusters can hint at the filter value, and whether a query is filtered shows in its round count. Decoy and Strict hide whether a filter was used (fixed rounds, fixed per-round counts in Decoy) and Decoy hides which clusters are real. The below-0.5% Strict scan has its own request shape, so the server can see that a filter was very selective (threat model updated).
 
-**Still to do:** one small encrypted confirmation run on an A10 (asked of the user before running), then the user accepts or rejects this amendment.
+**Still to do:** one small encrypted confirmation on an A10 (approved by the user, combined with the T3.7 parity test), then the user accepts or rejects this amendment.

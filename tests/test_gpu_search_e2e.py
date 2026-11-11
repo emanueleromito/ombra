@@ -137,38 +137,33 @@ def test_insert_search_delete(tmp_path, backend) -> None:
         for q in queries:
             want = _plain(x, fields, live, q)
             _check(col.search(q, K, n_probe=2), want)  # fast (the collection's level)
-            _check(col.search(q, K, level="decoy", decoys=2, n_probe=2, seed=1), want)
+            res = col.search(q, K, level="decoy", n_probe=2, seed=1)
+            _check(res, want)
+            assert res.rounds == 2  # Decoy: two rounds, filtered or not
             res = col.search(q, K, level="strict")
             _check(res, want)
-            assert sorted(res.probed) == list(range(col.cluster_count))
+            assert sorted(res.probed) == list(range(col.cluster_count)) and res.rounds == 2
             assert res.hits[0].metadata == {"i": int(res.hits[0].id[1:])}
         _check(col.search(queries[0], K, n_probe=2, workers=2), _plain(x, fields, live, queries[0]))
 
-        # with a filter; a filtered query probes at least what the unfiltered one does
+        # with a filter (0019 amendment): at least the unfiltered clusters, exactly two rounds
         for q in queries:
             unf = col.search(q, K, n_probe=2)
             for v in (0, 1):
-                fil = col.search(q, K, filter={0: v}, n_probe=2, probe="basic")
+                fil = col.search(q, K, filter={0: v}, n_probe=2)
                 _check(fil, _plain(x, fields, live, q, v))
                 assert set(unf.probed) <= set(fil.probed)
-                assert fil.rounds == 1 and fil.probed == unf.probed  # K matches: no widening
+                assert fil.rounds == 2
             both = col.search(q, K, filter={0: [0, 1]}, n_probe=2)
             _check(
                 both, _plain(x, fields, live, q, None, [i for i in range(n) if fields[i, 0] < 2])
             )
 
-        # a selective filter (4 matches, K = 5) widens 2x per round up to max_probe, then stops
+        # a selective filter (4 matches, K = 5): every match is found, the answer is reported short
         q = queries[0]
         rare_want = _plain(x, fields, live, q, 2)
-        res = col.search(
-            q, K, filter={0: 2}, n_probe=1, max_probe_factor=2, probe="basic", strict_fallback=False
-        )
-        assert res.incomplete and len(res.probed) == 2 and res.rounds == 2
-        assert not res.strict_fallback and all(fields[int(h.id[1:]), 0] == 2 for h in res.hits)
-        res = col.search(
-            q, K, filter={0: 2}, n_probe=1, max_probe_factor=2, probe="basic"
-        )  # Strict fallback
-        assert res.strict_fallback and res.incomplete and sorted(res.probed) == list(range(6))
+        res = col.search(q, K, filter={0: 2}, n_probe=1)
+        assert res.incomplete and res.rounds == 2
         assert [h.id for h in res.hits] == rare_want[0] and len(res.hits) == 4
 
         # a new vector comes back first, with its metadata and document
