@@ -63,8 +63,9 @@ SEED = 20261111
 HF = "https://huggingface.co/datasets/"
 MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 TARGETS = (0.01, 0.10, 0.50)
-GPU_BUDGET_MB = 30000
-HOST_BUDGET_MB = 48000
+# Server memory budgets; defaults fit an A100-40GB host, override for smaller GPUs (A10: 24 GB).
+GPU_BUDGET_MB = int(os.environ.get("OMBRA_GPU_BUDGET_MB", "30000"))
+HOST_BUDGET_MB = int(os.environ.get("OMBRA_HOST_BUDGET_MB", "48000"))
 
 
 def _download(url: str, path: Path) -> None:

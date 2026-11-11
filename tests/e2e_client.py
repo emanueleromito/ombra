@@ -132,8 +132,9 @@ class ServerProcess:
                 line = self.proc.stdout.readline()
                 break
         if not line.startswith("ombra_server listening on "):
+            tail = self.log_tail()  # before stop(), which closes the log
             self.stop()
-            raise RuntimeError(f"server did not start; log tail:\n{self.log_tail()}")
+            raise RuntimeError(f"server did not start; log tail:\n{tail}")
         self.address = line.strip().split()[-1]
         self.rest_address = ""
         if "--rest-port" in extra_args:
