@@ -39,21 +39,21 @@
               "strict_share": 0.0,
               "modelled_latency_ms": 125.69058854412773
             },
-            "E": {
-              "recall_at_10": 0.9834,
-              "clusters_searched_mean": 5.0,
-              "rounds_mean": 1.0,
-              "rounds_max": 1,
+            "E2 (Fast)": {
+              "recall_at_10": 0.9997999999999999,
+              "clusters_searched_mean": 15.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
-              "modelled_latency_ms": 125.69058854412773
+              "modelled_latency_ms": 234.15188958299902
             },
-            "E+A": {
-              "recall_at_10": 0.9834,
-              "clusters_searched_mean": 5.0,
-              "rounds_mean": 1.0,
-              "rounds_max": 1,
+            "E2 (Decoy)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 20.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
-              "modelled_latency_ms": 125.69058854412773
+              "modelled_latency_ms": 288.38254010243463
             }
           }
         },
@@ -90,21 +90,21 @@
               "strict_share": 0.0,
               "modelled_latency_ms": 233.06727657261033
             },
-            "E": {
-              "recall_at_10": 0.8681,
-              "clusters_searched_mean": 5.0,
-              "rounds_mean": 1.0,
-              "rounds_max": 1,
-              "strict_share": 0.0,
-              "modelled_latency_ms": 125.69058854412773
-            },
-            "E+A": {
+            "E2 (Fast)": {
               "recall_at_10": 1.0,
               "clusters_searched_mean": 6.0,
               "rounds_mean": 2.0,
               "rounds_max": 2,
               "strict_share": 0.0,
               "modelled_latency_ms": 136.53671864801487
+            },
+            "E2 (Decoy)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 20.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 288.38254010243463
             }
           }
         },
@@ -152,19 +152,19 @@
               "strict_share": 0.0,
               "modelled_latency_ms": 125.69058854412773
             },
-            "E": {
-              "recall_at_10": 0.8876000000000002,
-              "clusters_searched_mean": 5.0,
-              "rounds_mean": 1.0,
-              "rounds_max": 1,
+            "E2 (Fast)": {
+              "recall_at_10": 0.995,
+              "clusters_searched_mean": 15.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
-              "modelled_latency_ms": 125.69058854412773
+              "modelled_latency_ms": 234.15188958299902
             },
-            "E+A": {
+            "E2 (Decoy)": {
               "recall_at_10": 1.0,
               "clusters_searched_mean": 20.0,
-              "rounds_mean": 3.0,
-              "rounds_max": 3,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
               "modelled_latency_ms": 288.38254010243463
             }
@@ -243,19 +243,19 @@
               "strict_share": 0.0,
               "modelled_latency_ms": 125.69058854412773
             },
-            "E": {
-              "recall_at_10": 0.971,
-              "clusters_searched_mean": 5.0,
-              "rounds_mean": 1.0,
-              "rounds_max": 1,
+            "E2 (Fast)": {
+              "recall_at_10": 0.9990999999999999,
+              "clusters_searched_mean": 15.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
-              "modelled_latency_ms": 125.69058854412773
+              "modelled_latency_ms": 234.15188958299902
             },
-            "E+A": {
+            "E2 (Decoy)": {
               "recall_at_10": 1.0,
               "clusters_searched_mean": 20.0,
-              "rounds_mean": 3.0,
-              "rounds_max": 3,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
               "modelled_latency_ms": 288.38254010243463
             }
@@ -294,21 +294,21 @@
               "strict_share": 0.0,
               "modelled_latency_ms": 141.85132239891956
             },
-            "E": {
-              "recall_at_10": 0.7682,
-              "clusters_searched_mean": 5.08,
-              "rounds_mean": 1.0,
-              "rounds_max": 1,
+            "E2 (Fast)": {
+              "recall_at_10": 0.9913,
+              "clusters_searched_mean": 15.201,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
-              "modelled_latency_ms": 126.55827895243871
+              "modelled_latency_ms": 236.33196173388035
             },
-            "E+A": {
+            "E2 (Decoy)": {
               "recall_at_10": 1.0,
-              "clusters_searched_mean": 18.0,
-              "rounds_mean": 2.933,
-              "rounds_max": 3,
+              "clusters_searched_mean": 20.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
-              "modelled_latency_ms": 266.6902798946604
+              "modelled_latency_ms": 288.38254010243463
             }
           }
         },
@@ -359,19 +359,19 @@
               "strict_share": 0.0,
               "modelled_latency_ms": 125.69058854412773
             },
-            "E": {
-              "recall_at_10": 0.9312,
-              "clusters_searched_mean": 5.0,
-              "rounds_mean": 1.0,
-              "rounds_max": 1,
+            "E2 (Fast)": {
+              "recall_at_10": 0.9977999999999999,
+              "clusters_searched_mean": 15.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
-              "modelled_latency_ms": 125.69058854412773
+              "modelled_latency_ms": 234.15188958299902
             },
-            "E+A": {
+            "E2 (Decoy)": {
               "recall_at_10": 1.0,
               "clusters_searched_mean": 20.0,
-              "rounds_mean": 3.0,
-              "rounds_max": 3,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
               "modelled_latency_ms": 288.38254010243463
             }
@@ -409,19 +409,19 @@
               "strict_share": 0.0,
               "modelled_latency_ms": 125.69058854412773
             },
-            "E": {
-              "recall_at_10": 0.9794,
-              "clusters_searched_mean": 5.0,
-              "rounds_mean": 1.0,
-              "rounds_max": 1,
+            "E2 (Fast)": {
+              "recall_at_10": 0.9996,
+              "clusters_searched_mean": 15.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
-              "modelled_latency_ms": 125.69058854412773
+              "modelled_latency_ms": 234.15188958299902
             },
-            "E+A": {
+            "E2 (Decoy)": {
               "recall_at_10": 1.0,
               "clusters_searched_mean": 20.0,
-              "rounds_mean": 3.0,
-              "rounds_max": 3,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
               "modelled_latency_ms": 288.38254010243463
             }
@@ -460,21 +460,21 @@
               "strict_share": 0.0,
               "modelled_latency_ms": 145.64746793528005
             },
-            "E": {
-              "recall_at_10": 0.8325999999999999,
-              "clusters_searched_mean": 5.127,
-              "rounds_mean": 1.0,
-              "rounds_max": 1,
+            "E2 (Fast)": {
+              "recall_at_10": 0.9969000000000001,
+              "clusters_searched_mean": 15.315,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
-              "modelled_latency_ms": 127.0680470673214
+              "modelled_latency_ms": 237.56842056572347
             },
-            "E+A": {
+            "E2 (Decoy)": {
               "recall_at_10": 1.0,
-              "clusters_searched_mean": 18.0,
-              "rounds_mean": 2.895,
-              "rounds_max": 3,
+              "clusters_searched_mean": 20.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
-              "modelled_latency_ms": 266.6902798946604
+              "modelled_latency_ms": 288.38254010243463
             }
           }
         },
@@ -515,19 +515,19 @@
               "strict_share": 0.0,
               "modelled_latency_ms": 125.69058854412773
             },
-            "E": {
-              "recall_at_10": 0.9199,
-              "clusters_searched_mean": 5.0,
-              "rounds_mean": 1.0,
-              "rounds_max": 1,
+            "E2 (Fast)": {
+              "recall_at_10": 0.9951,
+              "clusters_searched_mean": 15.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
-              "modelled_latency_ms": 125.69058854412773
+              "modelled_latency_ms": 234.15188958299902
             },
-            "E+A": {
+            "E2 (Decoy)": {
               "recall_at_10": 1.0,
               "clusters_searched_mean": 20.0,
-              "rounds_mean": 3.0,
-              "rounds_max": 3,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
               "modelled_latency_ms": 288.38254010243463
             }
@@ -575,19 +575,19 @@
               "strict_share": 0.0,
               "modelled_latency_ms": 125.69058854412773
             },
-            "E": {
-              "recall_at_10": 0.9805,
-              "clusters_searched_mean": 5.0,
-              "rounds_mean": 1.0,
-              "rounds_max": 1,
+            "E2 (Fast)": {
+              "recall_at_10": 0.9995,
+              "clusters_searched_mean": 15.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
-              "modelled_latency_ms": 125.69058854412773
+              "modelled_latency_ms": 234.15188958299902
             },
-            "E+A": {
+            "E2 (Decoy)": {
               "recall_at_10": 1.0,
               "clusters_searched_mean": 20.0,
-              "rounds_mean": 3.0,
-              "rounds_max": 3,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
               "modelled_latency_ms": 288.38254010243463
             }
@@ -625,21 +625,21 @@
               "strict_share": 0.0,
               "modelled_latency_ms": 147.7082326550186
             },
-            "E": {
-              "recall_at_10": 0.8318000000000001,
-              "clusters_searched_mean": 5.16,
-              "rounds_mean": 1.0,
-              "rounds_max": 1,
+            "E2 (Fast)": {
+              "recall_at_10": 0.9964,
+              "clusters_searched_mean": 15.345,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
-              "modelled_latency_ms": 127.42596936074968
+              "modelled_latency_ms": 237.8938044688401
             },
-            "E+A": {
+            "E2 (Decoy)": {
               "recall_at_10": 1.0,
-              "clusters_searched_mean": 18.0,
-              "rounds_mean": 2.885,
-              "rounds_max": 3,
+              "clusters_searched_mean": 20.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
-              "modelled_latency_ms": 266.6902798946604
+              "modelled_latency_ms": 288.38254010243463
             }
           }
         },
@@ -675,19 +675,19 @@
               "strict_share": 0.0,
               "modelled_latency_ms": 125.69058854412773
             },
-            "E": {
-              "recall_at_10": 0.9718000000000001,
-              "clusters_searched_mean": 5.0,
-              "rounds_mean": 1.0,
-              "rounds_max": 1,
+            "E2 (Fast)": {
+              "recall_at_10": 0.9994000000000001,
+              "clusters_searched_mean": 15.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
-              "modelled_latency_ms": 125.69058854412773
+              "modelled_latency_ms": 234.15188958299902
             },
-            "E+A": {
+            "E2 (Decoy)": {
               "recall_at_10": 1.0,
               "clusters_searched_mean": 20.0,
-              "rounds_mean": 3.0,
-              "rounds_max": 3,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
               "modelled_latency_ms": 288.38254010243463
             }
@@ -728,19 +728,19 @@
               "strict_share": 0.0,
               "modelled_latency_ms": 125.69058854412773
             },
-            "E": {
-              "recall_at_10": 0.9821,
-              "clusters_searched_mean": 5.0,
-              "rounds_mean": 1.0,
-              "rounds_max": 1,
+            "E2 (Fast)": {
+              "recall_at_10": 0.9997999999999999,
+              "clusters_searched_mean": 15.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
-              "modelled_latency_ms": 125.69058854412773
+              "modelled_latency_ms": 234.15188958299902
             },
-            "E+A": {
+            "E2 (Decoy)": {
               "recall_at_10": 1.0,
               "clusters_searched_mean": 20.0,
-              "rounds_mean": 3.0,
-              "rounds_max": 3,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
               "modelled_latency_ms": 288.38254010243463
             }
@@ -776,21 +776,21 @@
               "strict_share": 0.0,
               "modelled_latency_ms": 103.99832833635348
             },
-            "E": {
-              "recall_at_10": 0.9933000000000001,
-              "clusters_searched_mean": 3.0,
-              "rounds_mean": 1.0,
-              "rounds_max": 1,
+            "E2 (Fast)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 6.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
-              "modelled_latency_ms": 103.99832833635348
+              "modelled_latency_ms": 136.53671864801487
             },
-            "E+A": {
-              "recall_at_10": 0.9933000000000001,
-              "clusters_searched_mean": 3.0,
-              "rounds_mean": 1.0,
-              "rounds_max": 1,
+            "E2 (Decoy)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 6.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
-              "modelled_latency_ms": 103.99832833635348
+              "modelled_latency_ms": 136.53671864801487
             }
           }
         },
@@ -826,21 +826,21 @@
               "strict_share": 0.0,
               "modelled_latency_ms": 114.89868909076004
             },
-            "E": {
+            "E2 (Fast)": {
               "recall_at_10": 1.0,
               "clusters_searched_mean": 1.0,
-              "rounds_mean": 1.0,
-              "rounds_max": 1,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
               "modelled_latency_ms": 82.30606812857923
             },
-            "E+A": {
+            "E2 (Decoy)": {
               "recall_at_10": 1.0,
-              "clusters_searched_mean": 1.0,
-              "rounds_mean": 1.0,
-              "rounds_max": 1,
+              "clusters_searched_mean": 6.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
-              "modelled_latency_ms": 82.30606812857923
+              "modelled_latency_ms": 136.53671864801487
             }
           }
         },
@@ -881,21 +881,21 @@
               "strict_share": 0.0,
               "modelled_latency_ms": 103.99832833635348
             },
-            "E": {
-              "recall_at_10": 0.9822000000000001,
-              "clusters_searched_mean": 3.0,
-              "rounds_mean": 1.0,
-              "rounds_max": 1,
-              "strict_share": 0.0,
-              "modelled_latency_ms": 103.99832833635348
-            },
-            "E+A": {
+            "E2 (Fast)": {
               "recall_at_10": 1.0,
               "clusters_searched_mean": 4.0,
               "rounds_mean": 2.0,
               "rounds_max": 2,
               "strict_share": 0.0,
               "modelled_latency_ms": 114.8444584402406
+            },
+            "E2 (Decoy)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 6.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 136.53671864801487
             }
           }
         },
@@ -959,15 +959,15 @@
               "strict_share": 0.0,
               "modelled_latency_ms": 103.99832833635348
             },
-            "E": {
-              "recall_at_10": 0.986,
-              "clusters_searched_mean": 3.0,
-              "rounds_mean": 1.0,
-              "rounds_max": 1,
+            "E2 (Fast)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 6.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
-              "modelled_latency_ms": 103.99832833635348
+              "modelled_latency_ms": 136.53671864801487
             },
-            "E+A": {
+            "E2 (Decoy)": {
               "recall_at_10": 1.0,
               "clusters_searched_mean": 6.0,
               "rounds_mean": 2.0,
@@ -1009,15 +1009,15 @@
               "strict_share": 0.0,
               "modelled_latency_ms": 108.48862619936276
             },
-            "E": {
-              "recall_at_10": 0.8082,
-              "clusters_searched_mean": 3.138,
-              "rounds_mean": 1.0,
-              "rounds_max": 1,
+            "E2 (Fast)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 6.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
-              "modelled_latency_ms": 105.4950942906899
+              "modelled_latency_ms": 136.53671864801487
             },
-            "E+A": {
+            "E2 (Decoy)": {
               "recall_at_10": 1.0,
               "clusters_searched_mean": 6.0,
               "rounds_mean": 2.0,
@@ -1062,15 +1062,15 @@
               "strict_share": 0.0,
               "modelled_latency_ms": 103.99832833635348
             },
-            "E": {
-              "recall_at_10": 0.9061000000000001,
-              "clusters_searched_mean": 3.0,
-              "rounds_mean": 1.0,
-              "rounds_max": 1,
+            "E2 (Fast)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 6.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
-              "modelled_latency_ms": 103.99832833635348
+              "modelled_latency_ms": 136.53671864801487
             },
-            "E+A": {
+            "E2 (Decoy)": {
               "recall_at_10": 1.0,
               "clusters_searched_mean": 6.0,
               "rounds_mean": 2.0,
@@ -1132,15 +1132,15 @@
               "strict_share": 0.0,
               "modelled_latency_ms": 103.99832833635348
             },
-            "E": {
-              "recall_at_10": 0.9787,
-              "clusters_searched_mean": 3.0,
-              "rounds_mean": 1.0,
-              "rounds_max": 1,
+            "E2 (Fast)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 6.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
               "strict_share": 0.0,
-              "modelled_latency_ms": 103.99832833635348
+              "modelled_latency_ms": 136.53671864801487
             },
-            "E+A": {
+            "E2 (Decoy)": {
               "recall_at_10": 1.0,
               "clusters_searched_mean": 6.0,
               "rounds_mean": 2.0,

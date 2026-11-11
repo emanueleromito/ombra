@@ -10,17 +10,23 @@ core/bench/filtered_recall.py. Embeddings are cached under the (gitignored) data
 
 Policies (the same first-round floor as T3.11: ceil(sqrt(clusters)) clusters), planned by
 ombra.probe.ProbePlanner, the same code the client runs:
-  E    per-cluster value counts; clusters in center-score order, zero expected matches skipped, add
-       until the expected matches reach 3k; widen 2x only below k matches; Strict scan if the
-       expected selectivity is below 0.5%.
-  E+A  E, then widen while a remaining cluster's score upper bound exceeds the k-th match score
-       (bound: cos(max(0, theta_qc - theta_r)), theta_r = arccos(min cosine member-to-center)),
-       at most max_rounds = 4 rounds, rounds growing 2x.
+  E2 (Fast)   the shipped policy. Round 1: clusters in center-score order, zero expected matches
+              skipped, add until the expected matches reach 3k (never fewer than the floor).
+              Round 2: always one widening round, the next clusters with nonzero expected matches,
+              2x round 1's real clusters, capped by what is left. Below 0.5% expected selectivity:
+              scan all clusters (two rounds). Exactly 2 rounds for every filtered query.
+  E2 (Decoy)  the same with round 1's real clusters capped at 2 * floor (Decoy's fixed padded size
+              is 2 * floor requested clusters in round 1 and 4 * floor in round 2, so "clusters
+              searched" for Decoy is min(C, 2f) + min(C - 2f, 4f), decoys included; recall counts
+              the real plus the decoy clusters' results, as the client does).
+  Strict      all clusters in two rounds: recall is exact by construction (not simulated).
   B    decision 0019's rule with the stop at 3k matches (first round = floor, widen 2x up to 8x).
   A0   (reference) decision 0019 as run in T3.11: stop at k matches. Reproduces T3.11's recall.
-After the rounds, a query with fewer than k matches falls back to a full (Strict) scan, as in the
-client. Latency is MODELLED, not measured (see the report): a least-squares fit of T3.11's measured
-per-cell latency on clusters searched and extra rounds.
+Superseded: "E" and "E+A" (the radius check never pruned; see the report).
+For A0 and B (baselines) a query with fewer than k matches falls back to a full scan; E2 has no
+fallback (fixed round count; `incomplete` instead). Latency is MODELLED, not measured (see the
+report): a least-squares fit of T3.11's measured per-cell latency on clusters searched and
+extra rounds.
 """
 
 from __future__ import annotations
@@ -38,14 +44,14 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import filtered_recall as fr  # noqa: E402
 from ombra.clustering import assign, cluster_vectors  # noqa: E402
-from ombra.probe import ClusterStats, ProbePlanner  # noqa: E402
+from ombra.probe import ClusterStats, ProbePlanner, decoy_round_sizes  # noqa: E402
 
 K = 10
 POLICIES = {
     "A0 (0019, stop at k)": dict(policy="basic", stop=1),
     "B (0019, stop at 3k)": dict(policy="basic", stop=3),
-    "E": dict(policy="e"),
-    "E+A": dict(policy="e_a"),
+    "E2 (Fast)": dict(policy="e2"),
+    "E2 (Decoy)": dict(policy="e2", decoy=True),
 }
 T311_JSON = HERE.parents[1] / "docs/plan/results/2026-11-11-t3.11-filtered-recall.json"
 
@@ -77,6 +83,10 @@ def fit_latency(t311: dict[str, Any]) -> dict[str, float]:
     }
 
 
+def _nmatch(scores: list[np.ndarray]) -> int:
+    return sum(len(a) for a in scores)
+
+
 def simulate_cell(
     s_all: np.ndarray,
     labels: np.ndarray,
@@ -89,8 +99,10 @@ def simulate_cell(
     pol: dict[str, Any],
     truth: list[set[int]],
 ) -> dict[str, float]:
-    if flt is None:  # the client keeps the unfiltered rule (stop at k) for unfiltered queries
-        pol = dict(policy="basic", stop=1)
+    if flt is None and pol["policy"] != "basic":
+        # unfiltered: round 1 = the floor, round 2 = the next 2 * floor (plain2); Fast would use
+        # one round, but recall of an unfiltered query is not what this table is about
+        pol = dict(policy="plain2", decoy=pol.get("decoy", False))
     members = [np.nonzero((labels == c) & mask)[0] for c in range(nc)]
     rec, clusters, rounds, strict = [], [], [], 0
     for qi in range(len(s_all)):
@@ -103,9 +115,8 @@ def simulate_cell(
             first,
             stats=stats,
             filter=flt,
-            center_scores=cs,
+            cap1=2 * first if pol.get("decoy") else None,
             stop_matches=K * pol.get("stop", 1) if pol["policy"] == "basic" else None,
-            max_rounds=pol.get("max_rounds", 4),
         )
         scores: list[np.ndarray] = []
         ids: list[np.ndarray] = []
@@ -126,30 +137,37 @@ def simulate_cell(
                     ids.append(members[c])
 
         first_cl = plan.first_round()
-        if first_cl is None:
+        if first_cl is None:  # low expected selectivity: all clusters, two rounds
             run(order)
             strict += 1
-            nrounds = 1
-        else:
+            nrounds = 2
+        elif pol["policy"] == "basic":
             run(first_cl)
             nrounds = 1
             while True:
-                cat = np.concatenate(scores) if scores else np.zeros(0)
-                kth = (
-                    float(np.partition(cat, len(cat) - K)[len(cat) - K])
-                    if len(cat) >= K
-                    else -np.inf
-                )
-                nxt = plan.next_round(kth, len(cat))
+                nxt = plan.next_round(_nmatch(scores))
                 if not nxt:
                     break
                 run(nxt)
                 nrounds += 1
-            cat = np.concatenate(scores) if scores else np.zeros(0)
-            if len(cat) < K and len(searched) < nc:  # the client's Strict fallback
+            if _nmatch(scores) < K and len(searched) < nc:  # the 0019 Strict fallback
                 run(order)
                 nrounds += 1
                 strict += 1
+        else:
+            run(first_cl)
+            if pol.get("decoy"):  # decoys' results count too; round sizes as the client pads them
+                r1, r2 = decoy_round_sizes(first, nc)
+                rng = np.random.default_rng(qi)
+                rest = [c for c in order if c not in searched]
+                run([int(c) for c in rng.permutation(rest)[: r1 - len(first_cl)]])
+                nxt = plan.next_round(0, searched)
+                run(nxt)
+                rest = [c for c in order if c not in searched]
+                run([int(c) for c in rng.permutation(rest)[: max(0, r2 - len(nxt))]])
+            else:
+                run(plan.next_round(0, searched))
+            nrounds = 2
         cat = np.concatenate(scores) if scores else np.zeros(0)
         cid = np.concatenate(ids) if ids else np.zeros(0, dtype=int)
         top = set(cid[np.argsort(-cat, kind="stable")[:K]].tolist())
@@ -173,7 +191,7 @@ def run_dataset(ds: dict[str, Any], lat: dict[str, float], nq: int) -> dict[str,
     labels = assign(x, centers)  # as the T3.11 run did (labels = assign(x, col.centers))
     nc = len(centers)
     first = math.ceil(math.sqrt(nc))
-    stats = ClusterStats.build(x, labels, centers, fields, ds["cards"])
+    stats = ClusterStats.build(labels, nc, fields, ds["cards"])
     s_all = q @ x.T
     cs_all = q @ centers.T
     filters = [None, *fr.build_filters(fields, ds["cards"], ds["field_names"], labels, nc)]
@@ -217,63 +235,6 @@ def run_dataset(ds: dict[str, Any], lat: dict[str, float], nq: int) -> dict[str,
     }
 
 
-QUANTILES = (1.0, 0.99, 0.95, 0.90, 0.75)  # 1.0 = max radius (min cosine); else angle quantile
-ROUNDS = (2, 3, 4)
-
-
-def run_sweep(ds: dict[str, Any], nq: int) -> dict[str, Any]:
-    """E+A with the radius of check A at an angle quantile of each cluster, and max_rounds."""
-    x, fields, q = ds["x"], ds["fields"], ds["queries"][:nq]
-    cl = cluster_vectors(x, ds["n_clusters"], seed=1)
-    centers = fr._flush(cl.centers)
-    labels = assign(x, centers)
-    nc = len(centers)
-    first = math.ceil(math.sqrt(nc))
-    s_all, cs_all = q @ x.T, q @ centers.T
-    stats_by_q = {
-        qt: ClusterStats.build(x, labels, centers, fields, ds["cards"], quantile=qt)
-        for qt in QUANTILES
-    }
-    filters = [None, *fr.build_filters(fields, ds["cards"], ds["field_names"], labels, nc)]
-    settings: dict[str, list[dict[str, Any]]] = {}
-    for f in filters:
-        if f is None:
-            mask, flt = np.ones(len(x), dtype=bool), None
-        else:
-            mask = np.isin(fields[:, f["field"]], f["values"])
-            flt = {f["field"]: [int(v) for v in f["values"]]}
-        rows = np.nonzero(mask)[0]
-        truth = [
-            set(rows[np.argsort(-s_all[i, rows], kind="stable")[:K]].tolist())
-            for i in range(len(q))
-        ]
-        for qt in QUANTILES:
-            for mr in ROUNDS:
-                pol = dict(policy="e_a", max_rounds=mr)
-                r = simulate_cell(
-                    s_all, labels, mask, cs_all, stats_by_q[qt], flt, first, nc, pol, truth
-                )
-                key = f"quantile={qt},max_rounds={mr}"
-                settings.setdefault(key, []).append(
-                    {
-                        "label": "unfiltered"
-                        if f is None
-                        else f"{f['field_name']} {f['placement']}",
-                        "target": None if f is None else f["target"],
-                        "share": 1.0 if f is None else f["share"],
-                        **r,
-                    }
-                )
-        print(f"[{ds['name']}] sweep cell done ({len(settings)} settings)", flush=True)
-    return {
-        "dataset": ds["name"],
-        "n_vectors": len(x),
-        "clusters": nc,
-        "queries": len(q),
-        "settings": settings,
-    }
-
-
 def _cache_embeddings(cache: Path) -> None:
     """Disk-cache fr.embed by the hash of its texts (the loaders call it once per text list)."""
     import hashlib
@@ -299,18 +260,11 @@ def main() -> None:
     ap.add_argument("--dataset", nargs="*", default=list(fr.LOADERS))
     ap.add_argument("--queries", type=int, default=1000)
     ap.add_argument("--small", action="store_true")
-    ap.add_argument("--sweep", action="store_true", help="radius quantile x max_rounds sweep")
     a = ap.parse_args()
     nq = 20 if a.small else a.queries
     a.datasets.mkdir(parents=True, exist_ok=True)
     _cache_embeddings(a.datasets)
     a.out.mkdir(parents=True, exist_ok=True)
-    if a.sweep:
-        out = {"task": "T3.11 radius sweep", "k": K, "results": []}
-        for name in a.dataset:
-            out["results"].append(run_sweep(fr.LOADERS[name](a.datasets, a.small, nq), nq))
-        (a.out / "t3.11-radius-sweep.json").write_text(json.dumps(out, indent=2))
-        return
     t311 = json.loads(T311_JSON.read_text())
     lat = fit_latency(t311)
     print("latency model", lat, flush=True)
