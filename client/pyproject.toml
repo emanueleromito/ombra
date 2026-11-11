@@ -9,6 +9,9 @@ description = "Client for Ombra, a vector database with fully homomorphic encryp
 requires-python = ">=3.12,<3.13"  # until T4.1 (wheels): local mode is built for 3.12 only
 dependencies = ["numpy", "cryptography", "faiss-cpu"]
 
+[project.scripts]
+ombra-recall = "ombra.recall:main"
+
 [project.optional-dependencies]
 local = ["openfhe==1.6.1.0.24.4", "protobuf", "grpcio-tools"]
 grpc = ["openfhe==1.6.1.0.24.4", "grpcio", "grpcio-tools"]

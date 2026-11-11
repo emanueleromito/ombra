@@ -86,7 +86,7 @@ T3.2 and T3.3 can run in parallel after T3.1. T3.6 needs the server API from M2 
 **Depends on:** T3.6
 **Steps:** build on the T1.6 recall check; a command that takes the user's vectors and a sample of queries, runs plaintext and encrypted search at the chosen settings and prints recall@10 and the gap, with no data written out.
 **Done when:** the tool runs on a sample corpus and prints recall@10 for plaintext and encrypted search, and the 0012 rule's pass or fail.
-**Status:** todo
+**Status:** done
 
 ### T3.11 Filtered recall on real datasets
 
