@@ -6,9 +6,11 @@ pure numpy logic with no OpenFHE and no server, so it is unit tested and also dr
 simulation in core/bench/filter_probe_sim.py:
 
 * `ClusterStats`: per cluster the number of live vectors, the number per value of each filter field
-  and `cos_min`, the smallest cosine between a member and its center. The client builds it at
-  create, updates it on insert and delete, and rebuilds it on re-clustering. It is persisted only
-  as an encrypted blob (`seal`/`unseal`, under the reserved id `STATS_ID`), never in plaintext.
+  and `cos_min`, the smallest cosine between a member and its center (`cos_bound`: the cosine
+  that a chosen quantile of the members reaches, used as the radius of check A).
+  The client builds it at create, updates it on insert and delete, and rebuilds it on
+  re-clustering. It is persisted only as an encrypted blob (`seal`/`unseal`, under the reserved
+  id `STATS_ID`), never in plaintext.
 * `ProbePlanner`: which clusters to search in each round. Policies:
   - "e_a" (default for filtered queries): order clusters by center score, skip clusters with zero
     expected matches, add clusters until the expected match count reaches 3k (never fewer than the
@@ -41,7 +43,8 @@ FIELDS_KEY = "\x00ombra/fields"  # record metadata key: the filter values of a v
 POLICIES = ("e_a", "e", "basic")
 SCORE_SLACK = 1e-4  # CKKS noise on center scores is about 1e-5; the bound gets this much room
 _MAGIC = b"OSTA"
-_VERSION = 1
+_VERSION = 2
+DEFAULT_RADIUS_QUANTILE = 1.0  # fraction of members inside the radius used by check A (see below)
 
 
 def check_user_id(ident: bytes) -> None:
@@ -55,6 +58,14 @@ class ClusterStats:
     sizes: np.ndarray  # (C,) live vectors per cluster
     counts: list[np.ndarray]  # per field, (C, card): live vectors per value
     cos_min: np.ndarray  # (C,) min cosine member-to-center (1.0 for an empty cluster)
+    # (C,) cosine that `quantile` of the members reach or exceed; check A uses it as the radius.
+    # With quantile 1.0 it equals cos_min (a guaranteed bound); below 1.0 it is a heuristic that
+    # may stop the search before a member beyond the radius is seen.
+    cos_bound: np.ndarray | None = None
+
+    def __post_init__(self) -> None:
+        if self.cos_bound is None:
+            self.cos_bound = self.cos_min.copy()
 
     @classmethod
     def empty(cls, n_clusters: int, cards: Sequence[int]) -> ClusterStats:
@@ -73,9 +84,16 @@ class ClusterStats:
         centers: np.ndarray,
         fields: np.ndarray,
         cards: Sequence[int],
+        quantile: float = DEFAULT_RADIUS_QUANTILE,
     ) -> ClusterStats:
         s = cls.empty(len(centers), cards)
         s.add(vectors, labels, centers, fields)
+        if quantile < 1.0:
+            labels = np.asarray(labels, dtype=np.int64)
+            cos = np.einsum("ij,ij->i", np.asarray(vectors, dtype=np.float64), centers[labels])
+            for c in range(len(centers)):
+                if (labels == c).any():
+                    s.cos_bound[c] = np.quantile(cos[labels == c], 1.0 - quantile)
         return s
 
     @property
@@ -93,6 +111,7 @@ class ClusterStats:
             np.add.at(self.counts[fi], (labels, np.asarray(fields)[:, fi]), 1)
         cos = np.einsum("ij,ij->i", np.asarray(vectors, dtype=np.float64), centers[labels])
         np.minimum.at(self.cos_min, labels, cos)
+        np.minimum.at(self.cos_bound, labels, cos)  # a new member never raises the radius
 
     def remove(self, labels: np.ndarray, fields: np.ndarray | None) -> None:
         """Delete vectors. Without their field values only the sizes can be updated."""
@@ -119,7 +138,7 @@ class ClusterStats:
     def upper_bounds(self, center_scores: np.ndarray) -> np.ndarray:
         """Per cluster: an upper bound on the score of any member (see the module docstring)."""
         th_q = np.arccos(np.clip(center_scores, -1.0, 1.0))
-        th_r = np.arccos(np.clip(self.cos_min, -1.0, 1.0))
+        th_r = np.arccos(np.clip(self.cos_bound, -1.0, 1.0))
         return np.cos(np.maximum(0.0, th_q - th_r))
 
     # ---- persistence: sealed by the caller's DocumentCodec, never stored in plaintext --------
@@ -127,6 +146,7 @@ class ClusterStats:
         head = struct.pack("<4sHIH", _MAGIC, _VERSION, self.n_clusters, len(self.cards))
         head += struct.pack(f"<{len(self.cards)}I", *self.cards)
         body = self.sizes.astype("<i8").tobytes() + self.cos_min.astype("<f8").tobytes()
+        body += self.cos_bound.astype("<f8").tobytes()
         body += b"".join(c.astype("<i8").tobytes() for c in self.counts)
         packed = zlib.compress(body, 6)
         return head + struct.pack("<I", len(packed)) + packed
@@ -143,11 +163,12 @@ class ClusterStats:
         body = zlib.decompress(raw[o + 4 : o + 4 + plen])
         sizes = np.frombuffer(body, "<i8", n, 0).astype(np.int64)
         cos_min = np.frombuffer(body, "<f8", n, 8 * n).astype(np.float64)
-        off, counts = 16 * n, []
+        cos_bound = np.frombuffer(body, "<f8", n, 16 * n).astype(np.float64)
+        off, counts = 24 * n, []
         for c in cards:
             counts.append(np.frombuffer(body, "<i8", n * c, off).reshape(n, c).astype(np.int64))
             off += 8 * n * c
-        return cls(tuple(cards), sizes, counts, cos_min)
+        return cls(tuple(cards), sizes, counts, cos_min, cos_bound)
 
     def seal(self, codec: Any) -> bytes:
         raw = self.to_bytes()
@@ -172,7 +193,7 @@ class ProbePlanner:
         stats: ClusterStats | None = None,
         filter: Mapping[int, int | Sequence[int]] | None = None,
         center_scores: np.ndarray | None = None,
-        max_rounds: int = 4,
+        max_rounds: int = 2,
         expect_factor: int = 3,
         min_selectivity: float = 0.005,
         stop_matches: int | None = None,

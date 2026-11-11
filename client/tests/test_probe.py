@@ -103,6 +103,7 @@ def _toy_stats(sizes, match_counts, cos_min):
     s.counts[0][:, 1] = match_counts
     s.counts[0][:, 0] = np.array(sizes) - np.array(match_counts)
     s.cos_min = np.array(cos_min, dtype=float)
+    s.cos_bound = s.cos_min.copy()
     return s
 
 
@@ -169,3 +170,20 @@ def test_basic_policy_is_the_0019_rule():
     q.first_round()
     assert q.next_round(0.1, 3) == []  # k matches: stop
     del stats, cs
+
+
+def test_quantile_radius_is_tighter_and_round_trips():
+    x, centers, labels, fields, _ = _data(4)
+    full = ClusterStats.build(x, labels, centers, fields, (5, 3))
+    q90 = ClusterStats.build(x, labels, centers, fields, (5, 3), quantile=0.9)
+    assert (q90.cos_bound >= full.cos_bound - 1e-12).all()
+    assert np.array_equal(q90.cos_min, full.cos_min)
+    assert (q90.cos_bound > full.cos_bound).any()
+    for c in range(6):  # about 90% of members lie inside the quantile radius
+        cos = x[labels == c] @ centers[c]
+        assert np.mean(cos >= q90.cos_bound[c] - 1e-12) >= 0.85
+    back = ClusterStats.from_bytes(q90.to_bytes())
+    assert np.array_equal(back.cos_bound, q90.cos_bound)
+    extra = _unit(np.random.default_rng(1).normal(size=(5, 8)))
+    q90.add(extra, assign(extra, centers), centers, np.zeros((5, 2), dtype=np.int64))
+    assert (q90.cos_bound <= back.cos_bound + 1e-12).all()  # an insert never raises the radius

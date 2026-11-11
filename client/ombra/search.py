@@ -154,7 +154,7 @@ def run_search(
     n_probe: int | None = None,
     max_probe_factor: int = 8,
     probe: str = "e_a",
-    max_rounds: int = 4,
+    max_rounds: int = 2,
     strict_fallback: bool = True,
     rerank_factor: int = 3,
     workers: int = 1,

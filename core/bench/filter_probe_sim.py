@@ -105,6 +105,7 @@ def simulate_cell(
             filter=flt,
             center_scores=cs,
             stop_matches=K * pol.get("stop", 1) if pol["policy"] == "basic" else None,
+            max_rounds=pol.get("max_rounds", 4),
         )
         scores: list[np.ndarray] = []
         ids: list[np.ndarray] = []
@@ -216,6 +217,63 @@ def run_dataset(ds: dict[str, Any], lat: dict[str, float], nq: int) -> dict[str,
     }
 
 
+QUANTILES = (1.0, 0.99, 0.95, 0.90, 0.75)  # 1.0 = max radius (min cosine); else angle quantile
+ROUNDS = (2, 3, 4)
+
+
+def run_sweep(ds: dict[str, Any], nq: int) -> dict[str, Any]:
+    """E+A with the radius of check A at an angle quantile of each cluster, and max_rounds."""
+    x, fields, q = ds["x"], ds["fields"], ds["queries"][:nq]
+    cl = cluster_vectors(x, ds["n_clusters"], seed=1)
+    centers = fr._flush(cl.centers)
+    labels = assign(x, centers)
+    nc = len(centers)
+    first = math.ceil(math.sqrt(nc))
+    s_all, cs_all = q @ x.T, q @ centers.T
+    stats_by_q = {
+        qt: ClusterStats.build(x, labels, centers, fields, ds["cards"], quantile=qt)
+        for qt in QUANTILES
+    }
+    filters = [None, *fr.build_filters(fields, ds["cards"], ds["field_names"], labels, nc)]
+    settings: dict[str, list[dict[str, Any]]] = {}
+    for f in filters:
+        if f is None:
+            mask, flt = np.ones(len(x), dtype=bool), None
+        else:
+            mask = np.isin(fields[:, f["field"]], f["values"])
+            flt = {f["field"]: [int(v) for v in f["values"]]}
+        rows = np.nonzero(mask)[0]
+        truth = [
+            set(rows[np.argsort(-s_all[i, rows], kind="stable")[:K]].tolist())
+            for i in range(len(q))
+        ]
+        for qt in QUANTILES:
+            for mr in ROUNDS:
+                pol = dict(policy="e_a", max_rounds=mr)
+                r = simulate_cell(
+                    s_all, labels, mask, cs_all, stats_by_q[qt], flt, first, nc, pol, truth
+                )
+                key = f"quantile={qt},max_rounds={mr}"
+                settings.setdefault(key, []).append(
+                    {
+                        "label": "unfiltered"
+                        if f is None
+                        else f"{f['field_name']} {f['placement']}",
+                        "target": None if f is None else f["target"],
+                        "share": 1.0 if f is None else f["share"],
+                        **r,
+                    }
+                )
+        print(f"[{ds['name']}] sweep cell done ({len(settings)} settings)", flush=True)
+    return {
+        "dataset": ds["name"],
+        "n_vectors": len(x),
+        "clusters": nc,
+        "queries": len(q),
+        "settings": settings,
+    }
+
+
 def _cache_embeddings(cache: Path) -> None:
     """Disk-cache fr.embed by the hash of its texts (the loaders call it once per text list)."""
     import hashlib
@@ -241,10 +299,18 @@ def main() -> None:
     ap.add_argument("--dataset", nargs="*", default=list(fr.LOADERS))
     ap.add_argument("--queries", type=int, default=1000)
     ap.add_argument("--small", action="store_true")
+    ap.add_argument("--sweep", action="store_true", help="radius quantile x max_rounds sweep")
     a = ap.parse_args()
     nq = 20 if a.small else a.queries
     a.datasets.mkdir(parents=True, exist_ok=True)
     _cache_embeddings(a.datasets)
+    a.out.mkdir(parents=True, exist_ok=True)
+    if a.sweep:
+        out = {"task": "T3.11 radius sweep", "k": K, "results": []}
+        for name in a.dataset:
+            out["results"].append(run_sweep(fr.LOADERS[name](a.datasets, a.small, nq), nq))
+        (a.out / "t3.11-radius-sweep.json").write_text(json.dumps(out, indent=2))
+        return
     t311 = json.loads(T311_JSON.read_text())
     lat = fit_latency(t311)
     print("latency model", lat, flush=True)

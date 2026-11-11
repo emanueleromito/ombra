@@ -1,0 +1,3082 @@
+{
+  "task": "T3.11 radius sweep",
+  "k": 10,
+  "results": [
+    {
+      "dataset": "arxiv-abstracts",
+      "n_vectors": 40000,
+      "clusters": 20,
+      "queries": 1000,
+      "settings": {
+        "quantile=1.0,max_rounds=2": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9834,
+            "clusters_searched_mean": 5.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.01,
+            "share": 0.0107,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.1,
+            "share": 0.08245,
+            "recall_at_10": 0.995,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.5,
+            "share": 0.40315,
+            "recall_at_10": 0.9990999999999999,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.01,
+            "share": 0.009075,
+            "recall_at_10": 0.9913,
+            "clusters_searched_mean": 15.201,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.1,
+            "share": 0.081325,
+            "recall_at_10": 0.9977999999999999,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.5,
+            "share": 0.476325,
+            "recall_at_10": 0.9996,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.01,
+            "share": 0.01025,
+            "recall_at_10": 0.9969000000000001,
+            "clusters_searched_mean": 15.315,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.1,
+            "share": 0.105125,
+            "recall_at_10": 0.9951,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.5,
+            "share": 0.40565,
+            "recall_at_10": 0.9995,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.01,
+            "share": 0.00845,
+            "recall_at_10": 0.9964,
+            "clusters_searched_mean": 15.345,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.1,
+            "share": 0.110975,
+            "recall_at_10": 0.9994000000000001,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.5,
+            "share": 0.424175,
+            "recall_at_10": 0.9997999999999999,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          }
+        ],
+        "quantile=1.0,max_rounds=3": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9834,
+            "clusters_searched_mean": 5.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.01,
+            "share": 0.0107,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.1,
+            "share": 0.08245,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.5,
+            "share": 0.40315,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.01,
+            "share": 0.009075,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.933,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.1,
+            "share": 0.081325,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.5,
+            "share": 0.476325,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.01,
+            "share": 0.01025,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.895,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.1,
+            "share": 0.105125,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.5,
+            "share": 0.40565,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.01,
+            "share": 0.00845,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.885,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.1,
+            "share": 0.110975,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.5,
+            "share": 0.424175,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          }
+        ],
+        "quantile=1.0,max_rounds=4": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9834,
+            "clusters_searched_mean": 5.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.01,
+            "share": 0.0107,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.1,
+            "share": 0.08245,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.5,
+            "share": 0.40315,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.01,
+            "share": 0.009075,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.933,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.1,
+            "share": 0.081325,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.5,
+            "share": 0.476325,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.01,
+            "share": 0.01025,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.895,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.1,
+            "share": 0.105125,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.5,
+            "share": 0.40565,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.01,
+            "share": 0.00845,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.885,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.1,
+            "share": 0.110975,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.5,
+            "share": 0.424175,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          }
+        ],
+        "quantile=0.99,max_rounds=2": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9834,
+            "clusters_searched_mean": 5.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.01,
+            "share": 0.0107,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.1,
+            "share": 0.08245,
+            "recall_at_10": 0.995,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.5,
+            "share": 0.40315,
+            "recall_at_10": 0.9990999999999999,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.01,
+            "share": 0.009075,
+            "recall_at_10": 0.9913,
+            "clusters_searched_mean": 15.201,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.1,
+            "share": 0.081325,
+            "recall_at_10": 0.9977999999999999,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.5,
+            "share": 0.476325,
+            "recall_at_10": 0.9996,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.01,
+            "share": 0.01025,
+            "recall_at_10": 0.9969000000000001,
+            "clusters_searched_mean": 15.315,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.1,
+            "share": 0.105125,
+            "recall_at_10": 0.9951,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.5,
+            "share": 0.40565,
+            "recall_at_10": 0.9995,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.01,
+            "share": 0.00845,
+            "recall_at_10": 0.9964,
+            "clusters_searched_mean": 15.345,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.1,
+            "share": 0.110975,
+            "recall_at_10": 0.9994000000000001,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.5,
+            "share": 0.424175,
+            "recall_at_10": 0.9997999999999999,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          }
+        ],
+        "quantile=0.99,max_rounds=3": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9834,
+            "clusters_searched_mean": 5.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.01,
+            "share": 0.0107,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.1,
+            "share": 0.08245,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.5,
+            "share": 0.40315,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.01,
+            "share": 0.009075,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.933,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.1,
+            "share": 0.081325,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.5,
+            "share": 0.476325,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.01,
+            "share": 0.01025,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.895,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.1,
+            "share": 0.105125,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.5,
+            "share": 0.40565,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.01,
+            "share": 0.00845,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.885,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.1,
+            "share": 0.110975,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.5,
+            "share": 0.424175,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          }
+        ],
+        "quantile=0.99,max_rounds=4": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9834,
+            "clusters_searched_mean": 5.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.01,
+            "share": 0.0107,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.1,
+            "share": 0.08245,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.5,
+            "share": 0.40315,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.01,
+            "share": 0.009075,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.933,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.1,
+            "share": 0.081325,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.5,
+            "share": 0.476325,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.01,
+            "share": 0.01025,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.895,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.1,
+            "share": 0.105125,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.5,
+            "share": 0.40565,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.01,
+            "share": 0.00845,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.885,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.1,
+            "share": 0.110975,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.5,
+            "share": 0.424175,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          }
+        ],
+        "quantile=0.95,max_rounds=2": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9834,
+            "clusters_searched_mean": 5.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.01,
+            "share": 0.0107,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.1,
+            "share": 0.08245,
+            "recall_at_10": 0.995,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.5,
+            "share": 0.40315,
+            "recall_at_10": 0.9990999999999999,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.01,
+            "share": 0.009075,
+            "recall_at_10": 0.9913,
+            "clusters_searched_mean": 15.201,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.1,
+            "share": 0.081325,
+            "recall_at_10": 0.9977999999999999,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.5,
+            "share": 0.476325,
+            "recall_at_10": 0.9996,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.01,
+            "share": 0.01025,
+            "recall_at_10": 0.9969000000000001,
+            "clusters_searched_mean": 15.315,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.1,
+            "share": 0.105125,
+            "recall_at_10": 0.9951,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.5,
+            "share": 0.40565,
+            "recall_at_10": 0.9995,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.01,
+            "share": 0.00845,
+            "recall_at_10": 0.9964,
+            "clusters_searched_mean": 15.345,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.1,
+            "share": 0.110975,
+            "recall_at_10": 0.9994000000000001,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.5,
+            "share": 0.424175,
+            "recall_at_10": 0.9997999999999999,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          }
+        ],
+        "quantile=0.95,max_rounds=3": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9834,
+            "clusters_searched_mean": 5.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.01,
+            "share": 0.0107,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.1,
+            "share": 0.08245,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.5,
+            "share": 0.40315,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.01,
+            "share": 0.009075,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.933,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.1,
+            "share": 0.081325,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.5,
+            "share": 0.476325,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.01,
+            "share": 0.01025,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.895,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.1,
+            "share": 0.105125,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.5,
+            "share": 0.40565,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.01,
+            "share": 0.00845,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.885,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.1,
+            "share": 0.110975,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.5,
+            "share": 0.424175,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          }
+        ],
+        "quantile=0.95,max_rounds=4": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9834,
+            "clusters_searched_mean": 5.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.01,
+            "share": 0.0107,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.1,
+            "share": 0.08245,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.5,
+            "share": 0.40315,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.01,
+            "share": 0.009075,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.933,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.1,
+            "share": 0.081325,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.5,
+            "share": 0.476325,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.01,
+            "share": 0.01025,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.895,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.1,
+            "share": 0.105125,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.5,
+            "share": 0.40565,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.01,
+            "share": 0.00845,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.885,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.1,
+            "share": 0.110975,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.5,
+            "share": 0.424175,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          }
+        ],
+        "quantile=0.9,max_rounds=2": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9834,
+            "clusters_searched_mean": 5.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.01,
+            "share": 0.0107,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.1,
+            "share": 0.08245,
+            "recall_at_10": 0.995,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.5,
+            "share": 0.40315,
+            "recall_at_10": 0.9990999999999999,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.01,
+            "share": 0.009075,
+            "recall_at_10": 0.9913,
+            "clusters_searched_mean": 15.201,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.1,
+            "share": 0.081325,
+            "recall_at_10": 0.9977999999999999,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.5,
+            "share": 0.476325,
+            "recall_at_10": 0.9996,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.01,
+            "share": 0.01025,
+            "recall_at_10": 0.9969000000000001,
+            "clusters_searched_mean": 15.315,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.1,
+            "share": 0.105125,
+            "recall_at_10": 0.9951,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.5,
+            "share": 0.40565,
+            "recall_at_10": 0.9995,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.01,
+            "share": 0.00845,
+            "recall_at_10": 0.9964,
+            "clusters_searched_mean": 15.345,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.1,
+            "share": 0.110975,
+            "recall_at_10": 0.9994000000000001,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.5,
+            "share": 0.424175,
+            "recall_at_10": 0.9997999999999999,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          }
+        ],
+        "quantile=0.9,max_rounds=3": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9834,
+            "clusters_searched_mean": 5.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.01,
+            "share": 0.0107,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.1,
+            "share": 0.08245,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.5,
+            "share": 0.40315,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.01,
+            "share": 0.009075,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.933,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.1,
+            "share": 0.081325,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.5,
+            "share": 0.476325,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.01,
+            "share": 0.01025,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.895,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.1,
+            "share": 0.105125,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.5,
+            "share": 0.40565,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.01,
+            "share": 0.00845,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.885,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.1,
+            "share": 0.110975,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.5,
+            "share": 0.424175,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          }
+        ],
+        "quantile=0.9,max_rounds=4": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9834,
+            "clusters_searched_mean": 5.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.01,
+            "share": 0.0107,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.1,
+            "share": 0.08245,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.5,
+            "share": 0.40315,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.01,
+            "share": 0.009075,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.933,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.1,
+            "share": 0.081325,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.5,
+            "share": 0.476325,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.01,
+            "share": 0.01025,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.895,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.1,
+            "share": 0.105125,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.5,
+            "share": 0.40565,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.01,
+            "share": 0.00845,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.885,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.1,
+            "share": 0.110975,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.5,
+            "share": 0.424175,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          }
+        ],
+        "quantile=0.75,max_rounds=2": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9834,
+            "clusters_searched_mean": 5.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.01,
+            "share": 0.0107,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.1,
+            "share": 0.08245,
+            "recall_at_10": 0.995,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.5,
+            "share": 0.40315,
+            "recall_at_10": 0.9990999999999999,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.01,
+            "share": 0.009075,
+            "recall_at_10": 0.9913,
+            "clusters_searched_mean": 15.201,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.1,
+            "share": 0.081325,
+            "recall_at_10": 0.9977999999999999,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.5,
+            "share": 0.476325,
+            "recall_at_10": 0.9996,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.01,
+            "share": 0.01025,
+            "recall_at_10": 0.9969000000000001,
+            "clusters_searched_mean": 15.315,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.1,
+            "share": 0.105125,
+            "recall_at_10": 0.9951,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.5,
+            "share": 0.40565,
+            "recall_at_10": 0.9995,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.01,
+            "share": 0.00845,
+            "recall_at_10": 0.9964,
+            "clusters_searched_mean": 15.345,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.1,
+            "share": 0.110975,
+            "recall_at_10": 0.9994000000000001,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.5,
+            "share": 0.424175,
+            "recall_at_10": 0.9997999999999999,
+            "clusters_searched_mean": 15.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          }
+        ],
+        "quantile=0.75,max_rounds=3": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9834,
+            "clusters_searched_mean": 5.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.01,
+            "share": 0.0107,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.1,
+            "share": 0.08245,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.5,
+            "share": 0.40315,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.01,
+            "share": 0.009075,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.933,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.1,
+            "share": 0.081325,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.5,
+            "share": 0.476325,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.01,
+            "share": 0.01025,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.895,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.1,
+            "share": 0.105125,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.5,
+            "share": 0.40565,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.01,
+            "share": 0.00845,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.885,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.1,
+            "share": 0.110975,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.5,
+            "share": 0.424175,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          }
+        ],
+        "quantile=0.75,max_rounds=4": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9834,
+            "clusters_searched_mean": 5.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.01,
+            "share": 0.0107,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.1,
+            "share": 0.08245,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category clustered",
+            "target": 0.5,
+            "share": 0.40315,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.01,
+            "share": 0.009075,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.933,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.1,
+            "share": 0.081325,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "primary_category spread",
+            "target": 0.5,
+            "share": 0.476325,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.01,
+            "share": 0.01025,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.895,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.1,
+            "share": 0.105125,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin clustered",
+            "target": 0.5,
+            "share": 0.40565,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.01,
+            "share": 0.00845,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 18.0,
+            "rounds_mean": 2.885,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.1,
+            "share": 0.110975,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          },
+          {
+            "label": "year_bin spread",
+            "target": 0.5,
+            "share": 0.424175,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 20.0,
+            "rounds_mean": 3.0,
+            "rounds_max": 3,
+            "strict_share": 0.0
+          }
+        ]
+      }
+    },
+    {
+      "dataset": "banking77",
+      "n_vectors": 10003,
+      "clusters": 6,
+      "queries": 1000,
+      "settings": {
+        "quantile=1.0,max_rounds=2": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9933000000000001,
+            "clusters_searched_mean": 3.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.01,
+            "share": 0.012096371088673398,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 1.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.1,
+            "share": 0.08047585724282715,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 4.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.5,
+            "share": 0.40527841647505747,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.01,
+            "share": 0.010296910926721983,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.1,
+            "share": 0.08107567729681096,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.5,
+            "share": 0.40067979606118165,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          }
+        ],
+        "quantile=1.0,max_rounds=3": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9933000000000001,
+            "clusters_searched_mean": 3.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.01,
+            "share": 0.012096371088673398,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 1.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.1,
+            "share": 0.08047585724282715,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 4.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.5,
+            "share": 0.40527841647505747,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.01,
+            "share": 0.010296910926721983,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.1,
+            "share": 0.08107567729681096,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.5,
+            "share": 0.40067979606118165,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          }
+        ],
+        "quantile=1.0,max_rounds=4": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9933000000000001,
+            "clusters_searched_mean": 3.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.01,
+            "share": 0.012096371088673398,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 1.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.1,
+            "share": 0.08047585724282715,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 4.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.5,
+            "share": 0.40527841647505747,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.01,
+            "share": 0.010296910926721983,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.1,
+            "share": 0.08107567729681096,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.5,
+            "share": 0.40067979606118165,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          }
+        ],
+        "quantile=0.99,max_rounds=2": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9933000000000001,
+            "clusters_searched_mean": 3.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.01,
+            "share": 0.012096371088673398,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 1.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.1,
+            "share": 0.08047585724282715,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 4.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.5,
+            "share": 0.40527841647505747,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.01,
+            "share": 0.010296910926721983,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.1,
+            "share": 0.08107567729681096,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.5,
+            "share": 0.40067979606118165,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          }
+        ],
+        "quantile=0.99,max_rounds=3": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9933000000000001,
+            "clusters_searched_mean": 3.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.01,
+            "share": 0.012096371088673398,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 1.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.1,
+            "share": 0.08047585724282715,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 4.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.5,
+            "share": 0.40527841647505747,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.01,
+            "share": 0.010296910926721983,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.1,
+            "share": 0.08107567729681096,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.5,
+            "share": 0.40067979606118165,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          }
+        ],
+        "quantile=0.99,max_rounds=4": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9933000000000001,
+            "clusters_searched_mean": 3.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.01,
+            "share": 0.012096371088673398,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 1.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.1,
+            "share": 0.08047585724282715,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 4.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.5,
+            "share": 0.40527841647505747,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.01,
+            "share": 0.010296910926721983,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.1,
+            "share": 0.08107567729681096,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.5,
+            "share": 0.40067979606118165,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          }
+        ],
+        "quantile=0.95,max_rounds=2": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9933000000000001,
+            "clusters_searched_mean": 3.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.01,
+            "share": 0.012096371088673398,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 1.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.1,
+            "share": 0.08047585724282715,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 4.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.5,
+            "share": 0.40527841647505747,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 5.953,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.01,
+            "share": 0.010296910926721983,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.1,
+            "share": 0.08107567729681096,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 5.997,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.5,
+            "share": 0.40067979606118165,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 5.98,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          }
+        ],
+        "quantile=0.95,max_rounds=3": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9933000000000001,
+            "clusters_searched_mean": 3.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.01,
+            "share": 0.012096371088673398,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 1.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.1,
+            "share": 0.08047585724282715,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 4.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.5,
+            "share": 0.40527841647505747,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 5.953,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.01,
+            "share": 0.010296910926721983,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.1,
+            "share": 0.08107567729681096,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 5.997,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.5,
+            "share": 0.40067979606118165,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 5.98,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          }
+        ],
+        "quantile=0.95,max_rounds=4": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9933000000000001,
+            "clusters_searched_mean": 3.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.01,
+            "share": 0.012096371088673398,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 1.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.1,
+            "share": 0.08047585724282715,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 4.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.5,
+            "share": 0.40527841647505747,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 5.953,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.01,
+            "share": 0.010296910926721983,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.1,
+            "share": 0.08107567729681096,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 5.997,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.5,
+            "share": 0.40067979606118165,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 5.98,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          }
+        ],
+        "quantile=0.9,max_rounds=2": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9933000000000001,
+            "clusters_searched_mean": 3.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.01,
+            "share": 0.012096371088673398,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 1.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.1,
+            "share": 0.08047585724282715,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 3.999,
+            "rounds_mean": 1.999,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.5,
+            "share": 0.40527841647505747,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 5.914,
+            "rounds_mean": 1.995,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.01,
+            "share": 0.010296910926721983,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.1,
+            "share": 0.08107567729681096,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 5.995,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.5,
+            "share": 0.40067979606118165,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 5.947,
+            "rounds_mean": 1.999,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          }
+        ],
+        "quantile=0.9,max_rounds=3": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9933000000000001,
+            "clusters_searched_mean": 3.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.01,
+            "share": 0.012096371088673398,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 1.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.1,
+            "share": 0.08047585724282715,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 3.999,
+            "rounds_mean": 1.999,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.5,
+            "share": 0.40527841647505747,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 5.914,
+            "rounds_mean": 1.995,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.01,
+            "share": 0.010296910926721983,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.1,
+            "share": 0.08107567729681096,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 5.995,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.5,
+            "share": 0.40067979606118165,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 5.947,
+            "rounds_mean": 1.999,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          }
+        ],
+        "quantile=0.9,max_rounds=4": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9933000000000001,
+            "clusters_searched_mean": 3.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.01,
+            "share": 0.012096371088673398,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 1.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.1,
+            "share": 0.08047585724282715,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 3.999,
+            "rounds_mean": 1.999,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.5,
+            "share": 0.40527841647505747,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 5.914,
+            "rounds_mean": 1.995,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.01,
+            "share": 0.010296910926721983,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.1,
+            "share": 0.08107567729681096,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 5.995,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.5,
+            "share": 0.40067979606118165,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 5.947,
+            "rounds_mean": 1.999,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          }
+        ],
+        "quantile=0.75,max_rounds=2": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9933000000000001,
+            "clusters_searched_mean": 3.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.01,
+            "share": 0.012096371088673398,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 1.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.1,
+            "share": 0.08047585724282715,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 3.996,
+            "rounds_mean": 1.996,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.5,
+            "share": 0.40527841647505747,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 5.764,
+            "rounds_mean": 1.98,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.01,
+            "share": 0.010296910926721983,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.1,
+            "share": 0.08107567729681096,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 5.987,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.5,
+            "share": 0.40067979606118165,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 5.845,
+            "rounds_mean": 1.997,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          }
+        ],
+        "quantile=0.75,max_rounds=3": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9933000000000001,
+            "clusters_searched_mean": 3.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.01,
+            "share": 0.012096371088673398,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 1.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.1,
+            "share": 0.08047585724282715,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 3.996,
+            "rounds_mean": 1.996,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.5,
+            "share": 0.40527841647505747,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 5.764,
+            "rounds_mean": 1.98,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.01,
+            "share": 0.010296910926721983,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.1,
+            "share": 0.08107567729681096,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 5.987,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.5,
+            "share": 0.40067979606118165,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 5.845,
+            "rounds_mean": 1.997,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          }
+        ],
+        "quantile=0.75,max_rounds=4": [
+          {
+            "label": "unfiltered",
+            "target": null,
+            "share": 1.0,
+            "recall_at_10": 0.9933000000000001,
+            "clusters_searched_mean": 3.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.01,
+            "share": 0.012096371088673398,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 1.0,
+            "rounds_mean": 1.0,
+            "rounds_max": 1,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.1,
+            "share": 0.08047585724282715,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 3.996,
+            "rounds_mean": 1.996,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket clustered",
+            "target": 0.5,
+            "share": 0.40527841647505747,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 5.764,
+            "rounds_mean": 1.98,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.01,
+            "share": 0.010296910926721983,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 6.0,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.1,
+            "share": 0.08107567729681096,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 5.987,
+            "rounds_mean": 2.0,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          },
+          {
+            "label": "intent_bucket spread",
+            "target": 0.5,
+            "share": 0.40067979606118165,
+            "recall_at_10": 1.0,
+            "clusters_searched_mean": 5.845,
+            "rounds_mean": 1.997,
+            "rounds_max": 2,
+            "strict_share": 0.0
+          }
+        ]
+      }
+    }
+  ]
+}
