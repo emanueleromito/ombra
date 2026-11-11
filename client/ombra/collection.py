@@ -25,23 +25,35 @@ passed in by the caller (the generated modules are built from proto/ombra/v1/omb
 
 from __future__ import annotations
 
+import os
+import re
+import struct
 import tempfile
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
 
 from ombra import presets
 from ombra import query as oq
+from ombra.blobstore import KIND_DOCUMENT, KIND_RECORD, BlobStore, GrpcBlobStore
 from ombra.clustering import assign, cluster_vectors
+from ombra.documents import DocumentCodec
 from ombra.file_format import Kind, read_envelope, write_envelope
+from ombra.keyfile import DEFAULT_SCRYPT, KeyMaterial, export_key_file, import_key_file
 from ombra.params import make_ckks_params
 from ombra.repack import DEFAULT_THRESHOLD, BlockStat, plan_repack
 
 KEY_CHUNK = 4_000_000  # below LIMIT_MAX_CHUNK_BYTES (4 MiB)
 API_VERSION = 1
+_LEVELS = {
+    "fast": "SECURITY_LEVEL_FAST",
+    "decoy": "SECURITY_LEVEL_DECOY",
+    "strict": "SECURITY_LEVEL_STRICT",
+}
 
 
 class CollectionError(Exception):
@@ -61,13 +73,23 @@ def _check(err: Any) -> None:
 class KeyKit:
     """Context, key pair and evaluation keys of one collection. The secret key stays inside."""
 
-    def __init__(self, derived: presets.Derived, openfhe_version: str, n_leaves: int) -> None:
+    def __init__(
+        self,
+        derived: presets.Derived,
+        openfhe_version: str,
+        n_leaves: int,
+        *,
+        master_key: bytes | None = None,
+        secret_blob: bytes | None = None,
+    ) -> None:
+        """New keys, or (with `secret_blob` from `KeyKit.load`) the keys of an earlier kit."""
         import openfhe as ofhe
 
         self.derived = derived
         self.openfhe_version = openfhe_version
         self.n_leaves = n_leaves
         self.slots = derived.batch_size
+        self.master_key = master_key if master_key is not None else os.urandom(32)
         cc = ofhe.GenCryptoContext(make_ckks_params(derived.values))
         for feature in (
             ofhe.PKESchemeFeature.PKE,
@@ -76,13 +98,87 @@ class KeyKit:
         ):
             cc.Enable(feature)
         self.cc = cc
-        self._keys = cc.KeyGen()
+        self._keys = cc.KeyGen() if secret_blob is None else self._restore(secret_blob)
         cc.EvalMultKeyGen(self._keys.secretKey)
         cc.ClearEvalAutomorphismKeys()  # the key store is static: hold exactly this layout's keys
         cc.EvalAutomorphismKeyGen(
             self._keys.secretKey, oq.automorphism_indices(cc.GetRingDimension(), n_leaves)
         )
         self.key_tag = self._keys.publicKey.GetKeyTag()
+
+    # ---- persistence (T3.2 key file) ------------------------------------------------------
+    _BLOB_MAGIC = b"OKSB"
+    _BLOB_VERSION = 1
+
+    def _secret_blob(self) -> bytes:
+        import openfhe as ofhe
+
+        sk = self._via_file(lambda p: ofhe.SerializeToFile(p, self._keys.secretKey, ofhe.BINARY))
+        pk = self._via_file(lambda p: ofhe.SerializeToFile(p, self._keys.publicKey, ofhe.BINARY))
+        return self._BLOB_MAGIC + struct.pack("<HI", self._BLOB_VERSION, len(sk)) + sk + pk
+
+    def _restore(self, blob: bytes) -> Any:
+        import openfhe as ofhe
+
+        head = struct.Struct("<4sHI")
+        if len(blob) < head.size:
+            raise ValueError("key blob is truncated")
+        magic, version, n = head.unpack_from(blob)
+        if magic != self._BLOB_MAGIC or version != self._BLOB_VERSION:
+            raise ValueError("key blob has an unknown format or version")
+        sk_raw, pk_raw = blob[head.size : head.size + n], blob[head.size + n :]
+
+        def load(raw: bytes, fn: Any) -> Any:
+            with tempfile.TemporaryDirectory() as t:
+                p = Path(t) / "k.bin"
+                p.write_bytes(raw)
+                obj, ok = fn(str(p), ofhe.BINARY)
+            if not ok:
+                raise ValueError("key could not be deserialized")
+            return obj
+
+        return SimpleNamespace(
+            secretKey=load(sk_raw, ofhe.DeserializePrivateKey),
+            publicKey=load(pk_raw, ofhe.DeserializePublicKey),
+        )
+
+    def save(
+        self,
+        path: str | os.PathLike[str],
+        passphrase: str,
+        *,
+        scrypt_params: tuple[int, int, int] = DEFAULT_SCRYPT,
+        overwrite: bool = False,
+    ) -> None:
+        """Write the secret key and the document master key to a passphrase-protected key file."""
+        material = KeyMaterial(self._secret_blob(), self.master_key)
+        export_key_file(
+            path, material, passphrase, scrypt_params=scrypt_params, overwrite=overwrite
+        )
+
+    @classmethod
+    def load(
+        cls,
+        path: str | os.PathLike[str],
+        passphrase: str,
+        derived: presets.Derived,
+        openfhe_version: str,
+        n_leaves: int,
+    ) -> KeyKit:
+        """Reopen a saved kit. The evaluation keys are generated again from the secret key."""
+        m = import_key_file(path, passphrase)
+        return cls(
+            derived, openfhe_version, n_leaves, master_key=m.master_key, secret_blob=m.secret_key
+        )
+
+    def encrypt_query(self, ext: np.ndarray) -> bytes:
+        """The symmetric coefficient-packed query (decision 0010), encrypted, as an envelope."""
+        import openfhe as ofhe
+
+        slots = oq.symmetric_slots(oq.prescale_query(ext), self.cc.GetRingDimension())
+        ct = self.cc.Encrypt(self._keys.publicKey, self.cc.MakeCKKSPackedPlaintext(slots.tolist()))
+        raw = self._via_file(lambda p: ofhe.SerializeToFile(p, ct, ofhe.BINARY))
+        return write_envelope(Kind.CIPHERTEXT, self.derived.preset, self.openfhe_version, raw)
 
     def __repr__(self) -> str:
         return f"KeyKit(preset={self.derived.preset!r}, key_tag={self.key_tag!r})"
@@ -173,8 +269,14 @@ class Collection:
         cards: Sequence[int],
         kit: KeyKit,
         centers: np.ndarray,
+        blobs: BlobStore | None = None,
+        security_level: str = "fast",
     ) -> None:
         self.pb, self.stub = pb, stub
+        self.blobs: BlobStore = blobs if blobs is not None else GrpcBlobStore(stub, pb)
+        self.security_level = security_level
+        # blob associated data binds the base name, so blobs survive a re-clustering unchanged
+        self.codec = DocumentCodec(kit.master_key, base_name)
         self.base_name, self.generation = base_name, generation
         self.derived, self.cards, self.kit = derived, tuple(cards), kit
         self.centers = centers
@@ -211,6 +313,11 @@ class Collection:
         seed: int = 0,
         generation: int = 0,
         kit: KeyKit | None = None,
+        metadata: Sequence[dict[str, Any]] | None = None,
+        documents: Sequence[str | bytes | None] | None = None,
+        security_level: str = "fast",
+        store_records: bool = True,
+        blobs: BlobStore | None = None,
     ) -> Collection:
         """Cluster, create the collection, upload the keys once, insert centers and data."""
         x = np.asarray(vectors, dtype=np.float64)
@@ -220,6 +327,9 @@ class Collection:
         if not np.allclose(np.linalg.norm(x, axis=1), 1.0, atol=1e-6):
             raise ValueError("vectors must be normalized before they are encrypted")
         cards = tuple(cards)
+        presets.check_filter_schema(derived, cards)  # decision 0019: refuse above F_max
+        if security_level not in _LEVELS:
+            raise ValueError(f"security level must be one of {sorted(_LEVELS)}")
         f = _fields(fields, len(x), cards)
         k = n_clusters or max(1, round(len(x) / derived.batch_size))
         if k > derived.batch_size:
@@ -243,13 +353,15 @@ class Collection:
             cards=cards,
             kit=kit,
             centers=clustering.centers,
+            blobs=blobs,
+            security_level=security_level,
         )
         spec = pb.CollectionSpec(
             api_version=API_VERSION,
             name=self.name,
             preset=derived.preset,
             dimension=derived.dimension,
-            security_level=pb.SECURITY_LEVEL_FAST,
+            security_level=getattr(pb, _LEVELS[security_level]),
             key_tag=kit.key_tag,
             cluster_count=self.cluster_count,
         )
@@ -264,10 +376,67 @@ class Collection:
             for c in range(self.cluster_count):
                 rows = np.nonzero(clustering.labels == c)[0]
                 self._insert_cluster(c, x[rows], f[rows], [ids[i] for i in rows])
+            if store_records:
+                self._put_records(x, ids, metadata, documents)
         except Exception:
             stub.DropCollection(pb.DropCollectionRequest(name=self.name))
             raise
         return self
+
+    @classmethod
+    def open(
+        cls, pb: Any, stub: Any, name: str, kit: KeyKit, *, blobs: BlobStore | None = None
+    ) -> Collection:
+        """Reopen an existing collection with a kit loaded from the key file (new process).
+
+        The centers are read back from the server's center block and decrypted.
+        """
+        r = stub.GetCollection(pb.GetCollectionRequest(name=name))
+        if r.WhichOneof("result") == "error":
+            raise CollectionError(r.error.code, r.error.message)
+        spec = r.info.spec
+        derived = presets.derive(spec.preset, spec.dimension)
+        cards = tuple(f.cardinality for f in sorted(spec.filter_fields, key=lambda f: f.field_id))
+        if kit.key_tag != spec.key_tag or kit.n_leaves != derived.dimension + sum(cards):
+            raise ValueError("the key kit does not belong to this collection")
+        m = re.fullmatch(r"(.*)\.g(\d+)", name)
+        base, gen = (m.group(1), int(m.group(2))) if m else (name, 0)
+        level = {v: k for k, v in _LEVELS.items()}.get(pb.SecurityLevel.Name(spec.security_level))
+        self = cls(
+            pb,
+            stub,
+            base_name=base,
+            generation=gen,
+            derived=derived,
+            cards=cards,
+            kit=kit,
+            centers=np.zeros((spec.cluster_count, derived.dimension)),
+            blobs=blobs,
+            security_level=level or "fast",
+        )
+        lst = stub.ListBlocks(pb.ListBlocksRequest(api_version=API_VERSION, collection=name))
+        _check(lst.error)
+        seg = [b.segment for b in lst.blocks if b.cluster_id == spec.cluster_count]
+        if len(seg) != 1:
+            raise CollectionError(0, "the center block is missing")
+        header, cols = self._get_block(seg[0])
+        n = spec.cluster_count
+        c = np.stack([kit.decrypt_column(col)[:n] for col in cols], axis=1)
+        self.centers = c / np.maximum(np.linalg.norm(c, axis=1, keepdims=True), 1e-12)
+        return self
+
+    def search(self, query: np.ndarray, k: int = 10, **options: Any) -> Any:
+        """Top-k search with exact re-ranking; see ombra.search.run_search for the options."""
+        from ombra.search import run_search
+
+        return run_search(self, query, k, **options)
+
+    def close(self) -> None:
+        """Stop the parallel decrypt workers, which hold a copy of the secret key in memory."""
+        pool = getattr(self, "_pool", None)
+        if pool is not None:
+            pool.close()
+            self._pool = None
 
     def _upload_keys(self) -> None:
         pb = self.pb
@@ -338,20 +507,50 @@ class Collection:
         vectors: np.ndarray,
         ids: Sequence[bytes],
         fields: np.ndarray | None = None,
+        metadata: Sequence[dict[str, Any]] | None = None,
+        documents: Sequence[str | bytes | None] | None = None,
     ) -> None:
-        """Assign each vector to its nearest center and upload one new block per cluster."""
+        """Assign each vector to its nearest center, upload one new block per cluster, and put the
+        encrypted record (exact vector copy and metadata) and document of each vector."""
         x = np.asarray(vectors, dtype=np.float64)
+        if len(ids) != len(x):
+            raise ValueError("one id per vector")
+        if not np.allclose(np.linalg.norm(x, axis=1), 1.0, atol=1e-6):
+            raise ValueError("vectors must be normalized before they are encrypted")
         f = _fields(fields, len(x), self.cards)
         labels = assign(x, self.centers)
         for c in np.unique(labels):
             rows = np.nonzero(labels == c)[0]
             self._insert_cluster(int(c), x[rows], f[rows], [ids[i] for i in rows])
+        self._put_records(x, ids, metadata, documents)
+
+    def _put_records(
+        self,
+        x: np.ndarray,
+        ids: Sequence[bytes],
+        metadata: Sequence[dict[str, Any]] | None,
+        documents: Sequence[str | bytes | None] | None,
+    ) -> None:
+        for name, seq in (("metadata", metadata), ("documents", documents)):
+            if seq is not None and len(seq) != len(ids):
+                raise ValueError(f"one {name} entry per vector")
+        v32 = np.asarray(x, dtype="<f4")
+        for i, blob_id in enumerate(ids):
+            meta = metadata[i] if metadata is not None else {}
+            sealed = self.codec.seal_record(blob_id, v32[i].tobytes(), meta)
+            self.blobs.put(self.name, KIND_RECORD, blob_id, sealed)
+            if documents is not None and documents[i] is not None:
+                doc = self.codec.seal_document(blob_id, documents[i])
+                self.blobs.put(self.name, KIND_DOCUMENT, blob_id, doc)
 
     def delete(self, ids: Sequence[bytes]) -> int:
+        """Delete vectors (tombstones on the server) and their record and document blobs."""
         r = self.stub.Delete(
             self.pb.DeleteRequest(api_version=API_VERSION, collection=self.name, ids=list(ids))
         )
         _check(r.error)
+        for kind in (KIND_RECORD, KIND_DOCUMENT):
+            self.blobs.delete(self.name, kind, ids)
         return r.deleted
 
     def retire(self) -> None:
@@ -477,6 +676,9 @@ class Collection:
             seed=seed,
             generation=self.generation + 1,
             kit=self.kit,
+            security_level=self.security_level,
+            store_records=False,  # the exact vectors are copied below, not re-derived
+            blobs=self.blobs,
         )
         try:
             self._copy_blobs(new.name, ids)

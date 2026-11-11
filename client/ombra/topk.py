@@ -44,6 +44,22 @@ def _decrypt_block(path: str, index: int, count: int, slots: int, k: int):
     return _order(vals, idx, k)
 
 
+def _decrypt_values(path: str, count: int, slots: int) -> np.ndarray:
+    import openfhe as ofhe
+
+    st = _STATE
+    ct, ok = ofhe.DeserializeCiphertext(path, ofhe.BINARY)
+    if not ok:
+        raise RuntimeError("cannot deserialize block")
+    dec = st["cc"].Decrypt(ct, st["sk"])
+    dec.SetLength(slots)
+    return np.asarray(dec.GetRealPackedValue(), dtype=np.float64)[:count]
+
+
+def _values_task(args: tuple[str, int, int]) -> np.ndarray:
+    return _decrypt_values(*args)
+
+
 def _task(args: tuple[str, int, int, int, int]) -> tuple[np.ndarray, np.ndarray]:
     return _decrypt_block(*args)
 
@@ -93,6 +109,11 @@ class ParallelTopk:
     ) -> tuple[np.ndarray, np.ndarray]:
         tasks = _tasks(files, slots, valid_last, k)
         return _merge(self._pool.map(_task, tasks, chunksize=1), k)
+
+    def decrypt(self, files: list[Path | str], counts: list[int], slots: int) -> list[np.ndarray]:
+        """Decrypt every block in parallel; the first `counts[i]` slot values of block i."""
+        tasks = [(str(f), c, slots) for f, c in zip(files, counts, strict=True)]
+        return list(self._pool.map(_values_task, tasks, chunksize=1))
 
     def close(self) -> None:
         self._pool.terminate()

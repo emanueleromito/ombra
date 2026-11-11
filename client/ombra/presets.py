@@ -8,6 +8,7 @@ cannot drift. Nothing here is hand-picked.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -65,3 +66,33 @@ def derive(preset: str, dimension: int, path: Path | None = None) -> Derived:
         security_level=values["security_level"],
         values=values,
     )
+
+
+# Server limits (proto LIMIT_MAX_FILTER_FIELDS, LIMIT_MAX_FILTER_CARDINALITY) and decision 0019.
+MAX_FILTER_FIELDS = 16
+MAX_FILTER_CARDINALITY = 64
+FILTER_LAMBDA = 4  # the penalty weight of one filter entry (decision 0019)
+_HEADROOM_MARGIN_BITS = 3  # allowed value = textbook bound at the lowest level, less 3 bits
+
+
+def filter_field_limit(derived: Derived) -> int:
+    """F_max of a preset by decision 0019, derived from its first modulus and scale bits.
+
+    A decrypted slot is score + lambda * c. A tombstoned slot reaches 1 + lambda * (F + 1). That
+    must stay under the allowed value 2^(first_mod - scale - 1 - 3), the bound at the lowest level
+    less a margin. Capped by the server's LIMIT_MAX_FILTER_FIELDS.
+    """
+    bits = derived.values["first_mod_size"] - derived.values["scaling_mod_size"] - 1
+    allowed = 2 ** (bits - _HEADROOM_MARGIN_BITS)
+    return min(MAX_FILTER_FIELDS, (allowed - 1) // FILTER_LAMBDA - 1)
+
+
+def check_filter_schema(derived: Derived, cards: Sequence[int]) -> None:
+    """Refuse a filter schema the preset cannot carry (field count, cardinality, query length)."""
+    fmax = filter_field_limit(derived)
+    if len(cards) > fmax:
+        raise ParamsError(f"{len(cards)} filter fields; preset {derived.preset} allows {fmax}")
+    if any(not 1 <= c <= MAX_FILTER_CARDINALITY for c in cards):
+        raise ParamsError(f"a filter field needs 1 to {MAX_FILTER_CARDINALITY} values")
+    if derived.dimension + sum(cards) > derived.ring_dim // 2:
+        raise ParamsError("dimension plus filter values exceed half the ring dimension")
