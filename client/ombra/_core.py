@@ -104,13 +104,15 @@ class ClientCore:
         *,
         key_file: str | Path,
         passphrase: str,
-        preset: str = presets.DEFAULT_PRESET,
+        preset: str | None = None,
         metadata: Sequence[dict[str, Any]] | None = None,
+        documents: Sequence[str | bytes | None] | None = None,
         filter_fields: Mapping[str, int] | None = None,
         security_level: str = "fast",
         n_clusters: int | None = None,
         scrypt_params: tuple[int, int, int] | None = None,
     ) -> str:
+        preset = preset or getattr(self._t, "default_preset", presets.DEFAULT_PRESET)
         x = np.asarray(vectors, dtype=np.float64)
         if x.ndim != 2 or len(x) == 0:
             raise ValueError("vectors must be a non-empty 2-D array")
@@ -136,6 +138,7 @@ class ClientCore:
             openfhe_version=self._t.openfhe_version,
             kit=kit,
             metadata=metadata,
+            documents=documents,
             security_level=security_level,
         )
         self._open[name] = (col, names)
@@ -219,12 +222,13 @@ class ClientCore:
         vectors: Sequence[Sequence[float]],
         ids: Sequence[str] | None = None,
         metadata: Sequence[dict[str, Any]] | None = None,
+        documents: Sequence[str | bytes | None] | None = None,
     ) -> list[str]:
         col, names = self._get(collection)
         x = np.asarray(vectors, dtype=np.float64)
         id_bytes = self._make_ids(ids, len(x))
         fields = self._field_values(names, col.cards, metadata, len(x))
-        col.insert_vectors(x, id_bytes, fields, metadata)
+        col.insert_vectors(x, id_bytes, fields, metadata, documents)
         return [i.decode() for i in id_bytes]
 
     def delete(self, collection: str, ids: Sequence[str]) -> None:

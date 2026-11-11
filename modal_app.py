@@ -297,22 +297,47 @@ def cpu_run8(cmd: str) -> None:
     _cpu_run(cmd)
 
 
-# T3.7: a machine WITHOUT a GPU and without our OpenFHE build: a plain Python image, `pip install
-# ./client[local]` (openfhe comes from PyPI, a wheel built for CPython 3.12), then a tiny search.
-# Only the client folder and the check script are uploaded.
+# T3.7: a machine WITHOUT a GPU: a plain Python 3.12 image, OpenFHE 1.6.1 (C++) installed the way
+# the docs describe, then `pip install ./client[local]`: openfhe-python comes from PyPI (a wheel for
+# CPython 3.12), and ombra._native is compiled by pip against the OpenFHE above (T4.1 will ship
+# wheels, then no compiler is needed). Only the client folder, the headers of core/ the extension
+# shares with the server, and the check script are uploaded.
+_CORE_FILES = ("src/security_floor.cpp", "src/openfhe_expand_ops.hpp")
+
+
+def _skip_core(p: Path) -> bool:
+    s = str(p)
+    keep = s in ("include", "src") or s.startswith("include/") or s in _CORE_FILES
+    return not keep
+
+
 local_install_image = (
     modal.Image.from_registry("ubuntu:24.04", add_python="3.12")  # libstdc++ of GCC 13+
-    .apt_install("libgomp1")  # the openfhe wheel needs OpenMP from the system
+    .apt_install("git", "build-essential", "cmake", "ninja-build", "libomp-dev")
+    .run_commands(
+        f"git clone --depth 1 --branch {OPENFHE_TAG} "
+        "https://github.com/openfheorg/openfhe-development /opt/openfhe-src",
+        "cmake -S /opt/openfhe-src -B /opt/openfhe-build -G Ninja "
+        "-DCMAKE_BUILD_TYPE=Release -DBUILD_UNITTESTS=OFF -DBUILD_EXAMPLES=OFF "
+        "-DBUILD_BENCHMARKS=OFF -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++",
+        "cmake --build /opt/openfhe-build -j",
+        "cmake --install /opt/openfhe-build",
+        "ldconfig",
+    )
+    .add_local_dir("core", remote_path="/work/core", copy=True, ignore=_skip_core)
     .add_local_dir(
         "client",
         remote_path="/work/client",
         copy=True,
         ignore=lambda p: any(
-            s in str(p) for s in ("__pycache__", ".pytest_cache", "tests", ".ruff_cache")
+            s in str(p)
+            for s in ("__pycache__", ".pytest_cache", "tests", ".ruff_cache", "_native.cpython")
         ),
     )
     .add_local_file("tests/local_install_check.py", "/work/local_install_check.py", copy=True)
-    .run_commands("pip install '/work/client[local]'")
+    .run_commands(
+        "CC=gcc CXX=g++ OMBRA_REQUIRE_NATIVE=1 pip install '/work/client[local]'",
+    )
 )
 
 

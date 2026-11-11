@@ -126,6 +126,8 @@ class _Stub:
 class LocalTransport:
     """What `ClientCore` needs: pb, stub, openfhe_version, close()."""
 
+    default_preset = "fast"  # m0_compact_n8192: the preset local mode is sized for
+
     def __init__(self, path: str | os.PathLike[str]) -> None:
         import openfhe
 
