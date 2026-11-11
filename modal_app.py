@@ -374,3 +374,35 @@ def profile_search(ncu: bool = True, micro: bool = True) -> None:
     print("$", " ".join(cmd), flush=True)
     code = subprocess.run(cmd, cwd=REPO_DIR).returncode
     print("ncu exit code:", code, flush=True)
+
+
+# T3.11: filtered recall on two real datasets through the M3 client and the real server. Embeddings
+# are computed here with sentence-transformers (installed at run time, so the image is unchanged);
+# the data is downloaded to the volume's dataset cache and never committed. The server holds the
+# encrypted collection (about 20 blocks of about 180 MB), so host memory is large.
+#   modal run modal_app.py::filtered_recall --dry-run     (tiny sizes, 5 queries)
+@app.function(gpu="A100-40GB", cpu=8.0, memory=65536, timeout=43200, volumes={DATA_DIR: volume})
+def filtered_recall(dry_run: bool = False, queries: int = 1000, dataset: str = "") -> None:
+    """Release build; T3.11 filtered recall@10 on two real datasets, preset fast."""
+    _build("Release")
+    _run(["pip", "install", "--quiet", "sentence-transformers"])
+    out_dir = Path(DATA_DIR) / "results"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        "python",
+        str(Path(REPO_DIR) / "core" / "bench" / "filtered_recall.py"),
+        "--out",
+        str(out_dir),
+        "--datasets",
+        str(Path(DATA_DIR) / "datasets" / "t3.11"),
+        "--queries",
+        str(queries),
+    ]
+    if dataset:
+        cmd += ["--dataset", *dataset.split()]
+    if dry_run:
+        cmd.append("--small")
+    try:
+        _run(cmd)
+    finally:
+        volume.commit()
