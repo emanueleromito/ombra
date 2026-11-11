@@ -238,6 +238,8 @@ class LocalTransport:
                 elif tag == b"E":
                     done = True
                     return
+                elif tag == b"X":
+                    raise ChildError(f"the local server failed: {body.decode(errors='replace')}")
                 else:
                     raise ChildError("the local server process failed")
         finally:
@@ -346,17 +348,18 @@ def _serve_call(server: LocalServer, pb: Any, conn: Any, method: str, body: byte
         else:
             conn.send_bytes(b"R" + result.SerializeToString())
         conn.send_bytes(b"E")
-    except (EOFError, OSError):
-        raise
+    except (EOFError, ConnectionError):
+        raise  # the socket to the client is gone: nothing to report to
     except Exception as exc:
-        # No details by default: a message could carry data. The client sees "the local server
-        # failed". OMBRA_LOCAL_DEBUG=1 prints the exception type and traceback (for developers).
+        # Includes OSError of the server's own work (disk full, ...): the client must hear of it,
+        # not see a closed connection. Only the exception type name goes back (no payloads, hard
+        # rule 4). OMBRA_LOCAL_DEBUG=1 also prints the traceback (for developers).
         if os.environ.get("OMBRA_LOCAL_DEBUG") == "1":
             import traceback
 
             print("local server error:", type(exc).__name__, file=sys.stderr)
             traceback.print_exc()
-        conn.send_bytes(b"X")
+        conn.send_bytes(b"X" + type(exc).__name__.encode()[:100])
 
 
 def _atomic(path: Path, data: bytes) -> None:

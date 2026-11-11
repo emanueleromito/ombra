@@ -160,3 +160,59 @@ def test_search_result_level_and_no_plaintext_in_the_child(tmp_path) -> None:
         col.close()
     finally:
         transport.close()
+
+
+def test_many_sequential_and_streamed_calls_on_one_transport(tmp_path) -> None:
+    """Regression: many calls (unary, client streams, server streams) reuse pooled connections,
+    and a failure of the child's own work (here an OSError) reaches the client as an error that
+    names only the exception type, not as a closed connection."""
+    from ombra._local import ChildError
+
+    transport = LocalTransport(tmp_path / "local")
+    pb, stub = transport.pb, transport.stub
+    try:
+        spec = pb.CollectionSpec(
+            api_version=1,
+            name="c",
+            preset="fast",
+            dimension=D,
+            key_tag="tag",
+            cluster_count=1,
+        )
+        assert not stub.CreateCollection(pb.CreateCollectionRequest(spec=spec)).HasField("error")
+        size = 16384
+
+        def put(i: int):
+            header = pb.PutBlobHeader(
+                collection="c", kind=pb.BLOB_KIND_RECORD, id=b"b%d" % i, size=size
+            )
+            yield pb.PutBlobRequest(api_version=1, header=header)
+            for _ in range(size // 4096):
+                yield pb.PutBlobRequest(api_version=1, data=bytes(4096))
+
+        for i in range(30):
+            assert not stub.PutBlob(put(i)).HasField("error")
+            r = stub.GetCollection(pb.GetCollectionRequest(name="c"))
+            assert not r.HasField("error")
+            got = b"".join(
+                m.data
+                for m in stub.GetBlob(
+                    pb.GetBlobRequest(
+                        api_version=1, collection="c", kind=pb.BLOB_KIND_RECORD, id=b"b%d" % i
+                    )
+                )
+            )
+            assert len(got) == size
+        assert len(transport._free) <= 2  # connections are reused, not one per call
+
+        # the child's own OSError (here: the blob directory is a file) is reported as an error
+        root = next((tmp_path / "local" / "c").iterdir())
+        for p in sorted((root / "blobs").rglob("*"), reverse=True):
+            p.unlink() if p.is_file() else p.rmdir()
+        (root / "blobs").rmdir()
+        (root / "blobs").write_bytes(b"")
+        with pytest.raises(ChildError, match="local server failed: .*Error"):
+            stub.PutBlob(put(99))
+        assert stub.GetCollection(pb.GetCollectionRequest(name="c")).info  # alive
+    finally:
+        transport.close()
