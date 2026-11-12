@@ -15,7 +15,7 @@ is installed.
 - About 1 GB of free disk space and a few GB of memory. A collection of six short texts writes
   about 300 MB of keys and ciphertexts.
 - No GPU for local mode.
-- **Ombra has no published wheels yet** (they come with task T4.1 of the plan). Until then you
+- **Ombra has no published wheels yet** (they are planned). Until then you
   build the client from source, and that needs a compiler, CMake and **OpenFHE 1.6.1** (C++,
   built with the default 64-bit native size). The OpenFHE build takes a while, so budget extra
   time for the first install. `modal_app.py` (`local_install_image`) shows the exact steps that
@@ -116,7 +116,7 @@ The code is the same; only the client object changes. Replace `Client.local(...)
 `insecure=True`, which is for test servers on a loopback address. The API key is an access token
 for the server; it is not your secret key and is not related to it.
 
-The server image ships in milestone M4. Until then you build `ombra_server` from this repository
+The server image is not released yet. Until then you build `ombra_server` from this repository
 with `make build` (it needs CUDA and an Ampere GPU, `sm_80` or `sm_86`). The options are listed
 at the top of `server/grpc/src/ombra_server.cpp`, and `docs/architecture.md` describes the
 design. In short:
