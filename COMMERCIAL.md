@@ -14,7 +14,7 @@ A commercial license replaces the PolyForm Noncommercial terms for the company t
 
 ## How to get a license
 
-Open an issue titled "Commercial license" or contact the maintainer through GitHub: [@emanueleromito](https://github.com/emanueleromito). Tell us your company, your intended use and roughly how large your deployment is.
+Open an issue titled "Commercial license" or write to Erai Labs at emanueleromito@erailabs.com. Tell us your company, your intended use and roughly how large your deployment is.
 
 ## Contributions
 
