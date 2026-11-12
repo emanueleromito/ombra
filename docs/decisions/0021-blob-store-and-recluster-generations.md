@@ -1,6 +1,6 @@
 # 0021. Encrypted blob store and re-clustering by generation
 
-- **Status:** proposed
+- **Status:** accepted (user, 2026-11-12)
 - **Date:** 2026-11-10
 
 ## Context

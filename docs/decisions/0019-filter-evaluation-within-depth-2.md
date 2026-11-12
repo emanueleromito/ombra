@@ -1,6 +1,6 @@
 # 0019. Filter evaluation within depth 2
 
-- **Status:** accepted (T2.7, 2026-11-10; measurements in `docs/plan/results/2026-11-10-t2.7-filter-0019.md`)
+- **Status:** accepted, amendment 1 accepted 2026-11-12 (T2.7, 2026-11-10; measurements in `docs/plan/results/2026-11-10-t2.7-filter-0019.md`)
 - **Date:** 2026-11-10
 
 ## Context
@@ -88,9 +88,9 @@ Also: a tombstoned slot reaches 1 + lambda * (F + 1), which lowers F_max at `m0_
 
 Note (user, 2026-11-10): 0019 stays accepted. Filtered recall on a real dataset is due before release (T3.11). The client probes at least the clusters an unfiltered query probes and widens only if fewer than k matches are found.
 
-## Amendment 1: filter-aware cluster choice (proposed, 2026-11-11)
+## Amendment 1: filter-aware cluster choice (accepted, 2026-11-12)
 
-**Status of this amendment:** proposed. Decision B above stands; this replaces the "Selective filters" probe rule.
+**Status of this amendment:** accepted (user, 2026-11-12). Decision B above stands; this replaces the "Selective filters" probe rule.
 
 **Why:** on real data (T3.11, `results/2026-11-11-t3.11-filtered-recall.md`: arXiv CC0 40k, banking77 CC-BY 10k, fast preset) recall@10 at about 1% selectivity was 0.76 to 0.81, because the rule stops at k matches in the first round, and those are usually not the true nearest matches. Encryption costs nothing (encrypted recall equals plaintext recall under the same cluster choices in all 21 cells), so policies were compared in plaintext on the same data, clusters and queries (`results/2026-11-11-t3.11-probe-policies.md`).
 

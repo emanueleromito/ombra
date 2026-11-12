@@ -1,6 +1,6 @@
 # 0022. Local mode uses the server's C++ expansion
 
-- **Status:** proposed
+- **Status:** accepted (user, 2026-11-12)
 - **Date:** 2026-11-11
 
 ## Context

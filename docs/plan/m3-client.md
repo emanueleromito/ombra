@@ -94,7 +94,7 @@ T3.2 and T3.3 can run in parallel after T3.1. T3.6 needs the server API from M2 
 **Depends on:** T3.6
 **Steps:** measure filtered recall@10 on two real public datasets at filter selectivity of about 1%, 10% and 50%, including filters correlated with the clusters, with the probe rule of 0019 (at least the clusters an unfiltered query probes, widening only below k matches); judge each case under the decision-0012 rule; record the extra rounds.
 **Done when:** the numbers for both datasets are in `results/`; 0019's recall condition and the 0012 rule hold on real data, or the user is told where they do not. **Due before release.**
-**Status:** todo
+**Status:** done (user chose to accept, 2026-11-12: plaintext on arXiv and banking77 with the 0019 amendment, min recall@10 0.991 at ~1% in Fast, `results/2026-11-11-t3.11-filtered-recall.md` and `results/2026-11-11-t3.11-probe-policies.md`; encrypted confirmation on banking77 only, on an A10, matching the simulation, `results/2026-11-11-t3.11-a10-confirmation.md`; arXiv not run encrypted)
 
 ### T3.10 Quickstart docs
 
