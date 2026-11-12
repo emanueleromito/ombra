@@ -51,7 +51,11 @@ def comment_prefix(path: str) -> str | None:
 
 def tracked_source_files() -> list[tuple[str, str]]:
     out = subprocess.run(
-        ["git", "ls-files"], cwd=ROOT, check=True, capture_output=True, text=True
+        ["git", "ls-files"],  # noqa: S607
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
     ).stdout.splitlines()
     result = []
     for path in out:

@@ -9,6 +9,7 @@
 FROM ubuntu:24.04
 
 LABEL org.opencontainers.image.source="https://github.com/erailabs/ombra"
+LABEL org.opencontainers.image.licenses="PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial"
 
 ARG OPENFHE_TAG=v1.6.1
 ARG OPENFHE_PYTHON_TAG=v1.6.1.0
