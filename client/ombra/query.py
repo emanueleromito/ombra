@@ -111,6 +111,8 @@ def encode_query(cc: Any, public_key: Any, query: np.ndarray) -> Any:
     q = np.asarray(query, dtype=np.float64)
     if q.ndim != 1 or q.size == 0:
         raise ValueError("query must be a non-empty one-dimensional vector")
+    if not np.all(np.isfinite(q)):
+        raise ValueError("query must contain only finite values")
     if abs(float(np.linalg.norm(q)) - 1.0) > NORM_TOLERANCE:
         raise ValueError("query must be normalized to unit length before encryption")
     slots = symmetric_slots(prescale_query(q), cc.GetRingDimension())
