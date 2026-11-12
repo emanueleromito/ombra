@@ -325,7 +325,7 @@ def run_cell(
 
 
 def run_dataset(ds: dict[str, Any], preset: str, n_queries: int, tmp: Path) -> dict[str, Any]:
-    import e2e_client as ec  # lazy: the plaintext simulation reuses this module without gRPC
+    import e2e_client as ec  # lazy: this module is importable without gRPC
     from ombra.collection import Collection
 
     x, fields, q = ds["x"], ds["fields"], ds["queries"][:n_queries]

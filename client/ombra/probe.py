@@ -1,8 +1,7 @@
 """Client-side cluster statistics and the probe policy for filtered search.
 
 Stopping at k matches in the first round lost recall at about 1% selectivity, so the client plans
-probes from per-cluster statistics. Pure numpy logic with no OpenFHE and no server; it also drives
-the plaintext simulation in core/bench/filter_probe_sim.py.
+probes from per-cluster statistics. Pure numpy logic with no OpenFHE and no server.
 
 * `ClusterStats`: per cluster the number of live vectors and the number per value of each filter
   field. The client builds it at create, updates it on insert and delete, and rebuilds it on

@@ -222,20 +222,6 @@ def test_openfhe(pytest_args: str = "") -> None:
     volume.commit()
 
 
-# Parallel decrypt: CPU only. 25 level-2 blocks of the m0_depth2 preset are small (a few MB each,
-# local disk).
-@app.function(cpu=16.0, memory=16384, timeout=3600, volumes={DATA_DIR: volume})
-def bench_topk(blocks: int = 25, runs: int = 5, preset: str = "m0_depth2") -> None:
-    """Serial vs parallel client decrypt + top-k, CPU only."""
-    out_dir = Path(DATA_DIR) / "results"
-    script = str(Path(REPO_DIR) / "core" / "bench" / "topk_parallel.py")
-    _run(
-        ["python", script, "--out", str(out_dir)]
-        + ["--blocks", str(blocks), "--runs", str(runs), "--preset", preset]
-    )
-    volume.commit()
-
-
 # memory: the column search benchmark holds one block (about 1.2 GB at d = 1536) as OpenFHE
 # ciphertexts plus its flattened copy on the host at a time, so about 3 to 4 GB peak; 16 GiB leaves
 # headroom. The filter measurements (`--task filter-measurements`) runs here too: it starts
@@ -437,73 +423,6 @@ def recall(
         _run(cmd)
     finally:
         volume.commit()
-
-
-# "A100-40GB" pins the SXM4 40 GB part that the column search benchmark ran on (plain "A100" may be
-# an 80 GB PCIe card).
-@app.function(gpu="A100-40GB", memory=16384, timeout=3600)
-def profile_search(ncu: bool = True, micro: bool = True) -> None:
-    """Search kernel profiling: micro kernels, instruction mix, Nsight Compute attempt (A100)."""
-    import json
-    import shutil
-
-    _run(["nvidia-smi"])
-    print(
-        "ncu on PATH:", shutil.which("ncu"), "| cuobjdump:", shutil.which("cuobjdump"), flush=True
-    )
-    _build("Release", targets=("ombra_profile_search",))
-    preset = json.loads((Path(REPO_DIR) / "core/params/ckks_presets.json").read_text())
-    p = preset["presets"]["m0_depth2"]
-    towers = p["multiplicative_depth"] + 1
-    bits = ",".join([str(p["first_mod_size"])] + [str(p["scaling_mod_size"])] * (towers - 1))
-    exe = f"{BUILD_DIR}/core/ombra_profile_search"
-    common = ["--ring", str(p["ring_dim"]), "--bits", bits]
-    if micro:
-        _run([exe, *common])
-    _run(
-        [
-            "python",
-            str(Path(REPO_DIR) / "core/bench/sass_mix.py"),
-            exe,
-            "column_search_kernel",
-            "column_search_batched_kernel",
-            "plain_search_kernel",
-            "prof_kernelILi0ELi1ELb1E",
-            "prof_kernelILi1ELi1ELb1E",
-            "prof_kernelILi2ELi1ELb1E",
-            "prof_kernelILi4ELi1ELb0E",
-            "prof_kernelILi5ELi1ELb0E",
-            "prof_kernelILi6ELi1ELb0E",
-        ]
-    )
-    if not ncu:
-        return
-    # Hardware counters may be refused inside the container; report whatever happens.
-    cmd = [
-        "ncu",
-        "--clock-control",
-        "none",  # the container may not lock clocks (first attempt failed on that)
-        "--set",
-        "full",
-        "-k",
-        "regex:column_search_kernel",
-        "-c",
-        "1",
-        exe,
-        *common,
-        "--ref-only",
-        "--d",
-        "384",
-        "--blocks",
-        "16",
-        "--warmup",
-        "0",
-        "--iters",
-        "1",
-    ]
-    print("$", " ".join(cmd), flush=True)
-    code = subprocess.run(cmd, cwd=REPO_DIR).returncode
-    print("ncu exit code:", code, flush=True)
 
 
 # Filtered recall on two real datasets through the client and the real server. Embeddings

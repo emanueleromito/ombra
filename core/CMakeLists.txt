@@ -98,12 +98,6 @@ target_link_libraries(ombra_plain_search PRIVATE ombra_core)
 add_executable(ombra_bench_plain_search src/ombra_bench_plain_search.cpp)
 target_link_libraries(ombra_bench_plain_search PRIVATE ombra_core)
 
-# Bench-only micro kernels that separate arithmetic from memory cost (no OpenFHE).
-add_executable(ombra_profile_search bench/profile_search.cu)
-set_target_properties(ombra_profile_search PROPERTIES CUDA_STANDARD 17)
-target_include_directories(ombra_profile_search PRIVATE kernels)
-target_link_libraries(ombra_profile_search PRIVATE ombra_rns_cuda)
-
 add_executable(ombra_search_gpu src/ombra_search_gpu.cpp)
 target_link_libraries(ombra_search_gpu PRIVATE ombra_core)
 

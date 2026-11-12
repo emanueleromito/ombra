@@ -17,10 +17,6 @@ and iterations per d.
 
     python core/bench/run.py --task expansion --out <dir>
 
-Compact configurations (ring dimension 8192 preset, fp16/int8 plaintext storage), see
-core/bench/compact_configs.py. Only runs when asked for: `--task compact-configs` (not part of
-`all`).
-
 Query batching (`ombra_bench_batch`, one run per d): search and expansion throughput for
 Q = 1, 8, 32, 128 queries per pass over the same stored blocks, the batched search kernel's
 achieved memory bandwidth, and the per-(d, Q) memory plan (queries per pass, passes, peak device
@@ -543,14 +539,6 @@ def main() -> None:
         "--workers-grpc", type=int, default=0, help="grpc-e2e: client processes (0 = affinity)"
     )
     parser.add_argument("--rerun-grpc", action="store_true", help="grpc-e2e: redo existing files")
-    parser.add_argument(
-        "--presets-compact-configs", default="m0_depth2,m0_compact_n8192", help="compact-configs"
-    )
-    parser.add_argument(
-        "--error-presets-compact-configs",
-        default="m0_compact_n8192",
-        help="compact-configs: presets with the e2e error",
-    )
     args = parser.parse_args()
 
     task = args.task.lower()
@@ -559,7 +547,6 @@ def main() -> None:
         "column-search",
         "expansion",
         "batching",
-        "compact-configs",
         "e2e-latency",
         "gpu-cache",
         "filter-measurements",
@@ -631,19 +618,6 @@ def main() -> None:
                 openfhe_version(),
                 name=args.name_e2e_latency,
             )
-    if task == "compact-configs":
-        from compact_configs import run_compact_configs
-
-        run_compact_configs(
-            args.out,
-            dims,
-            tuple(args.presets_compact_configs.split(",")),
-            tuple(x for x in args.error_presets_compact_configs.split(",") if x),
-            args.warmup,
-            args.iters,
-            find_binary,
-            openfhe_version(),
-        )
 
 
 if __name__ == "__main__":
