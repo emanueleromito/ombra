@@ -62,10 +62,9 @@ def test_packaged_license_files_match_the_root_ones():
         folder = (ROOT / path).parent
         if folder == ROOT:
             continue
-        for name in ("LICENSE", "LICENSING.md"):
-            copy = folder / name
-            if copy.exists():
-                assert copy.read_bytes() == (ROOT / name).read_bytes(), f"{copy} differs from root"
+        copy = folder / "LICENSE"
+        if copy.exists():
+            assert copy.read_bytes() == (ROOT / "LICENSE").read_bytes(), f"{copy} differs from root"
 
 
 def test_ci_image_carries_the_license_label():

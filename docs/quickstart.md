@@ -2,7 +2,7 @@
 
 Run your first encrypted search. Your vectors and your query are encrypted on your machine with
 fully homomorphic encryption (FHE); the server only computes on ciphertexts. Ombra is
-source-available (see `LICENSING.md`).
+source-available (see `LICENSE`).
 
 You start in local mode, which runs a CPU server inside your process and needs no GPU and no
 network. Then you run the same code against a server. The steps take about 10 minutes once Ombra

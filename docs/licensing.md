@@ -35,7 +35,7 @@ The commercial license replaces the PolyForm terms for that company. Pricing to 
 
 ## How it works in practice
 
-1. **GitHub repo:** full source code public, with the PolyForm Noncommercial `LICENSE` file and a separate `LICENSING.md` explaining both license options and how companies buy a license.
+1. **GitHub repo:** full source code public, with the PolyForm Noncommercial `LICENSE` file whose header names both license options, and a License section in the README explaining who needs which and how companies buy a license.
 2. **README wording:** "Free for personal, academic and non-commercial use. Companies need a commercial license." Never "open source"; use "source-available".
 3. **Contributor License Agreement (CLA):** every outside contributor signs one (e.g. via CLA Assistant on GitHub), so we can include their code in commercial licenses.
 4. **Commercial license agreement:** a standard contract for companies, covering scope (per company or per cluster), duration, support, and an annual audit clause.

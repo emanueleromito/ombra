@@ -23,7 +23,7 @@ When the task's tests pass, commit your work on your worktree's branch with a me
 Never:
 - Push, switch to or create other branches, merge, or open pull requests. The main agent reviews your branch and merges it.
 - Lower FHE parameters below 128-bit security, touch the secret key outside the client, or loosen a test tolerance without explaining why.
-- Edit `CLAUDE.md`, `.claude/`, `LICENSE`, `LICENSING.md` or `docs/decisions/`.
+- Edit `CLAUDE.md`, `.claude/`, `LICENSE` or `docs/decisions/`.
 
 When you finish, report back in this shape:
 1. **Status:** done, or blocked (and why)
