@@ -1,4 +1,4 @@
-// ombra_column_search: oracle driver for the column-packed search kernel (T0.4).
+// ombra_column_search: oracle driver for the column-packed search kernel.
 //
 // Usage: ombra_column_search <context.bin> <in_dir> <out_dir> <dims> <blocks>
 //

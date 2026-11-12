@@ -1,9 +1,10 @@
-"""Blob store access for encrypted records and documents (T3.4).
+"""Blob store access for encrypted records and documents.
 
 The server stores opaque blobs keyed by (collection, kind, id); this module is the client side
 of that API. `BlobStore` is the protocol, `InMemoryBlobStore` is for tests, and `GrpcBlobStore`
 uses the generated stubs (passed in, so this module needs neither grpc nor the stubs).
-Blobs, ids and collection names never appear in reprs or error messages (hard rule 4).
+Blobs, ids and collection names never appear in reprs or error messages (no plaintext in logs or
+errors).
 """
 
 from __future__ import annotations

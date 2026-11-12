@@ -2,7 +2,7 @@
 //
 // See core/kernels/column_search.cu for what is computed and the memory layout. All words are
 // OpenFHE evaluation-form RNS words; moduli come from the ciphertexts. No relinearization and no
-// rescale is done: the result has 3 components per block (T0.4 limitation).
+// rescale is done: the result has 3 components per block (a limitation of this kernel).
 // Public functions throw std::invalid_argument for bad input and CudaError for CUDA failures.
 #pragma once
 
@@ -38,13 +38,13 @@ class ColumnSearchDevice {
 
     // Copy one stored block (shape.block_words() words) to the device. Words must be reduced.
     void upload_block(std::size_t block, const std::uint64_t* words, std::size_t count);
-    // T1.3: seconds the cudaMemcpy of the last upload_block took (excludes the range check).
+    // Seconds the cudaMemcpy of the last upload_block took (excludes the range check).
     double last_upload_seconds() const;
     // Device-to-device copy of block `src` into block `dst` (for synthetic benchmark data).
     void copy_block(std::size_t src, std::size_t dst);
     // Copy the query (shape.query_words() words) to the device. Words must be reduced.
     void upload_query(const std::uint64_t* words, std::size_t count);
-    // T1.3: device-to-device copy of query dimension j (2 * num_towers * ring_dim words, one
+    // Device-to-device copy of query dimension j (2 * num_towers * ring_dim words, one
     // ciphertext in the [component][tower][coeff] layout) from `src`, a device pointer, into the
     // query buffer. Ordered after earlier work on the default stream. No host round trip and no
     // range check of the words: the source is the output of the expansion kernels.
@@ -53,7 +53,7 @@ class ColumnSearchDevice {
     double run();
     // Copy the result (shape.out_words() words) to the host.
     void download_result(std::vector<std::uint64_t>& out);
-    // Device pointer to the result [block][component 0..2][tower][coeff] (T1.2: the GPU-only
+    // Device pointer to the result [block][component 0..2][tower][coeff] (the GPU-only
     // search feeds it to relinearization without a host round trip). Valid for the object's life.
     const std::uint64_t* result_device() const;
 
@@ -62,7 +62,7 @@ class ColumnSearchDevice {
     std::unique_ptr<Impl> impl_;
 };
 
-// T2.6: scores ONE stored block that lives at an arbitrary device address (e.g. a slot of the
+// Scores ONE stored block that lives at an arbitrary device address (e.g. a slot of the
 // server's GPU cluster cache) with the same kernel as ColumnSearchDevice, on a caller-given stream.
 // launch() is asynchronous and does no checks on the data; the caller keeps the pointers alive and
 // ordered (events) until the stream has finished. Layouts: stored shape.block_words() words,
@@ -85,7 +85,7 @@ class ColumnSearchLauncher {
     std::unique_ptr<Impl> impl_;
 };
 
-// Batched search (T0.7): Q queries scored in one pass over the same stored blocks. Layouts:
+// Batched search: Q queries scored in one pass over the same stored blocks. Layouts:
 //   queries [q][dim][comp 0..1][tower][coeff]   (each query as in ColumnSearchShape::query_words)
 //   result  [q][block][comp 0..2][tower][coeff]
 // Memory is the caller's to plan: stored + max_queries * (query + result) words stay on the device.

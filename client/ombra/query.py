@@ -1,4 +1,4 @@
-"""Symmetric real query encoding for server-side expansion (decision 0010, T0.5).
+"""Symmetric real query encoding for server-side expansion (decision 0010).
 
 The query q (d normalized values) becomes the polynomial p(X) = q_0 + sum_{j>=1} q_j (X^j + X^-j)
 in R = Z[X]/(X^N+1), where X^-j = -X^(N-j): coefficient j is q_j, coefficient N-j is -q_j, all
@@ -26,7 +26,7 @@ from typing import Any
 
 import numpy as np
 
-# Vectors must be unit length to within this much (client/CLAUDE.md: normalize before encryption).
+# Vectors must be unit length to within this much (vectors are normalized before encryption).
 NORM_TOLERANCE = 1e-6
 # The embedding of a symmetric p is real up to floating-point error; its imaginary part must be
 # below this (absolute) or the encoding is refused.

@@ -1,4 +1,4 @@
-// ombra_bench_cache: benchmark of the GPU cluster cache (T2.6).
+// ombra_bench_cache: benchmark of the GPU cluster cache.
 //
 // Usage: ombra_bench_cache <context.bin> <public_key.bin> <dims> <budget_blocks> <accesses_per_block>
 //                          <out.json>

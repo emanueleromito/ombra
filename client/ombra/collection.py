@@ -1,9 +1,9 @@
-"""Collection creation, re-clustering and repacking (T3.5), client side.
+"""Collection creation, re-clustering and repacking, client side.
 
 The client holds the secret key (never sent, never printed). It clusters the vectors, encrypts
 the data blocks and the cluster centers, generates the evaluation keys, uploads them once per
 collection and creates the collection on the server. Parameters come only from
-`ombra.presets.derive` (hard rule 1).
+`ombra.presets.derive` (the 128-bit security floor).
 
 Layout (docs/architecture.md, decision 0019): a data block holds up to `slots` vectors of one
 cluster as D column ciphertexts (slot i of column j = component j of vector i) followed by one
@@ -108,7 +108,7 @@ class KeyKit:
         )
         self.key_tag = self._keys.publicKey.GetKeyTag()
 
-    # ---- persistence (T3.2 key file) ------------------------------------------------------
+    # ---- persistence (key file) ------------------------------------------------------
     _BLOB_MAGIC = b"OKSB"
     _BLOB_VERSION = 1
 
@@ -326,7 +326,9 @@ class Collection:
     ) -> Collection:
         """Cluster, create the collection, upload the keys once, insert centers and data."""
         x = np.asarray(vectors, dtype=np.float64)
-        derived = presets.derive(preset, x.shape[1])  # hard rule 1: parameters only from here
+        derived = presets.derive(
+            preset, x.shape[1]
+        )  # the 128-bit security floor: parameters only from here
         if len(ids) != len(x):
             raise ValueError("one id per vector")
         if not np.allclose(np.linalg.norm(x, axis=1), 1.0, atol=1e-6):

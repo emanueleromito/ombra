@@ -1,4 +1,4 @@
-// GPU cluster cache (T2.6). Unit of caching = one segment (cluster block) as device-ready RNS words
+// GPU cluster cache. Unit of caching = one segment (cluster block) as device-ready RNS words
 // (the layout the column search kernel reads), keyed by (collection, segment).
 //
 //   storage --loader--> pinned host pool (LRU) --async H2D on a copy stream--> GPU cache (LRU)

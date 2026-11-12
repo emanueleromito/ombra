@@ -1,6 +1,7 @@
 """Load CKKS parameter presets from core/params/ckks_presets.json.
 
-All parameter numbers live in that JSON file (hard rule 1); this module only reads them. A preset
+All parameter numbers live in that JSON file (the 128-bit security floor); this module only reads
+them. A preset
 whose security level is not 128-bit-or-stronger is refused before any OpenFHE object is created.
 """
 

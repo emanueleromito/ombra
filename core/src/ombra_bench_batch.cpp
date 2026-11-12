@@ -1,4 +1,4 @@
-// ombra_bench_batch: query batching benchmark for search and expansion (T0.7).
+// ombra_bench_batch: query batching benchmark for search and expansion.
 //
 // Usage: ombra_bench_batch <context.bin> <public_key.bin> <autokeys.bin> <d> <blocks> <warmup>
 //                          <iters> <mem_budget_bytes> <queries_csv> <out.json> [max_per_pass]

@@ -1,4 +1,4 @@
-"""Recall tool on your own data (T3.9): what does encryption cost in recall@10?
+"""Recall tool on your own data: what does encryption cost in recall@10?
 
     python -m ombra.recall vectors.npy [--filter-field f.npy] [--queries q.npy | --n-queries 100]
                            [--preset fast] [--security-level fast] [--k 10] [--n-probe N]

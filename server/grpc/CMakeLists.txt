@@ -1,9 +1,9 @@
-# T2.7b gRPC server. The request policy (limits, spec validation, preset headroom) is plain C++ and
+# gRPC server. The request policy (limits, spec validation, preset headroom) is plain C++ and
 # tested on the CPU. The service and the ombra_server executable need CUDA (the search engine) and
 # gRPC for C++ (Ubuntu 22.04: libgrpc++-dev libprotobuf-dev protobuf-compiler
 # protobuf-compiler-grpc); without either, only the policy is built and the CPU build is unchanged.
 
-# ---- Preset table, generated from the preset JSON (hard rule 1: no hand-picked numbers) ----------
+# ---- Preset table, generated from the preset JSON (the 128-bit security floor: no hand-picked numbers) ----------
 set(OMBRA_PRESET_JSON ${CMAKE_CURRENT_SOURCE_DIR}/../../core/params/ckks_presets.json)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${OMBRA_PRESET_JSON})
 file(READ ${OMBRA_PRESET_JSON} _presets_json)
@@ -42,7 +42,7 @@ add_executable(server_policy_test tests/policy_test.cpp)
 target_link_libraries(server_policy_test PRIVATE ombra_server_policy)
 add_test(NAME server_policy COMMAND server_policy_test)
 
-# ---- T2.9 API keys, metrics, HTTP parsing: plain C++ (own SHA-256, no OpenSSL), CPU tests ---------
+# ---- API keys, metrics, HTTP parsing: plain C++ (own SHA-256, no OpenSSL), CPU tests ---------
 add_library(ombra_server_admin STATIC src/auth.cpp src/metrics.cpp src/http.cpp)
 target_include_directories(ombra_server_admin PUBLIC include)
 

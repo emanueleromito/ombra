@@ -1,4 +1,4 @@
-// Kernel family: GPU CKKS encoding of real plaintext columns (T0.11, plaintext-DB mode).
+// Kernel family: GPU CKKS encoding of real plaintext columns (plaintext-DB mode).
 //
 // Mirrors OpenFHE v1.6.1 CKKSPackedEncoding::Encode (pke/lib/encoding/ckkspackedencoding.cpp) for
 // real input, full packing (slots = N/2), noise-scale degree 1, NATIVE_SIZE = 64:
@@ -101,7 +101,7 @@ __global__ void finish_kernel(const double2* buf, u64 total, u64 slots, u32 log_
   }
 }
 
-// Test aid for the exact oracle (T1.9): the reduction step of finish_kernel on given integers.
+// Test aid for the exact oracle: the reduction step of finish_kernel on given integers.
 // Launch shape: one thread per (col, coefficient), grid = ceil(cols * ring_dim / kThreads),
 // block = kThreads. in is int64 [col][ring_dim]; out is [col][tower][ring_dim].
 __global__ void reduce_ints_kernel(const long long* in, u64 total, u64 ring_dim,

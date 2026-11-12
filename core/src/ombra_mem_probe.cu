@@ -5,7 +5,7 @@
 // Allocates `count` separate buffers of `bytes_per_buffer` (cudaMalloc each) and reports the
 // change in free device memory (cudaMemGetInfo) per buffer, then does the same with the buffers
 // carved from one slab of the same total nominal size. Prints sizes only; no data. Used by
-// tests/test_gpu_mem_probe.py to document the nominal-versus-actual footprint (T0.7).
+// tests/test_gpu_mem_probe.py to document the nominal-versus-actual footprint.
 // Exit code: 0 ok, 2 error.
 
 #include <cstdio>

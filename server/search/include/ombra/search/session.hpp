@@ -1,4 +1,4 @@
-// Search engine API (T2.7a), what the gRPC service (part b) calls. Needs OpenFHE and CUDA.
+// Search engine API, what the gRPC service calls. Needs OpenFHE and CUDA.
 //
 //   SearchEngine engine(store, config);        // GPU cluster cache, one compute stream
 //   engine.load_collection("docs");            // context + EvalMult + automorphism keys from the store
@@ -14,7 +14,8 @@
 // number of filter fields that vector matches). Tombstoned slots get -lambda * (F + 1) added with
 // an OpenFHE plaintext (no level), so they decrypt below every live slot. No mask multiply.
 //
-// Key handling (hard rule 2): the engine reads the public context and the public EvalMult and
+// Key handling (the secret key stays on the client): the engine reads the public context and the
+// public EvalMult and
 // automorphism keys. It never accepts or derives a secret key. Every request carries a key tag that
 // is checked against the collection's, and so is the key tag inside every ciphertext (query and
 // stored columns); a mismatch throws KeyTagMismatch.

@@ -1,8 +1,8 @@
-// Request policy of the gRPC server (T2.7b): limits and collection-spec validation. Pure C++, no
+// Request policy of the gRPC server: limits and collection-spec validation. Pure C++, no
 // gRPC, no OpenFHE and no GPU, so it is unit-tested on the CPU.
 //
 // The preset numbers come from core/params/ckks_presets.json through a header that CMake generates
-// at configure time (preset_table.hpp); nothing is hand-picked here (hard rule 1).
+// at configure time (preset_table.hpp); nothing is hand-picked here (the 128-bit security floor).
 #pragma once
 
 #include <cstddef>

@@ -1,4 +1,4 @@
-// ombra_cache_search: paging test driver for the GPU cluster cache (T2.6).
+// ombra_cache_search: paging test driver for the GPU cluster cache.
 //
 // Usage: ombra_cache_search <context.bin> <in_dir> <dims> <blocks> <seed>
 //

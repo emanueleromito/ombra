@@ -8,7 +8,7 @@
 //   .  V  OpenFHE version string
 //   .  8  payload length L (u64)
 //   .  L  payload (OpenFHE BINARY serialization); the file ends here
-// There is deliberately no kind for a secret key (hard rule 2).
+// There is deliberately no kind for a secret key (the secret key stays on the client).
 #pragma once
 
 #include <cstdint>

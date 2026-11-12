@@ -1,11 +1,11 @@
-"""Local mode: a CPU server in a child process behind the same API as the gRPC server (T3.7).
+"""Local mode: a CPU server in a child process behind the same API as the gRPC server.
 
 `LocalTransport` (client process) starts the child with the `spawn` method and talks to it over a
 local socket. The child runs `LocalServer`, which has the method names and message types of the gRPC
 stub of service ombra.v1.Ombra (streams are Python iterators), so `Collection`, `run_search` and
 `GrpcBlobStore` run on it unchanged, in both modes. It is the CPU twin of the C++ server in
 server/. The child receives only the API messages: ciphertexts, the crypto context and public
-evaluation keys, as bytes in 0016 envelopes (hard rule 2: it never gets the secret key, and its
+evaluation keys, as bytes in 0016 envelopes (the child never gets the secret key, and its
 code has no way to ask for one). It deserializes the context and the keys itself.
 
 All OpenFHE work of the child is C++: `ombra._native` (client/native/, built against OpenFHE 1.6.1)

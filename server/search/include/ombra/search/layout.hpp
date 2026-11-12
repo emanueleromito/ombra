@@ -1,4 +1,4 @@
-// Pure logic of the search path (T2.7), no OpenFHE and no CUDA: the query/column layout of a
+// Pure logic of the search path, no OpenFHE and no CUDA: the query/column layout of a
 // collection (decision 0019, additive penalty) and the tombstone penalty vector.
 //
 // A collection has d vector columns and F filter fields with cardinalities V_1..V_F. A data block

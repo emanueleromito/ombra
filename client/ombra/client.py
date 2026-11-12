@@ -120,7 +120,7 @@ class Client:
         metadata: Sequence[dict[str, Any]] | None = None,
         documents: Sequence[str | bytes | None] | None = None,
     ) -> list[str]:
-        """Add vectors; their documents and metadata are stored encrypted (T3.4)."""
+        """Add vectors; their documents and metadata are stored encrypted."""
         return self._core.insert(collection, vectors, ids, metadata, documents)
 
     def delete(self, collection: str, ids: Sequence[str]) -> None:
@@ -231,7 +231,7 @@ class AsyncClient:
         metadata: Sequence[dict[str, Any]] | None = None,
         documents: Sequence[str | bytes | None] | None = None,
     ) -> list[str]:
-        """Add vectors; their documents and metadata are stored encrypted (T3.4)."""
+        """Add vectors; their documents and metadata are stored encrypted."""
         return self._core.insert(collection, vectors, ids, metadata, documents)
 
     async def delete(self, collection: str, ids: Sequence[str]) -> None:

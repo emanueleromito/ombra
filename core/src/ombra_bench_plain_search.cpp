@@ -1,4 +1,4 @@
-// ombra_bench_plain_search: search throughput of compact plaintext storage (T0.11 step 2).
+// ombra_bench_plain_search: search throughput of compact plaintext storage.
 //
 // Usage: ombra_bench_plain_search <context.bin> <public_key.bin> <dims> <blocks> <warmup> <iters>
 //                                 <out.json>
@@ -9,7 +9,8 @@
 // words, random fp16 codes in [2^-7, 1) and random int8 codes: the kernels' speed does not depend
 // on the values), so nothing real is stored or printed. Four modes are timed on the same shape
 // (d dimensions, `blocks` blocks of N/2 vectors), each with CUDA events, after `warmup` runs:
-//   ct_x_ct          the T0.4 kernel (stored ciphertexts x query ciphertexts, 3 components)
+//   ct_x_ct          the column-search kernel (stored ciphertexts x query ciphertexts, 3
+//   components)
 //   pt_preencoded    the ciphertext x plaintext kernel on RNS plaintexts already encoded
 //   fp16, int8       compact codes encoded on the GPU in chunks of blocks right before the multiply
 //                    (encode + search; the two parts are reported separately as well)
@@ -130,7 +131,7 @@ int main(int argc, char** argv) {
       return median(t);
     };
 
-    // ct_x_ct: the T0.4 kernel on random ciphertext words.
+    // ct_x_ct: the column-search kernel on random ciphertext words.
     {
       ombra::core::ColumnSearchShape shape{dims, blocks, nt, n};
       ombra::core::ColumnSearchDevice dev(shape, tables.moduli);

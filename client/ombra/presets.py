@@ -1,6 +1,6 @@
-"""Product presets and parameter derivation (T3.3).
+"""Product presets and parameter derivation.
 
-Users pick a preset name and a vector dimension; they never pick ring sizes or moduli (hard rule
+Users pick a preset name and a vector dimension; they never pick ring sizes or moduli (the 128-bit
 1). Every number comes from core/params/ckks_presets.json through ombra.params, the same file the
 C++ server reads (server/grpc/CMakeLists.txt generates its preset table from it), so the two sides
 cannot drift. Nothing here is hand-picked.

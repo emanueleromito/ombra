@@ -1,6 +1,6 @@
 // Ombra gRPC API, version 1 (package ombra.v1). Decisions 0003, 0010, 0016, 0019.
 //
-// Hard rule 2: no message here has a field for a secret key, and none may get one. The server
+// The secret key stays on the client: no message here has a field for a secret key, and none may get one. The server
 // receives ciphertexts (inside the 0016 envelope) and public evaluation keys only. Ids are opaque
 // bytes chosen by the client; documents and metadata values never appear in any message.
 // Version rule: every message that the server stores carries `api_version`; the server refuses a
@@ -21,7 +21,7 @@ enum Limit {
   LIMIT_MAX_FILTER_FIELDS = 16;         // F; the preset's headroom may lower it (see below)
   LIMIT_MAX_FILTER_CARDINALITY = 64;    // values per field (higher cardinality is hashed)
   LIMIT_MAX_CLUSTERS_PER_ROUND = 4096;
-  // Encrypted blob sizes (T3.4): a stored blob is exactly one of these sizes, never another, so
+  // Encrypted blob sizes: a stored blob is exactly one of these sizes, never another, so
   // the server learns only the bucket of a document, not its size. Larger files are kept in the
   // customer's own storage and the blob holds an encrypted reference.
   LIMIT_BLOB_BUCKET_0 = 16384;
@@ -214,7 +214,7 @@ message ReplaceBlockResponse {
   Error error = 3;
 }
 
-// Encrypted blob store (T3.4). Blobs are opaque client ciphertexts (the client's versioned
+// Encrypted blob store. Blobs are opaque client ciphertexts (the client's versioned
 // document layout); the server never parses them. Keyed by (collection, kind, id). The size of
 // every blob must be one of the LIMIT_BLOB_BUCKET_* values, else ERROR_SIZE_LIMIT. Same storage
 // and crash-safety rules as segments: a blob is visible only after it is fully written, synced

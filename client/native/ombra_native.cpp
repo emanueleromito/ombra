@@ -1,4 +1,4 @@
-// ombra._native: the CPU (OpenFHE) work of the local-mode server (T3.7, decision 0022).
+// ombra._native: the CPU (OpenFHE) work of the local-mode server (decision 0022).
 //
 // Imported ONLY by the child process of local mode, never by the client process: the client
 // process holds the secret key through the openfhe-python wheel, and one process must not hold two
@@ -132,7 +132,7 @@ public:
             }
         }
         if (!cc_) throw std::invalid_argument("cannot read the crypto context");
-        ombra::core::require_security_floor(cc_);  // hard rule 1, on the server side too
+        ombra::core::require_security_floor(cc_);  // the 128-bit floor holds on the server side too
 
         using Impl = CryptoContextImpl<DCRTPoly>;
         // OpenFHE's key store is static and refuses a tag that already holds keys: a second

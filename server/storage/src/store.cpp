@@ -48,7 +48,8 @@ std::string hex_name(char prefix, std::uint64_t id, const char* ext) {
   return buf;
 }
 
-// Logs carry counts and timings only: never ids, names of vectors or bytes (hard rule 4).
+// Logs carry counts and timings only: never ids, names of vectors or bytes (no plaintext in logs or
+// errors).
 void log_line(const char* what, std::size_t a, std::size_t b, double ms) {
   std::fprintf(stderr, "[ombra.storage] %s count=%zu bytes=%zu ms=%.2f\n", what, a, b, ms);
 }

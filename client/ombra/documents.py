@@ -1,4 +1,4 @@
-"""Encrypted record and document blobs (T3.4).
+"""Encrypted record and document blobs.
 
 Each blob has its own fresh AES-256-GCM key, wrapped with the document master key
 (KeyMaterial.master_key). Layout, version 1 (all integers little-endian); the stored blob is
@@ -15,7 +15,7 @@ moved to another id, collection or kind, or with any byte changed, fails authent
 
 Reference mode: a body larger than `inline_threshold` (default 1 MiB) is not stored; the blob
 holds an encrypted reference to the customer's own storage, and `fetch_document` checks the sha256.
-Errors and reprs never carry plaintext, keys or ids (hard rule 4).
+Errors and reprs never carry plaintext, keys or ids (no plaintext in logs or errors).
 """
 
 from __future__ import annotations

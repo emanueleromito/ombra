@@ -1,4 +1,4 @@
-// GPU-only search pipeline (T1.2): multiply-and-add over d dimensions, relinearize, rescale, mask
+// GPU-only search pipeline: multiply-and-add over d dimensions, relinearize, rescale, mask
 // multiply (with relinearization), rescale. After the uploads, run() executes every step on the
 // GPU; no OpenFHE call is made between the search kernel and the final ciphertexts.
 //
@@ -100,16 +100,16 @@ class GpuSearch {
 
   void upload_block(std::size_t block, const std::vector<Ct>& columns);  // dims ciphertexts
   void upload_query(const std::vector<Ct>& columns);                     // dims ciphertexts
-  // T1.3: the same as upload_block for columns already flattened (flatten_ciphertexts), so the
+  // The same as upload_block for columns already flattened (flatten_ciphertexts), so the
   // host-to-device copy can be timed apart from the flattening.
   void upload_block_flat(std::size_t block, const FlatCiphertexts& columns);
-  // T1.3: device-to-device copy of stored block `src` into `dst` (synthetic benchmark data only).
+  // Device-to-device copy of stored block `src` into `dst` (synthetic benchmark data only).
   void copy_block(std::size_t src, std::size_t dst);
-  // T1.3: seconds of the host-to-device copy in the last upload_block / upload_block_flat.
+  // Seconds of the host-to-device copy in the last upload_block / upload_block_flat.
   double last_upload_seconds() const;
   // Device bytes this object holds (stored blocks, query, search output, stage buffers).
   std::size_t device_bytes() const;
-  // T1.3: device-to-device handoff of the query. column_ptrs[j] is a device pointer to dimension j
+  // Device-to-device handoff of the query. column_ptrs[j] is a device pointer to dimension j
   // (2 * num_q * N words, [component][tower][coeff], e.g. an expansion leaf from
   // ExpansionDevice::device_ptr). `meta` is the level, noise-scale degree and scaling factor of the
   // columns; the caller has checked them (and the moduli) against the stored columns, as the

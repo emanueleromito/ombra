@@ -1,4 +1,4 @@
-// Kernel family: batched negacyclic NTT (T0.5, T0.5b), in OpenFHE v1.6.1's convention.
+// Kernel family: batched negacyclic NTT, in OpenFHE v1.6.1's convention.
 //
 // Forward (NumberTheoreticTransformNat::ForwardTransformToBitReverseInPlace, transformnat-impl.h):
 // Cooley-Tukey. For m = 1, 2, 4 .. N/2 and t = N/(2m): for each group i < m and j < t, with

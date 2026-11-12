@@ -14,8 +14,9 @@
 // base-leveledshe.cpp:621) accumulated over j with EvalAdd (EvalAddCoreInPlace, :575). The result
 // has 3 components.
 //
-// LIMITATION (T0.4): no relinearization and no rescale. Relinearizing the 3-component sum once at
-// the end needs key switching (T0.5 and later); rescale is likewise left to the caller. The
+// LIMITATION: no relinearization and no rescale. Relinearizing the 3-component sum once at
+// the end needs key switching (added with the expansion kernels); rescale is likewise left to the
+// caller. The
 // result therefore has noise-scale degree 2 and scaling factor scale_stored * scale_query.
 //
 // Memory layout (device, 64-bit words, contiguous; P = num_towers * ring_dim words per polynomial):
@@ -27,7 +28,7 @@
 // touch consecutive words (coalesced), and the tower modulus is tc[e / ring_dim].
 // All input words must be reduced (< their modulus); moduli < 2^60 and odd.
 //
-// Arithmetic (T1.4): products use Montgomery multiplication (modarith.cuh, mont_mul), which takes
+// Arithmetic: products use Montgomery multiplication (modarith.cuh, mont_mul), which takes
 // 42.8 instead of 57.2 instructions per modular multiplication in the loop. The kernel accumulates
 // acc = sum_j mont_mul(x_j, y_j) mod q = R^-1 * sum_j x_j y_j with R = 2^64 and multiplies once by R
 // (mont_finish) at the end, so inputs and outputs stay standard-form residues and the result is
@@ -90,7 +91,7 @@ __global__ void __launch_bounds__(kBlockThreads, 4) column_search_kernel(const u
     }
 }
 
-// ---- Batched search (T0.7): Q queries in one pass over the same stored blocks ----
+// ---- Batched search: Q queries in one pass over the same stored blocks ----
 //
 // Computes, for every query q < Q and stored block b, the same 3-component sum as above:
 //   out[q][b][c] = column_search of stored block b with query q   (c = 0..2)

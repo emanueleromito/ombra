@@ -137,7 +137,7 @@ struct ExpansionDevice::Impl {
   KeyDev relin_key;  // words only (no automorphism map)
   bool has_relin_key = false;
   std::map<std::size_t, DeviceBuffer<u64>> monos;
-  // Rescale (T1.2): constants, plus scratch for `rs_cap` nodes: last [2][N], tmp [2][nq-1][N] per
+  // Rescale: constants, plus scratch for `rs_cap` nodes: last [2][N], tmp [2][nq-1][N] per
   // node and the pointer array of the dropped towers (2 per node).
   DeviceBuffer<u64> ql_inv;
   DeviceBuffer<NttRow> rows_inv_last, rows_fwd_rs;

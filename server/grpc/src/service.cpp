@@ -207,7 +207,7 @@ static void fill_info(storage::Store& store, const storage::CollectionSpec& spec
   std::uint64_t n = 0;
   for (const auto& r : store.segments(spec.name))
     if (r.cluster != spec.cluster_count) n += r.n_vectors;  // the center block is not a vector
-  info->set_vector_count(n);  // includes tombstoned vectors until compaction (T2.8)
+  info->set_vector_count(n);  // includes tombstoned vectors until compaction
   info->set_deleted_count(store.tombstones(spec.name).size());
   bool keys = true;
   for (const char* k : {storage::kKeyContext, storage::kKeyEvalMult, storage::kKeyAutomorphism})
@@ -658,7 +658,7 @@ grpc::Status OmbraService::run_ReplaceBlock(grpc::ServerContext*, grpc::ServerRe
 }
 
 // ---------------------------------------------------------------------------------------------
-// Blob store (T3.4). Blobs are opaque bytes; ids and bytes are never logged.
+// Blob store. Blobs are opaque bytes; ids and bytes are never logged.
 
 grpc::Status OmbraService::run_PutBlob(grpc::ServerContext*, grpc::ServerReader<v1::PutBlobRequest>* in,
                                        v1::PutBlobResponse* resp) {

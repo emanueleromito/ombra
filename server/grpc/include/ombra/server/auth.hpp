@@ -1,5 +1,6 @@
-// API keys and scopes (T2.9). An API key is an access token for the data API, not an FHE key: the
-// server never sees a secret key (hard rule 2). Tokens are random, shown once at creation and
+// API keys and scopes. An API key is an access token for the data API, not an FHE key: the
+// server never sees a secret key (the secret key stays on the client). Tokens are random, shown
+// once at creation and
 // stored only as salted SHA-256 in <data-dir>/api_keys.v1 (mode 0600). Nothing here logs a token.
 #pragma once
 

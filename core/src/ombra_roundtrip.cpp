@@ -1,4 +1,4 @@
-// ombra_roundtrip: oracle driver for the GPU RNS kernels (T0.3).
+// ombra_roundtrip: oracle driver for the GPU RNS kernels.
 //
 // Usage: ombra_roundtrip <context.bin> <ct_a.bin> <ct_b.bin> <pt_values.bin> <out_dir>
 //

@@ -1,4 +1,4 @@
-// Compact plaintext storage and ciphertext x plaintext column search (T0.11 step 2).
+// Compact plaintext storage and ciphertext x plaintext column search.
 //
 // Plaintext-DB mode: the database holds the vectors as plain numbers (fp16 or int8, 2d or d bytes
 // per vector), column-packed: dimension j of the vectors of a block is one array of `slots` values.

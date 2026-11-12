@@ -1,4 +1,4 @@
-"""Two-stage search with filters, security levels and exact re-ranking (T3.6).
+"""Two-stage search with filters, security levels and exact re-ranking.
 
 Flow on one Search stream (decisions 0004, 0019): the query carries the d query values followed by
 lambda * one-hot entries for each filter field (all lambda for a field that is not filtered, so the
@@ -127,7 +127,7 @@ def _chunks(seq: list[int]) -> list[list[int]]:
 
 
 def _decrypt_round(col: Any, envelopes: list[bytes], counts: list[int], workers: int) -> list:
-    """Decrypt score blocks: in parallel (T2.1) when `workers` > 1, else in this process."""
+    """Decrypt score blocks: in parallel when `workers` > 1, else in this process."""
     if workers <= 1 or len(envelopes) < 2:
         return [col.kit.decrypt_column(e)[:n] for e, n in zip(envelopes, counts, strict=True)]
     kit = col.kit

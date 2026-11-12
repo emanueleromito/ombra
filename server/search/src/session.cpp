@@ -41,7 +41,7 @@ double ms_since(Clock::time_point t0) {
   return std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 }
 
-// Counts and timings only (hard rule 4).
+// Counts and timings only (no plaintext in logs or errors).
 void log_line(const char* what, std::size_t blocks, double ms) {
   std::fprintf(stderr, "[ombra.search] %s blocks=%zu ms=%.2f\n", what, blocks, ms);
 }

@@ -1,13 +1,13 @@
-"""Client-side cluster statistics and the probe policy for filtered search (T3.11, T3.6).
+"""Client-side cluster statistics and the probe policy for filtered search.
 
 Decision 0019's first probe rule (stop at k matches in the first round) lost recall at about 1%
-selectivity (docs/plan/results/2026-11-11-t3.11-filtered-recall.md). This module holds the fix, as
+selectivity (measured in the filtered-recall benchmark). This module holds the fix, as
 pure numpy logic with no OpenFHE and no server, so it is unit tested and also drives the plaintext
 simulation in core/bench/filter_probe_sim.py:
 
 * `ClusterStats`: per cluster the number of live vectors and the number per value of each filter
   field. (An earlier version also stored a radius per cluster for a stopping check; the sweep in
-  docs/plan/results/2026-11-11-t3.11-probe-policies.md showed it never pruned, so it was dropped
+  the probe-policy benchmark showed it never pruned, so it was dropped
   and the blob version bumped.) The client builds it at create, updates it on insert and delete,
   and rebuilds it on re-clustering. It is persisted only as an encrypted blob (`seal`/`unseal`,
   under the reserved id `STATS_ID`), never in plaintext.

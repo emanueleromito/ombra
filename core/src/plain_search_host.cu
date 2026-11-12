@@ -1,4 +1,4 @@
-// Host side of the GPU CKKS encoder and the ciphertext x plaintext search (T0.11).
+// Host side of the GPU CKKS encoder and the ciphertext x plaintext search.
 // Kernels: core/kernels/encode.cu, core/kernels/plain_search.cu, core/kernels/ntt.cu.
 // Internal code returns Status; the public functions convert to exceptions at the boundary.
 

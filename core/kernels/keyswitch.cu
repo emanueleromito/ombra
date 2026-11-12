@@ -1,4 +1,4 @@
-// Kernel family: hybrid key-switched automorphism and the expansion split (T0.5, T0.5b, decision
+// Kernel family: hybrid key-switched automorphism and the expansion split (decision
 // 0010).
 //
 // Mirrors OpenFHE v1.6.1 LeveledSHEBase::EvalAutomorphismCore (base-leveledshe.cpp:400), HYBRID
@@ -49,7 +49,7 @@ __global__ void ks_copy_own_kernel(const u64* const* __restrict__ ct, u64* __res
 // ba[0] += cv0 * P on the Q towers; then AutomorphismTransform with out[j] = in[auto_map[j]]).
 // All three are pointwise in the coefficient index, so evaluating the pointwise expression at
 // s = auto_map[j] and storing at j equals "compute, then permute".
-// Relinearization (T1.2, KeySwitchCore on component 2 of a 3-component ciphertext) uses the same
+// Relinearization (KeySwitchCore on component 2 of a 3-component ciphertext) uses the same
 // kernel with auto_map == nullptr (s = j), KsDims::add_c0_p == 0 (no "+ c0 * P": the caller adds
 // the ModDown result to c0, c1 afterwards) and KsDims::src_comp == 2 (the polynomial being
 // switched is component 2, so a digit's own towers are read from there).

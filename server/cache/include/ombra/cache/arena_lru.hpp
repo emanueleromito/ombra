@@ -1,4 +1,4 @@
-// LRU policy with pinning over an arena (T2.6). Pure bookkeeping, no memory is touched: used for
+// LRU policy with pinning over an arena. Pure bookkeeping, no memory is touched: used for
 // the pinned host pool and for the GPU cache. A key is one segment (cluster block) of a collection.
 #pragma once
 

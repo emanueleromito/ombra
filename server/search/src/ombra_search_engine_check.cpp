@@ -1,4 +1,4 @@
-// ombra_search_engine_check: oracle driver for the search engine (T2.7a).
+// ombra_search_engine_check: oracle driver for the search engine.
 //
 // Usage: ombra_search_engine_check <in_dir> <out_dir> <gpu_blocks> <host_blocks>
 //
