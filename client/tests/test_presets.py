@@ -1,4 +1,4 @@
-"""T3.3: preset and dimension mapping, refusals, and agreement with the C++ side."""
+"""Preset and dimension mapping, refusals, and agreement with the C++ side."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""T3.9: the recall tool end to end in local mode on a small synthetic corpus."""
+"""The recall tool end to end in local mode on a small synthetic corpus."""
 
 from __future__ import annotations
 

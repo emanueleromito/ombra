@@ -1,4 +1,4 @@
-"""T0.7: batched column-packed search (Q queries in one pass) against OpenFHE.
+"""Batched column-packed search (Q queries in one pass) against OpenFHE.
 
 Same setup as tests/test_gpu_column_search.py, with Q distinct queries. The C++ driver
 `ombra_column_search_batch` scores all Q queries against the stored blocks in one kernel launch and,
@@ -23,7 +23,7 @@ pytestmark = pytest.mark.gpu
 PRESET = "m0_depth2"
 SEED = 20260110
 
-# Same agreed bound as T0.4 (tests/test_gpu_column_search.py); do not loosen.
+# Same agreed bound as tests/test_gpu_column_search.py; do not loosen.
 DECRYPT_TOLERANCE = 1e-6
 
 REPO_ROOT = Path(__file__).resolve().parents[1]

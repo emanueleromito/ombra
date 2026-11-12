@@ -1,4 +1,4 @@
-"""Instruction mix of compiled sm_80 kernels (T1.4, bench-only).
+"""Instruction mix of compiled sm_80 kernels (bench-only).
 
 Usage: python sass_mix.py <binary-or-cubin> <regex on the mangled kernel name> [...]
 Runs `cuobjdump -sass -arch sm_80`, finds each matching function and prints the opcode histogram of

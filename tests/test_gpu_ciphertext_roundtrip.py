@@ -1,4 +1,4 @@
-"""T0.3: ciphertext round trip through the CUDA kernels.
+"""Ciphertext round trip through the CUDA kernels.
 
 Python generates keys and synthetic seeded data, encrypts, and writes only public material (the
 CryptoContext and ciphertexts, OpenFHE BINARY serialization) to disk. The C++ driver
@@ -28,7 +28,7 @@ N_VALUES = 256
 
 # Maximum error between a decrypted result and the same computation in numpy (and between the GPU
 # and OpenFHE CPU results). Values are normalized, scale is 2^50, depth is 1 here: the real error
-# is orders of magnitude lower. Same agreed bound as T0.2; do not loosen.
+# is orders of magnitude lower. Same agreed bound as the CPU baseline; do not loosen.
 DECRYPT_TOLERANCE = 1e-6
 
 REPO_ROOT = Path(__file__).resolve().parents[1]

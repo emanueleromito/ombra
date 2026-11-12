@@ -1,4 +1,4 @@
-"""T0.5: client query encoding (client/ombra/query.py).
+"""Client query encoding (client/ombra/query.py).
 
 CPU-only checks of the numpy side (symmetric coefficients, embedding, indices, expansion tree on
 plain polynomials) run under `make test`. The `openfhe` tests check, through OpenFHE, that the real

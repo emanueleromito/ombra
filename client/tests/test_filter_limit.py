@@ -1,4 +1,4 @@
-"""T3.6: F_max per preset from decision 0019's formula, and the refusals of a filter schema."""
+"""F_max per preset from decision 0019's formula, and the refusals of a filter schema."""
 
 from __future__ import annotations
 

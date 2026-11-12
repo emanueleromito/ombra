@@ -1,4 +1,4 @@
-"""T2.9: TLS, API keys with scopes and the REST admin port of `ombra_server`.
+"""TLS, API keys with scopes and the REST admin port of `ombra_server`.
 
 The server runs with TLS (a self-signed certificate made with the `openssl` CLI in tmp_path) and
 three API keys made with `ombra_server --create-api-key`. Cases: no key -> UNAUTHENTICATED; a read

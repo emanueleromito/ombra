@@ -1,7 +1,7 @@
-"""T2.4: the v1 proto compiles for Python and C++; messages round-trip; unknown versions refused.
+"""The v1 proto compiles for Python and C++; messages round-trip; unknown versions refused.
 
 Uses grpcio-tools' bundled protoc. The C++ check generates the C++ sources; building them needs
-the protobuf C++ library, which arrives with the server (T2.7). Synthetic data only.
+the protobuf C++ library, which arrives with the server. Synthetic data only.
 """
 
 from __future__ import annotations
@@ -121,7 +121,7 @@ def test_every_stored_message_has_api_version(pb) -> None:
 
 
 def test_no_secret_key_field_anywhere(pb) -> None:
-    """Hard rule 2: no field name suggests a secret key or plaintext."""
+    """the secret key stays on the client: no field name suggests a secret key or plaintext."""
     bad = re.compile(r"secret|private|plaintext|password|passphrase", re.I)
     for msg in pb.DESCRIPTOR.message_types_by_name.values():
         for field in msg.fields:
@@ -129,7 +129,7 @@ def test_no_secret_key_field_anywhere(pb) -> None:
 
 
 def test_block_messages_carry_counts_only(pb) -> None:
-    """ListBlocks exposes counts and the segment name, no ids (hard rule 4)."""
+    """ListBlocks exposes counts and the segment name, no ids (no plaintext in logs or errors)."""
     fields = set(pb.BlockInfo.DESCRIPTOR.fields_by_name)
     assert fields == {"segment", "cluster_id", "n_vectors", "n_deleted"}
     assert pb.ERROR_BLOCK_NOT_FOUND == 12 and pb.ERROR_BLOCK_MISMATCH == 13

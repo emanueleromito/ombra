@@ -1,10 +1,10 @@
-"""T0.11 benchmark: compact configurations (called from core/bench/run.py, `--task t0.11`).
+"""Compact configurations benchmark (called from core/bench/run.py, `--task compact-configs`).
 
 Per preset (m0_depth2 = baseline, m0_compact_n8192 = ring dimension 8192) and per d in
 384, 768, 1536 (default), one case per measurement:
 
   * "expansion": GPU query expansion time and automorphism-key size (binary `ombra_bench_expand`);
-  * "search": per mode ct_x_ct (T0.4 kernel), pt_preencoded, fp16, int8 (binary
+  * "search": per mode ct_x_ct (column-search kernel), pt_preencoded, fp16, int8 (binary
     `ombra_bench_plain_search`): vectors/s, storage bytes per vector, encode/search split;
   * "quantization": score error of fp16 and int8 storage against numpy on the unquantized
     vectors (seeded synthetic normalized vectors, max and mean absolute error, no bound);
@@ -14,7 +14,7 @@ Per preset (m0_depth2 = baseline, m0_compact_n8192 = ring dimension 8192) and pe
     process; only the context, the public key, the automorphism keys and ciphertexts go to a
     temporary directory. Nothing printed or written contains vectors or scores.
 
-Output: `<out>/t0.11-a100.json`.
+Output: `<out>/compact-configs-a100.json`.
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ BOUND = 1e-6
 SEED = 20260111
 # Stored data per search benchmark is kept near constant: blocks = BUDGET // d.
 BLOCK_DIM_BUDGET = 8 * 1536
-OUT_NAME = "t0.11-a100.json"
+OUT_NAME = "compact-configs-a100.json"
 
 
 def _run(cmd: list[str], timeout: int = 3000) -> str:
@@ -170,7 +170,7 @@ def end_to_end_error(
     }
 
 
-def run_t011(
+def run_compact_configs(
     out_dir: Path,
     dims: tuple[int, ...],
     presets: tuple[str, ...],
@@ -282,15 +282,16 @@ def run_t011(
                     )
 
     record = {
-        "task": "t0.11",
+        "task": "compact-configs",
         "format_version": 1,
         "openfhe_version": openfhe_version,
         "gpu_name": gpu_name,
         "presets": preset_info,
         "note": (
-            "expansion: median wall time of the whole tree (as t0.5). search: kernel time with "
-            "CUDA events; ct_x_ct is the T0.4 kernel (3 components), pt_preencoded the ct x pt "
-            "kernel on RNS plaintexts, fp16/int8 encode on the GPU in chunks of blocks then "
+            "expansion: median wall time of the whole tree. search: kernel time with "
+            "CUDA events; ct_x_ct is the column search kernel (3 components), pt_preencoded "
+            "the ct x pt kernel on RNS plaintexts, fp16/int8 encode on the GPU in chunks of "
+            "blocks then "
             "search (seconds_median = encode + search). Data is seeded synthetic; quantization "
             "errors are computed in float64 on the decoded stored values. end_to_end_error is "
             "reported against the 1e-6 bound; a failure is a result."

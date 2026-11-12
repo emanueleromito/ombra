@@ -1,4 +1,4 @@
-"""T3.9: argument parsing and verdict logic of the recall tool (no OpenFHE needed)."""
+"""Argument parsing and verdict logic of the recall tool (no OpenFHE needed)."""
 
 from __future__ import annotations
 

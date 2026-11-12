@@ -1,14 +1,16 @@
-"""T1.2: GPU relinearize, rescale and ciphertext mask multiply, and the GPU-only search.
+"""GPU relinearize, rescale and ciphertext mask multiply, and the GPU-only search.
 
-Oracle (hard rule 3): the driver `ombra_search_gpu` feeds the same OpenFHE ciphertexts to each GPU
+Oracle (every kernel is compared with OpenFHE): the driver `ombra_search_gpu` feeds the same OpenFHE
+ciphertexts to each GPU
 kernel (relinearize at both levels, rescale at both levels, ciphertext x ciphertext multiply at the
 mask level) and to OpenFHE on the CPU, and compares every RNS word, the moduli, level, noise-scale
 degree and scaling factor exactly. It then runs the GPU-only pipeline (multiply-and-add kernel,
 relinearize, rescale, mask, rescale; no OpenFHE call in between) and compares every stage with the
 OpenFHE chain. This test then decrypts the GPU-only output for three masks and reports the max
-error against numpy, with the same 1e-6 bound as T0.6 (test_gpu_filter_mask.py), same inputs.
+error against numpy, with the same 1e-6 bound as test_gpu_filter_mask.py, same inputs.
 
-Query leaves come from the GPU expansion, as in T0.6. Only public material goes to disk; the secret
+Query leaves come from the GPU expansion, as in test_gpu_filter_mask.py. Only public material goes
+to disk; the secret
 key stays in this process. Data is synthetic; only aggregates are printed.
 Default d = 16; `--expansion-large` adds d = 384, 768, 1536.
 """
@@ -31,11 +33,13 @@ pytestmark = pytest.mark.gpu
 PRESETS = ["m0_depth2", "m0_compact_n8192"]
 SEED = 20260110  # same seed and data as test_gpu_filter_mask.py
 
-# Max |decrypted slot - (stored @ q) * mask|. Same agreed bound as T0.2 to T0.6; do not loosen.
+# Max |decrypted slot - (stored @ q) * mask|. Same agreed bound as the other GPU tests; do not
+# loosen.
 TOLERANCE = 1e-6
-# m0_compact_n8192 is known to miss 1e-6 at d >= 384 (T0.11: 3.5e-6 to 6.3e-6; here up to 7.6e-6 on
+# m0_compact_n8192 is known to miss 1e-6 at d >= 384 (3.5e-6 to 6.3e-6; here up to 7.6e-6 on
 # the CPU result too). The GPU output is bit-identical to OpenFHE's, so this is the preset's own
-# noise, not the kernels'. Its acceptance rule is T1.6/T1.7; here it only gets a sanity bound.
+# noise, not the kernels'. Its acceptance rule is the recall acceptance check; here it only gets a
+# sanity bound.
 COMPACT_SANITY_BOUND = 1e-5
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -127,7 +131,7 @@ def test_gpu_relin_rescale_mask_and_search(tmp_path: Path, d: int, preset: str) 
         mask_ct = cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(mask.tolist(), 1, 1))
         assert ofhe.SerializeToFile(str(in_dir / f"mask_{kind}.bin"), mask_ct, ofhe.BINARY)
 
-    # T1.10: more blocks of different data and a different mask per block (ragged: 7 blocks with
+    # More blocks of different data and a different mask per block (ragged: 7 blocks with
     # max_batch 3 give chunks of 3, 3, 1). Block 0 reuses the stored columns above.
     n_blocks = 7
     for b in range(1, n_blocks):

@@ -1,4 +1,4 @@
-"""Probe policy and cluster statistics (T3.11): pure logic, no OpenFHE, no server."""
+"""Probe policy and cluster statistics: pure logic, no OpenFHE, no server."""
 
 import numpy as np
 import pytest

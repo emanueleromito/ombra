@@ -1,4 +1,4 @@
-"""T3.7 parity: the same data and queries through local mode (CPU, child process, compiled
+"""Local mode parity: the same data and queries through local mode (CPU, child process, compiled
 expansion) and through the real GPU server give the same top-k, and the score ciphertexts come back
 at the same level. Synthetic data only; d = 384 on the "fast" preset, one filter field.
 """

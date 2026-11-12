@@ -1,4 +1,4 @@
-"""T0.2: CKKS parameter security, CPU round trip and CPU timings.
+"""CKKS parameter security, CPU round trip and CPU timings.
 
 All data is synthetic, seeded and normalized. Nothing prints plaintext values or keys; assertions
 compare scalar errors only.
@@ -34,7 +34,7 @@ ROUND_TRIP_TOLERANCE = 1e-6
 HE_STD_128_CLASSIC_MAX_LOG_QP = {1024: 27, 2048: 54, 4096: 109, 8192: 218, 16384: 438, 32768: 881}
 
 TIMING_ITERATIONS = 5
-RESULTS_FILE = Path("/data/results/t0.2-cpu.json")
+RESULTS_FILE = Path("/data/results/cpu-baseline.json")
 
 
 def _normalized(rng: np.random.Generator, n: int) -> np.ndarray:
@@ -167,7 +167,7 @@ def test_cpu_timings(ofhe):
 
     assert all(t > 0 for t in timings.values())
     report = {
-        "task": "T0.2",
+        "task": "cpu-baseline",
         "preset": PRESET,
         "ring_dim": preset["ring_dim"],
         "cpu_count": os.cpu_count(),

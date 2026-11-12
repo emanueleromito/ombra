@@ -1,4 +1,4 @@
-"""T3.6: insert, delete and search through the client library against the real gRPC server.
+"""Insert, delete and search through the client library against the real gRPC server.
 
 Synthetic data only; d = 384 on the "fast" preset, one filter field with 3 values, 6 clusters of
 well separated vectors. Checks that top-k with re-ranking equals a plaintext search at each
@@ -25,7 +25,7 @@ from ombra.params import ParamsError  # noqa: E402
 
 BACKENDS = [
     pytest.param("server", marks=pytest.mark.gpu),
-    pytest.param("local", marks=pytest.mark.openfhe),  # the in-process CPU server (T3.7)
+    pytest.param("local", marks=pytest.mark.openfhe),  # the in-process CPU server
 ]
 
 VERSION = "test-openfhe"

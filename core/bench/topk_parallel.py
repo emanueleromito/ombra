@@ -1,4 +1,4 @@
-"""T2.1 benchmark: serial vs parallel client decrypt + top-k on synthetic level-2 blocks.
+"""Serial vs parallel client decrypt + top-k on synthetic level-2 blocks.
 
 CPU only. Prints the host CPU model, os.cpu_count() and the affinity, and the median of --runs runs
 after a warmup. Synthetic data; only timings are printed.
@@ -111,7 +111,7 @@ def main() -> None:
     print(json.dumps(res, indent=2))
     if a.out:
         Path(a.out).mkdir(parents=True, exist_ok=True)
-        Path(a.out, "t2.1-parallel-decrypt.json").write_text(json.dumps(res, indent=2))
+        Path(a.out, "parallel-decrypt.json").write_text(json.dumps(res, indent=2))
 
 
 if __name__ == "__main__":

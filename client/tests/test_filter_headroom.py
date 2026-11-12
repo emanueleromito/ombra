@@ -1,4 +1,4 @@
-"""T2.3 / decision 0019: how large a value a filtered score can hold and still decrypt.
+"""Decision 0019: how large a value a filtered score can hold and still decrypt.
 
 With the additive penalty, a decrypted slot is `score + LAMBDA * c`, with |score| <= 1 and
 c <= F (the number of filter fields), so |slot| <= 1 + LAMBDA * F. This test sweeps powers of two
@@ -22,7 +22,7 @@ LAMBDA = 4
 ERR_OK = 1e-3
 PRESETS = ["m0_depth2", "m0_compact_n8192"]
 # Largest value that the client allows in a decrypted filtered score, per preset, with a 4 bit
-# safety margin below the measured cliff (set from the sweep in the T2.3 results note).
+# safety margin below the measured cliff (set from the sweep in the results note).
 MAX_VALUE = {"m0_depth2": 2**6, "m0_compact_n8192": 2**11}
 
 

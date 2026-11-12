@@ -1,4 +1,4 @@
-"""T0.7: the batching benchmark runs end to end at a tiny size (d = 4) on the test GPU.
+"""The batching benchmark runs end to end at a tiny size (d = 4) on the test GPU.
 
 Runs core/bench/run.py, which builds the context from the preset, writes only public material and
 runs the C++ benchmark binary. Checks the record, the memory plan and the multi-pass path (a cap of
@@ -26,7 +26,7 @@ def test_bench_batch_tiny(tmp_path: Path) -> None:
             sys.executable,
             str(REPO_ROOT / "core" / "bench" / "run.py"),
             "--task",
-            "t0.7",
+            "batching",
             "--out",
             str(tmp_path),
             "--dims",
@@ -43,15 +43,15 @@ def test_bench_batch_tiny(tmp_path: Path) -> None:
             "1",
             "--iters",
             "3",
-            "--name-t07",
-            "t0.7-test.json",
+            "--name-batching",
+            "batching-test.json",
         ],
         capture_output=True,
         text=True,
         timeout=900,
     )
     assert proc.returncode == 0, f"bench failed (exit {proc.returncode}): {proc.stderr}"
-    record = json.loads((tmp_path / "t0.7-test.json").read_text())
+    record = json.loads((tmp_path / "batching-test.json").read_text())
     assert record["preset"] == "m0_depth2"
     assert record["published_peak_memory_bandwidth_gb_per_s"] == 1555.0
     assert "command_output" in record["gpu_memory_query"]

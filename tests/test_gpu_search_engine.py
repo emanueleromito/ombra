@@ -1,4 +1,4 @@
-"""T2.7a: the search engine (expansion, stage 1, stage 2 with filter columns, tombstones) is exact.
+"""The search engine (expansion, stage 1, stage 2 with filter columns, tombstones) is exact.
 
 Python builds a small collection with synthetic data for both presets: d = 16, two filter fields
 (cardinalities 3 and 4, so D = 23 columns per data block), three clusters (one with two blocks) and

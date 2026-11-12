@@ -1,4 +1,4 @@
-"""T1.6: pass/fail logic of the recall acceptance check (core/bench/recall_check.py), CPU only."""
+"""Pass/fail logic of the recall acceptance check (core/bench/recall_check.py), CPU only."""
 
 from __future__ import annotations
 

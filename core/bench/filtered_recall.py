@@ -1,4 +1,4 @@
-"""T3.11: filtered recall@10 on two real public datasets, through the M3 client path.
+"""Filtered recall@10 on two real public datasets, through the client path.
 
     python core/bench/filtered_recall.py --out <dir> --datasets <dir> [--small]
         [--dataset arxiv-abstracts|banking77 ...] [--queries 1000] [--preset fast]
@@ -28,8 +28,10 @@ the reference. Filters per field: value sets built greedily to a target share of
 "spread" (values spread over many clusters first). The effective number of clusters the matches
 occupy is reported, so the reader can see how correlated each filter is with the clusters.
 
-Only aggregates are written. Secret keys stay in this process (hard rule 2); no vectors, queries or
-scores are printed or stored (hard rule 4; the data is public text, but the rule is kept).
+Only aggregates are written. Secret keys stay in this process (the secret key stays on the client);
+no vectors, queries or
+scores are printed or stored (no plaintext in output; the data is public text, but the rule is
+kept).
 """
 
 from __future__ import annotations
@@ -355,7 +357,7 @@ def run_dataset(ds: dict[str, Any], preset: str, n_queries: int, tmp: Path) -> d
         col = Collection.create(
             pb,
             api.stub,
-            "t311",
+            "filtered_recall",
             x,
             ids,
             preset=preset,
@@ -415,7 +417,7 @@ def main() -> None:
     nq = 5 if a.small else a.queries
     a.out.mkdir(parents=True, exist_ok=True)
     result: dict[str, Any] = {
-        "task": "T3.11",
+        "task": "filtered-recall",
         "preset": a.preset,
         "k": K,
         "embedding_model": MODEL,
@@ -426,7 +428,7 @@ def main() -> None:
         ds = LOADERS[name](a.datasets, a.small, nq)
         with tempfile.TemporaryDirectory(dir="/tmp") as t:  # noqa: S108
             result["results"].append(run_dataset(ds, a.preset, nq, Path(t)))
-        (a.out / f"t3.11-filtered-recall{'-small' if a.small else ''}.json").write_text(
+        (a.out / f"filtered-recall{'-small' if a.small else ''}.json").write_text(
             json.dumps(result, indent=2)
         )
     print(re.sub(r"\s+", " ", "done"))

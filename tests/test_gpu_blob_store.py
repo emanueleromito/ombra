@@ -1,4 +1,4 @@
-"""T3.4 (server): the encrypted blob store through the gRPC server `ombra_server`.
+"""The encrypted blob store through the gRPC server `ombra_server`.
 
 Blobs are opaque bytes (synthetic here, not ciphertexts: the server never parses them). Cases: put,
 get, replace, delete round trip across all four bucket sizes; refusals (a size that is not a

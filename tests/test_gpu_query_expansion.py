@@ -1,4 +1,4 @@
-"""T0.5: GPU query expansion against OpenFHE (decision 0010).
+"""GPU query expansion against OpenFHE (decision 0010).
 
 Python makes keys (preset m0_depth2), encodes a normalized query as the symmetric polynomial,
 generates automorphism keys for exactly N/2^k + 1, k < ceil(log2(2d)), and writes only public
@@ -25,7 +25,7 @@ np = pytest.importorskip("numpy")
 
 pytestmark = pytest.mark.gpu
 
-PRESETS = ["m0_depth2", "m0_compact_n8192"]  # T0.11: every test runs on both
+PRESETS = ["m0_depth2", "m0_compact_n8192"]  # Every test runs on both
 SEED = 20260109
 
 # Max |decrypted slot - q_j| for GPU leaves, and between GPU and CPU leaves. Same agreed bound as

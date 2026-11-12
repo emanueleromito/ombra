@@ -1,4 +1,4 @@
-"""T0.6: encrypted 0/1 filter mask on GPU-produced scores (no new kernel, no parameter change).
+"""Encrypted 0/1 filter mask on GPU-produced scores (no new kernel, no parameter change).
 
 Real pipeline with preset m0_depth2: GPU query expansion (`ombra_expand_gpu`), GPU column-packed
 search (`ombra_column_search`, 3-component degree-2 result at level 0), then in OpenFHE:
@@ -25,10 +25,11 @@ np = pytest.importorskip("numpy")
 
 pytestmark = pytest.mark.gpu
 
-PRESETS = ["m0_depth2", "m0_compact_n8192"]  # T0.11: every test runs on both
+PRESETS = ["m0_depth2", "m0_compact_n8192"]  # Every test runs on both
 SEED = 20260110
 
-# Max |decrypted slot - (stored @ q) * mask|. Same agreed bound as T0.2 to T0.5; do not loosen.
+# Max |decrypted slot - (stored @ q) * mask|. Same agreed bound as the other GPU tests; do not
+# loosen.
 TOLERANCE = 1e-6
 
 REPO_ROOT = Path(__file__).resolve().parents[1]

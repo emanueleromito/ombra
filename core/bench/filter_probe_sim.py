@@ -1,14 +1,16 @@
-"""T3.11 follow-up: plaintext simulation of three probe policies for filtered search (CPU only).
+"""Plaintext simulation of three probe policies for filtered search (CPU only), a follow-up to the
+filtered-recall benchmark.
 
     OMBRA_EMBED_DEVICE=cpu python core/bench/filter_probe_sim.py --out <dir> --datasets <cache dir>
         [--dataset arxiv-abstracts|banking77 ...] [--queries 1000] [--small]
 
-T3.11 showed encrypted recall == plaintext recall under the same cluster choices, so exact plaintext
+The filtered-recall benchmark showed encrypted recall == plaintext recall under the same cluster
+choices, so exact plaintext
 scores with the same clusters, queries and filter cells answer the question without the GPU. The
 loaders, embedding model, cluster counts, queries and filter cells are those of
 core/bench/filtered_recall.py. Embeddings are cached under the (gitignored) dataset dir.
 
-Policies (the same first-round floor as T3.11: ceil(sqrt(clusters)) clusters), planned by
+Policies (the same first-round floor as ceil(sqrt(clusters)) clusters), planned by
 ombra.probe.ProbePlanner, the same code the client runs:
   E2 (Fast)   the shipped policy. Round 1: clusters in center-score order, zero expected matches
               skipped, add until the expected matches reach 3k (never fewer than the floor).
@@ -21,11 +23,13 @@ ombra.probe.ProbePlanner, the same code the client runs:
               the real plus the decoy clusters' results, as the client does).
   Strict      all clusters in two rounds: recall is exact by construction (not simulated).
   B    decision 0019's rule with the stop at 3k matches (first round = floor, widen 2x up to 8x).
-  A0   (reference) decision 0019 as run in T3.11: stop at k matches. Reproduces T3.11's recall.
+  A0   (reference) decision 0019 as run in stop at k matches. Reproduces the filtered-recall
+  benchmark's recall.
 Superseded: "E" and "E+A" (the radius check never pruned; see the report).
 For A0 and B (baselines) a query with fewer than k matches falls back to a full scan; E2 has no
 fallback (fixed round count; `incomplete` instead). Latency is MODELLED, not measured (see the
-report): a least-squares fit of T3.11's measured per-cell latency on clusters searched and
+report): a least-squares fit of the filtered-recall benchmark's measured per-cell latency on
+clusters searched and
 extra rounds.
 """
 
@@ -53,13 +57,15 @@ POLICIES = {
     "E2 (Fast)": dict(policy="e2"),
     "E2 (Decoy)": dict(policy="e2", decoy=True),
 }
-T311_JSON = HERE.parents[1] / "docs/plan/results/2026-11-11-t3.11-filtered-recall.json"
+FILTERED_RECALL_JSON = sorted(
+    (HERE.parents[1] / "docs/plan/results").glob("*-filtered-recall.json")
+)[-1]
 
 
-def fit_latency(t311: dict[str, Any]) -> dict[str, float]:
+def fit_latency(recall_json: dict[str, Any]) -> dict[str, float]:
     """latency_ms = base + per_cluster * clusters + per_round * extra rounds (least squares)."""
     rows, y = [], []
-    for res in t311["results"]:
+    for res in recall_json["results"]:
         for c in res["cells"]:
             rows.append([1.0, c["clusters_searched_mean"], c["extra_rounds_mean"]])
             y.append(c["latency_ms_mean"])
@@ -188,7 +194,9 @@ def run_dataset(ds: dict[str, Any], lat: dict[str, float], nq: int) -> dict[str,
     x, fields, q = ds["x"], ds["fields"], ds["queries"][:nq]
     cl = cluster_vectors(x, ds["n_clusters"], seed=1)
     centers = fr._flush(cl.centers)
-    labels = assign(x, centers)  # as the T3.11 run did (labels = assign(x, col.centers))
+    labels = assign(
+        x, centers
+    )  # as the filtered-recall benchmark did (labels = assign(x, col.centers))
     nc = len(centers)
     first = math.ceil(math.sqrt(nc))
     stats = ClusterStats.build(labels, nc, fields, ds["cards"])
@@ -265,12 +273,12 @@ def main() -> None:
     a.datasets.mkdir(parents=True, exist_ok=True)
     _cache_embeddings(a.datasets)
     a.out.mkdir(parents=True, exist_ok=True)
-    t311 = json.loads(T311_JSON.read_text())
-    lat = fit_latency(t311)
+    recall_json = json.loads(FILTERED_RECALL_JSON.read_text())
+    lat = fit_latency(recall_json)
     print("latency model", lat, flush=True)
     a.out.mkdir(parents=True, exist_ok=True)
     result: dict[str, Any] = {
-        "task": "T3.11 probe policies (plaintext simulation)",
+        "task": "filtered-recall probe policies (plaintext simulation)",
         "k": K,
         "embedding_model": fr.MODEL,
         "latency_model": lat,
@@ -280,7 +288,7 @@ def main() -> None:
     for name in a.dataset:
         ds = fr.LOADERS[name](a.datasets, a.small, nq)
         result["results"].append(run_dataset(ds, lat, nq))
-        (a.out / f"t3.11-probe-policies{'-small' if a.small else ''}.json").write_text(
+        (a.out / f"filtered-recall-probe-policies{'-small' if a.small else ''}.json").write_text(
             json.dumps(result, indent=2)
         )
 

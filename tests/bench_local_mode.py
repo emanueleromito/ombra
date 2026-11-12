@@ -1,4 +1,4 @@
-"""T3.7 timing of local mode: create time and search time at 10k synthetic vectors.
+"""Timing of local mode: create time and search time at 10k synthetic vectors.
 
     python tests/bench_local_mode.py --d 768 [--n 10000] [--queries 5]
 

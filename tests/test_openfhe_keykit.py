@@ -1,4 +1,4 @@
-"""T3.6: a KeyKit saved to the T3.2 key file can be reopened, in this and in a new process."""
+"""A KeyKit saved to a key file can be reopened, in this and in a new process."""
 
 from __future__ import annotations
 

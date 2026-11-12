@@ -1,6 +1,7 @@
-"""T0.11: the compact-configurations benchmark runs end to end at a tiny size (d = 16).
+"""The compact-configurations benchmark runs end to end at a tiny size (d = 16).
 
-Runs core/bench/run.py --task t0.11, which creates the context, writes only public material and
+Runs core/bench/run.py --task compact-configs, which creates the context, writes only public
+material and
 runs the C++ benchmark binaries and the GPU pipeline. Checks the output record, not the speed.
 """
 
@@ -18,18 +19,18 @@ pytestmark = pytest.mark.gpu
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_bench_t011_tiny(tmp_path: Path) -> None:
+def test_bench_compact_configs_tiny(tmp_path: Path) -> None:
     proc = subprocess.run(  # noqa: S603
         [
             sys.executable,
             str(REPO_ROOT / "core" / "bench" / "run.py"),
             "--task",
-            "t0.11",
+            "compact-configs",
             "--out",
             str(tmp_path),
             "--dims",
             "16",
-            "--presets-t011",
+            "--presets-compact-configs",
             "m0_compact_n8192",
             "--warmup",
             "1",
@@ -41,7 +42,7 @@ def test_bench_t011_tiny(tmp_path: Path) -> None:
         timeout=1500,
     )
     assert proc.returncode == 0, f"bench failed (exit {proc.returncode}): {proc.stderr}"
-    record = json.loads((tmp_path / "t0.11-a100.json").read_text())
+    record = json.loads((tmp_path / "compact-configs-a100.json").read_text())
     assert record["gpu_name"] != "unknown"
     by_kind: dict[str, list[dict]] = {}
     for r in record["results"]:

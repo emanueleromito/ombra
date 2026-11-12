@@ -1,11 +1,12 @@
-// ombra_profile_search (T1.4, profiling only): separates the arithmetic cost of the T0.4 search
+// ombra_profile_search (profiling only): separates the arithmetic cost of the column-packed search
 // kernel from its memory cost with bench-only micro kernels, and times the real kernel as the
 // reference on the same run. Synthetic data only (hash-filled words reduced mod each tower's q);
 // no OpenFHE, no keys. Not part of the product; it does not change any existing kernel.
 //
 // Usage: ombra_profile_search [--d D] [--blocks B] [--iters N] [--warmup W] [--ref-only]
 //                             [--no-verify] --ring N --bits b0,b1,...
-// Default: d = 384, 768, 1536 with blocks = 24576 / d (the T0.4 sizes: 19.3 GB of stored data),
+// Default: d = 384, 768, 1536 with blocks = 24576 / d (the column-search benchmark sizes: 19.3 GB
+// of stored data),
 // ring size and tower bit sizes are given by --ring and --bits (the Modal entry point reads them
 // from core/params/ckks_presets.json, preset m0_depth2: bits 60,50,50, P = 3 * ring words).
 // The moduli are fresh primes of those sizes, not the exact OpenFHE ones (timing is value-blind).
@@ -13,7 +14,7 @@
 // Every variant uses the launch shape of column_search_kernel: block = 256 threads,
 // grid = (ceil(P / (256 * W)), ceil(blocks / 4)), 4 stored blocks per thread, W words per thread.
 // Variants (template <MODE, W, LOAD>):
-//   MODE 0  Barrett search body (identical arithmetic to the T0.4 kernel)
+//   MODE 0  Barrett search body (identical arithmetic to the column-search kernel)
 //   MODE 1  Montgomery search body (query pre-multiplied by R mod q on the host)
 //   MODE 2  lazy search body: 128-bit accumulators, one reduction per 64 dimensions
 //   MODE 3  memory only: the search kernel's loads, xor-reduced (no modular arithmetic)
@@ -623,7 +624,7 @@ int main(int argc, char** argv) {
     PCHECK(cudaMemcpy(dv.query_mont, dv.query, qw * 8, cudaMemcpyDeviceToDevice));
     PCHECK(cudaDeviceSynchronize());
 
-    // reference: the existing T0.4 kernel
+    // reference: the existing column-search kernel
     {
       ColumnSearchDims cd{d, blocks, towers, ring_dim};
       auto ms = time_runs(
@@ -638,7 +639,8 @@ int main(int argc, char** argv) {
           mm / t, (double)P * blocks * d * 16 / t / 1e9);
       std::fflush(stdout);
     }
-    // the other two search kernels, kernel-only (T1.4 before/after): batched Q = 4 (one query
+    // the other two search kernels, kernel-only (before/after the optimisation): batched Q = 4 (one
+    // query
     // tile; the query buffer holds 4 copies of the query) and ciphertext x plaintext
     {
       const u64 nq = 4;

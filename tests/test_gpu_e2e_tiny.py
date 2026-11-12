@@ -1,4 +1,4 @@
-"""T1.3: the end-to-end latency measurement path on tiny synthetic data.
+"""The end-to-end latency measurement path on tiny synthetic data.
 
 Runs core/bench/e2e.py (client in this process, `ombra_bench_e2e` as the server) at d = 16 with
 2 chosen blocks, 3 queries: client encode and encrypt, GPU expansion, the device-to-device leaf
@@ -46,7 +46,7 @@ def _find_binary(name: str) -> Path:
 def test_e2e_tiny(tmp_path: Path) -> None:
     e2e = _load_e2e()
     # N = 20,000 vectors, 60% searched = 12,000 vectors = 2 blocks of 8192 (the last one masked).
-    out = e2e.run_t13(
+    out = e2e.run_e2e_latency(
         tmp_path,
         (16,),
         queries=3,
@@ -54,7 +54,7 @@ def test_e2e_tiny(tmp_path: Path) -> None:
         find_binary=_find_binary,
         openfhe_version="test",
         cases_spec=[(20_000, 0.6, 8)],
-        name="t1.3-tiny.json",
+        name="e2e-latency-tiny.json",
     )
     rec = json.loads(out.read_text())
     assert len(rec["cases"]) == 1

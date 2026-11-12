@@ -1,4 +1,4 @@
-"""T2.7b: end-to-end through the gRPC server `ombra_server`, both presets.
+"""End-to-end through the gRPC server `ombra_server`, both presets.
 
 The test starts the server on a free localhost port in a temp directory and drives it with
 tests/e2e_client.py: the client creates the keys (the secret key stays in this process), creates a

@@ -1,6 +1,7 @@
-"""T2.7c: the measurements decision 0019 requires, through the real gRPC server (A100, Modal).
+"""The measurements decision 0019 requires, through the real gRPC server (A100, Modal).
 
-    python core/bench/run.py --task t2.7 --out <dir>     # writes <dir>/t2.7-<preset>-a100.json
+    # writes <dir>/filter-measurements-<preset>-a100.json
+    python core/bench/run.py --task filter-measurements --out <dir>
 
 This process is the CLIENT (it holds the secret key, never written or sent). It starts the C++
 server `ombra_server` on localhost like tests/test_gpu_e2e_grpc.py and drives it with
@@ -19,7 +20,8 @@ Three measurements per preset (`m0_depth2`, `m0_compact_n8192`):
     decoder's band boundary (4m - 2), the observed gap between the bands, whether every c decoded
     exactly, and the ratio of the F > 0 error to the F = 0 error.
  2. The decision-0012 rule with the extra columns (F = 2 fields of 8 values): same method as
-    T1.6/T1.7 (recall.py / recall_check.py): recall@10 of the encrypted pipeline without
+    the recall acceptance checks (recall.py / recall_check.py): recall@10 of the encrypted pipeline
+    without
     re-ranking against the plaintext recall of the same cluster setting (exact centers, exact
     scores), gap within 0.005 for the full scan and every nprobe. One encrypted scan of all
     clusters per query, restricted to the probed clusters afterwards (as recall.py does). Query
@@ -584,7 +586,7 @@ def run_preset(out_dir: Path, preset: str, queries: int, scratch: Path | None = 
         finally:
             env.close()
     result = {
-        "task": "T2.7",
+        "task": "filter-measurements",
         "decision": "0019",
         "preset": preset,
         "slots": ombra_params.get_preset(preset)["batch_size"],
@@ -598,13 +600,13 @@ def run_preset(out_dir: Path, preset: str, queries: int, scratch: Path | None = 
         "part3_filtered_recall": p3,
         "total_wall_seconds": time.time() - t_start,
     }
-    path = out_dir / f"t2.7-{preset}-a100.json"
+    path = out_dir / f"filter-measurements-{preset}-a100.json"
     path.write_text(json.dumps(result, indent=2) + "\n")
     print(f"wrote {path}", flush=True)
     return path
 
 
-def run_t27(out_dir: Path, presets: tuple[str, ...], queries: int) -> None:
+def run_filter(out_dir: Path, presets: tuple[str, ...], queries: int) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     for preset in presets:
         run_preset(out_dir, preset, queries)

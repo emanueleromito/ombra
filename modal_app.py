@@ -64,10 +64,11 @@ image = (
         "cmake --install /opt/openfhe-python-build",
     )
     .env({"LD_LIBRARY_PATH": "/usr/local/lib"})
-    # T0.8: reads the Hugging Face parquet embedding shards. A layer after the OpenFHE build, so
+    # Recall check: reads the Hugging Face parquet embedding shards. A layer after the OpenFHE
+    # build, so
     # OpenFHE is not rebuilt. (ann-benchmarks.com does not host the dbpedia hdf5, so no h5py.)
     .pip_install("pyarrow==17.0.0")
-    # T2.7b: gRPC for C++ (the server) and Python (tests/e2e_client.py). Layers after the OpenFHE
+    # gRPC for C++ (the server) and Python (tests/e2e_client.py). Layers after the OpenFHE
     # build, so OpenFHE is not rebuilt.
     .apt_install(
         "libgrpc++-dev",
@@ -75,8 +76,8 @@ image = (
         "protobuf-compiler",
         "protobuf-compiler-grpc",
         "pkg-config",
-        "libssl-dev",  # T2.9: REST over TLS
-        "openssl",  # T2.9: tests make a self-signed certificate with the CLI
+        "libssl-dev",  # REST over TLS
+        "openssl",  # tests make a self-signed certificate with the CLI
     )
     .pip_install("grpcio", "grpcio-tools")
     .pip_install("cryptography")  # client key file and document blobs (AES-GCM)
@@ -122,7 +123,7 @@ NATIVE_BUILD_DIR = "/root/ombra-native-build"
 
 
 def _build_native() -> None:
-    """T3.7: build ombra._native (client/CMakeLists.txt) against OpenFHE in /usr/local and put it
+    """Build ombra._native (client/CMakeLists.txt) against OpenFHE in /usr/local and put it
     next to the client sources (tests import the client from source). CPU only, no CUDA."""
     import glob
     import os
@@ -193,9 +194,9 @@ def gpu_info() -> None:
 def test_gpu(pytest_args: str = "") -> None:
     """Build in Debug and run C++ (ctest) and Python GPU tests on an A10."""
     _build("Debug")
-    _build_native()  # the parity test (T3.7) also runs local mode
+    _build_native()  # the parity test also runs local mode
     _run(["ctest", "--test-dir", BUILD_DIR, "--output-on-failure", "--no-tests=ignore"])
-    # Zero collected tests (pytest exit code 5) is a failure: GPU tests exist now (T0.3). The
+    # Zero collected tests (pytest exit code 5) is a failure: GPU tests exist now. The
     # driver for tests/test_gpu_ciphertext_roundtrip.py is built into BUILD_DIR above.
     _run(
         ["python", "-m", "pytest", "-m", "gpu", "-v", "-s", *pytest_args.split()],
@@ -215,16 +216,17 @@ def test_openfhe(pytest_args: str = "") -> None:
     Release build, so the CPU timings are meaningful.
     """
     _build("Release", targets=("ombra_expand", "ombra_encoding_check"))
-    _build_native()  # T3.7: local mode runs the compiled expansion in a child process
+    _build_native()  # local mode runs the compiled expansion in a child process
     cmd = ["python", "-m", "pytest", "-m", "openfhe", "-v", "-s", *pytest_args.split()]
     _run(cmd, ok_codes=(0,))
     volume.commit()
 
 
-# T2.1: CPU only. 25 level-2 blocks of the m0_depth2 preset are small (a few MB each, local disk).
+# Parallel decrypt: CPU only. 25 level-2 blocks of the m0_depth2 preset are small (a few MB each,
+# local disk).
 @app.function(cpu=16.0, memory=16384, timeout=3600, volumes={DATA_DIR: volume})
 def bench_topk(blocks: int = 25, runs: int = 5, preset: str = "m0_depth2") -> None:
-    """Serial vs parallel client decrypt + top-k (T2.1), CPU only."""
+    """Serial vs parallel client decrypt + top-k, CPU only."""
     out_dir = Path(DATA_DIR) / "results"
     script = str(Path(REPO_DIR) / "core" / "bench" / "topk_parallel.py")
     _run(
@@ -234,12 +236,15 @@ def bench_topk(blocks: int = 25, runs: int = 5, preset: str = "m0_depth2") -> No
     volume.commit()
 
 
-# memory: the T0.4 benchmark holds one block (about 1.2 GB at d = 1536) as OpenFHE ciphertexts plus
+# memory: the column search benchmark holds one block (about 1.2 GB at d = 1536) as OpenFHE
+# ciphertexts plus
 # its flattened copy on the host at a time, so about 3 to 4 GB peak; 16 GiB leaves headroom.
-# T2.7 (`--task t2.7`, filter measurements of decision 0019) runs here too: it starts ombra_server
+# The filter measurements (`--task filter-measurements`, filter measurements of decision 0019) runs
+# here too: it starts ombra_server
 # (built with everything else) and drives it over localhost; 16 GiB covers the client's cached
 # ciphertexts (about 1 GB) and the server's pinned pool (2 GiB budget).
-# T1.3 needs the 40 GB card (the plain "A100" sometimes lands on the 80 GB PCIe one) and more time:
+# The end-to-end latency benchmark needs the 40 GB card (the plain "A100" sometimes lands on the 80
+# GB PCIe one) and more time:
 # 12 cases, each with 23 queries, plus encrypting two blocks per d. Host memory: block 0 flattened
 # (1.2 GB at d = 1536) plus its OpenFHE ciphertexts and the Python client; 16 GiB is enough.
 @app.function(gpu="A100-40GB", memory=16384, timeout=14400, volumes={DATA_DIR: volume})
@@ -252,25 +257,27 @@ def bench(task: str = "all", extra: str = "") -> None:
     if not bench_script.exists():
         print("No benchmarks yet (core/bench/run.py is missing). Nothing to run.")
         return
-    # `extra` carries run.py options, e.g. --extra "--presets-t13 m0_depth2,m0_compact_n8192"
+    # `extra` carries run.py options, e.g. --extra "--presets-e2e-latency
+    # m0_depth2,m0_compact_n8192"
     _run(["python", str(bench_script), "--task", task, "--out", str(out_dir), *extra.split()])
     volume.commit()
 
 
-# T2.10 (`--task t2.10`): the client encrypts about 50k to 100k ciphertexts per preset at 1M vectors
+# The gRPC end-to-end benchmark (`--task grpc-e2e`): the client encrypts about 50k to 100k
+# ciphertexts per preset at 1M vectors
 # in parallel processes, and the server keeps about 40 GB of ciphertexts per (preset, size) on the
 # container's local disk (deleted after each run). The run refuses, and says so in its JSON, if the
 # free disk is below the estimate. Run presets/sizes as separate invocations to stay within limits:
-#   modal run modal_app.py::bench_e2e --extra "--presets-t210 m0_depth2 --sizes-t210 1000000"
+#   modal run modal_app.py::bench_e2e --extra "--presets-grpc m0_depth2 --sizes-grpc 1000000"
 @app.function(gpu="A100-40GB", cpu=16.0, memory=65536, timeout=86400, volumes={DATA_DIR: volume})
 def bench_e2e(extra: str = "") -> None:
-    """Release build; T2.10 end-to-end benchmark over gRPC on an A100."""
+    """Release build; grpc-e2e end-to-end benchmark over gRPC on an A100."""
     _build("Release")
     out_dir = Path(DATA_DIR) / "results"
     out_dir.mkdir(parents=True, exist_ok=True)
     script = Path(REPO_DIR) / "core" / "bench" / "run.py"
-    cmd = ["python", str(script), "--task", "t2.10", "--out", str(out_dir)]
-    _run([*cmd, "--workers-t210", "16", *extra.split()])
+    cmd = ["python", str(script), "--task", "grpc-e2e", "--out", str(out_dir)]
+    _run([*cmd, "--workers-grpc", "16", *extra.split()])
     volume.commit()
 
 
@@ -301,13 +308,14 @@ def cpu_run(cmd: str) -> None:
 
 @app.function(cpu=8.0, memory=32768, timeout=7200)
 def cpu_run8(cmd: str) -> None:
-    """Same as cpu_run on 8 CPUs (T3.7 timings)."""
+    """Same as cpu_run on 8 CPUs (local mode timings)."""
     _cpu_run(cmd)
 
 
-# T3.7: a machine WITHOUT a GPU: a plain Python 3.12 image, OpenFHE 1.6.1 (C++) installed the way
+# Local mode: a machine WITHOUT a GPU: a plain Python 3.12 image, OpenFHE 1.6.1 (C++) installed the
+# way
 # the docs describe, then `pip install ./client[local]`: openfhe-python comes from PyPI (a wheel for
-# CPython 3.12), and ombra._native is compiled by pip against the OpenFHE above (T4.1 will ship
+# CPython 3.12), and ombra._native is compiled by pip against the OpenFHE above (wheels will ship
 # wheels, then no compiler is needed). Only the client folder, the headers of core/ the extension
 # shares with the server, and the check script are uploaded.
 _CORE_FILES = ("src/security_floor.cpp", "src/openfhe_expand_ops.hpp")
@@ -358,7 +366,7 @@ def test_local_install() -> None:
 
 @app.function(gpu="A10", memory=16384, timeout=3600, volumes={DATA_DIR: volume})
 def profile_expand(dims: str = "1536") -> None:
-    """Release build; time the stages of one expansion split on an A10 (T0.5b profiling)."""
+    """Release build; time the stages of one expansion split on an A10 (expansion profiling)."""
     _build("Release")
     out_dir = Path(DATA_DIR) / "results-profile"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -368,7 +376,7 @@ def profile_expand(dims: str = "1536") -> None:
             "python",
             str(bench_script),
             "--task",
-            "t0.5",
+            "expansion",
             "--profile",
             "--dims",
             dims,
@@ -376,8 +384,8 @@ def profile_expand(dims: str = "1536") -> None:
             "2",
             "--iters",
             "5",
-            "--name-t05",
-            "t0.5-profile-a10.json",
+            "--name-expansion",
+            "expansion-profile-a10.json",
             "--out",
             str(out_dir),
         ]
@@ -385,7 +393,7 @@ def profile_expand(dims: str = "1536") -> None:
     volume.commit()
 
 
-# Recall acceptance check (T0.8, T1.6). At N = 100,000 and d = 1536 the run encrypts 13 database
+# Recall acceptance check. At N = 100,000 and d = 1536 the run encrypts 13 database
 # blocks plus 3 centers blocks (about 19 GB of ciphertexts on the container's local disk, kept on
 # the GPU as well: about 20 GB of the A100's 40 GB). The host holds one block at a time (3 to 4 GB)
 # plus the dataset subset (about 1 GB as float64) and faiss. Query results are decrypted while the
@@ -434,10 +442,11 @@ def recall(
         volume.commit()
 
 
-# "A100-40GB" pins the SXM4 40 GB part that T0.4 ran on (plain "A100" may be an 80 GB PCIe card).
+# "A100-40GB" pins the SXM4 40 GB part that the column search benchmark ran on (plain "A100" may be
+# an 80 GB PCIe card).
 @app.function(gpu="A100-40GB", memory=16384, timeout=3600)
 def profile_search(ncu: bool = True, micro: bool = True) -> None:
-    """T1.4 profiling: micro kernels, instruction mix and an Nsight Compute attempt on an A100."""
+    """Search kernel profiling: micro kernels, instruction mix, Nsight Compute attempt (A100)."""
     import json
     import shutil
 
@@ -500,18 +509,19 @@ def profile_search(ncu: bool = True, micro: bool = True) -> None:
     print("ncu exit code:", code, flush=True)
 
 
-# T3.11: filtered recall on two real datasets through the M3 client and the real server. Embeddings
+# Filtered recall on two real datasets through the client and the real server. Embeddings
 # are computed here with sentence-transformers (installed at run time, so the image is unchanged);
 # the data is downloaded to the volume's dataset cache and never committed. The server holds the
 # encrypted collection (about 20 blocks of about 180 MB), so host memory is large.
 #   modal run modal_app.py::filtered_recall --dry-run     (tiny sizes, 5 queries)
 # One A10 run for two checks, so the image build and startup are paid once (user-approved budget:
-# under $1; the 40-minute timeout caps it): the T3.7 parity test (local mode vs the server, same
+# under $1; the 40-minute timeout caps it): the local mode parity test (local mode vs the server,
+# same
 # top-k) and the encrypted confirmation of the 0019 amendment on banking77 (all cells, 200 queries).
 #   modal run modal_app.py::confirm_a10
 @app.function(gpu="A10", cpu=4.0, memory=16384, timeout=2400, volumes={DATA_DIR: volume})
 def confirm_a10(queries: int = 200, bench_only: bool = False) -> None:
-    """Release build; T3.7 local/server parity and the e2e test, then T3.11 on banking77."""
+    """Release build; local/server parity, the e2e test, then filtered recall on banking77."""
     _build("Release")
     _build_native()
     import os
@@ -537,7 +547,7 @@ def confirm_a10(queries: int = 200, bench_only: bool = False) -> None:
     out_dir = Path(DATA_DIR) / "results"
     out_dir.mkdir(parents=True, exist_ok=True)
     bench = str(Path(REPO_DIR) / "core" / "bench" / "filtered_recall.py")
-    data = str(Path(DATA_DIR) / "datasets" / "t3.11")
+    data = str(Path(DATA_DIR) / "datasets" / "filtered-recall")
     try:
         _run(
             [
@@ -559,7 +569,7 @@ def confirm_a10(queries: int = 200, bench_only: bool = False) -> None:
 
 @app.function(gpu="A100-40GB", cpu=8.0, memory=65536, timeout=43200, volumes={DATA_DIR: volume})
 def filtered_recall(dry_run: bool = False, queries: int = 1000, dataset: str = "") -> None:
-    """Release build; T3.11 filtered recall@10 on two real datasets, preset fast."""
+    """Release build; filtered recall@10 on two real datasets, preset fast."""
     _build("Release")
     _run(["pip", "install", "--quiet", "sentence-transformers"])
     out_dir = Path(DATA_DIR) / "results"
@@ -570,7 +580,7 @@ def filtered_recall(dry_run: bool = False, queries: int = 1000, dataset: str = "
         "--out",
         str(out_dir),
         "--datasets",
-        str(Path(DATA_DIR) / "datasets" / "t3.11"),
+        str(Path(DATA_DIR) / "datasets" / "filtered-recall"),
         "--queries",
         str(queries),
     ]

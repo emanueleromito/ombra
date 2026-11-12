@@ -1,4 +1,4 @@
-"""T0.11 step 2: GPU CKKS encoding of compact plaintext columns and ciphertext x plaintext search.
+"""GPU CKKS encoding of compact plaintext columns and ciphertext x plaintext search.
 
 Python generates keys and seeded synthetic normalized vectors, stores them as fp16 or int8 (or as
 exact doubles), encrypts the pre-expanded query (query value j in every slot) and writes only

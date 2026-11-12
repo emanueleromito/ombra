@@ -1,7 +1,7 @@
-"""T2.10: end-to-end latency, recall and storage through the real gRPC server (A100, Modal).
+"""End-to-end latency, recall and storage through the real gRPC server (A100, Modal).
 
-    python core/bench/run.py --task t2.10 --out <dir> [--presets-t210 ...] [--sizes-t210 ...]
-        writes <dir>/t2.10-<preset>-n<N>-a100.json, one file per (preset, size)
+    python core/bench/run.py --task grpc-e2e --out <dir> [--presets-grpc ...] [--sizes-grpc ...]
+        writes <dir>/grpc-e2e-<preset>-n<N>-a100.json, one file per (preset, size)
 
 This process is the CLIENT (secret key held here, never written or sent). It starts `ombra_server`
 on localhost like tests/test_gpu_e2e_grpc.py, drives it with tests/e2e_client.py, and measures
@@ -12,7 +12,8 @@ Setup per (preset, N): d = 384, two filter fields (8 values each, so 400 columns
 client-side spherical k-means (Lloyd, a few iterations) into C = round(N / (2 * slots)) clusters,
 so a cluster holds about two blocks (2 to 3 with the usual imbalance) and a probe of nprobe
 clusters reads about 2 * nprobe blocks. Blocks are encrypted by a pool of forked worker processes
-(public key only; the same pool decrypts the answers, as T2.1, and holds the secret key in its
+(public key only; the same pool decrypts the answers, as in topk_parallel.py, and holds the secret
+key in its
 memory like client/ombra/topk.py). Collection is created, public keys uploaded, blocks inserted.
 
 Per query (timed, after a warm-up) the steps are:
@@ -24,7 +25,7 @@ Per query (timed, after a warm-up) the steps are:
   stage2      from sending SearchChosen (nprobe = 2 clusters) to the last SearchScores message
               (server column-packed search over the chosen clusters' blocks + transfer);
               also the arrival of the first message
-  decrypt     client: decrypt all score blocks of stage 2 in parallel processes (T2.1) and band-
+  decrypt     client: decrypt all score blocks of stage 2 in parallel processes and band-
               decode (decision 0019)
   topk        client: merge the per-block top-10 lists
 A second SearchChosen of the next 2 clusters follows on the same stream (not part of the per-query
@@ -96,7 +97,7 @@ _ST: dict[str, Any] = {}
 
 def _shm_path(tag: str) -> str:
     base = "/dev/shm" if os.path.isdir("/dev/shm") else tempfile.gettempdir()  # noqa: S108
-    return f"{base}/t210-{os.getpid()}-{tag}.bin"
+    return f"{base}/grpc-e2e-{os.getpid()}-{tag}.bin"
 
 
 def _ct_envelope(ct: Any) -> bytes:
@@ -406,21 +407,27 @@ class Runner:
 
 
 def run_case(
-    out: Path, preset: str, n: int, nq: int, workers: int, rerun: bool, name_prefix: str = "t2.10"
+    out: Path,
+    preset: str,
+    n: int,
+    nq: int,
+    workers: int,
+    rerun: bool,
+    name_prefix: str = "grpc-e2e",
 ) -> None:
     dest = out / f"{name_prefix}-{preset}-n{n}-a100.json"
     if dest.exists() and not rerun:
-        print(f"[t2.10] {dest.name} exists, skipped (resumable at this granularity)", flush=True)
+        print(f"[grpc-e2e] {dest.name} exists, skipped (resumable at this granularity)", flush=True)
         return
     p = ombra_params.get_preset(preset)
     slots = int(p["batch_size"])
     n_clusters = max(max(NPROBES), round(n / (BLOCKS_PER_CLUSTER * slots)))
     n_cols = D + sum(CARDS)
     est_bytes = int(n * n_cols * BYTES_PER_VECTOR_COLUMN * 1.15)
-    tmpdir = Path(tempfile.mkdtemp(prefix="t210-"))
+    tmpdir = Path(tempfile.mkdtemp(prefix="grpc-e2e-"))
     free = shutil.disk_usage(tmpdir).free
     result: dict[str, Any] = {
-        "task": "t2.10",
+        "task": "grpc-e2e",
         "preset": preset,
         "n_vectors": n,
         "d": D,
@@ -441,7 +448,7 @@ def run_case(
         result["reason"] = f"disk: need about {est_bytes} bytes, free {free}"
         dest.write_text(json.dumps(result, indent=2))
         shutil.rmtree(tmpdir, ignore_errors=True)
-        print(f"[t2.10] {preset} n={n}: NOT RUN ({result['reason']})", flush=True)
+        print(f"[grpc-e2e] {preset} n={n}: NOT RUN ({result['reason']})", flush=True)
         return
     try:
         _run_case(result, tmpdir, preset, n, nq, workers, slots, n_clusters)
@@ -449,7 +456,7 @@ def run_case(
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
     dest.write_text(json.dumps(result, indent=2))
-    print(f"[t2.10] wrote {dest}", flush=True)
+    print(f"[grpc-e2e] wrote {dest}", flush=True)
 
 
 def _run_case(
@@ -508,7 +515,7 @@ def _run_case(
         t = time.perf_counter()
         cl.make_keys(D + sum(CARDS))
         result["keygen_s"] = time.perf_counter() - t
-        print(f"[t2.10 {preset} n={n}] keys generated in {result['keygen_s']:.0f}s", flush=True)
+        print(f"[grpc-e2e {preset} n={n}] keys generated in {result['keygen_s']:.0f}s", flush=True)
         files = cl.key_files()
         result["key_bytes"] = {str(k): len(v) for k, v in files.items()}
         cl.create_collection(cl.make_spec("bench", D, CARDS, c_count))
@@ -524,7 +531,7 @@ def _run_case(
         pool = _InlinePool() if n_workers == 1 else mp.get_context("fork").Pool(n_workers)
         result["client_workers"] = n_workers
         tasks = len(blocks) + 1
-        print(f"[t2.10 {preset} n={n}] pool of {n_workers} workers, {tasks} tasks", flush=True)
+        print(f"[grpc-e2e {preset} n={n}] pool of {n_workers} workers, {tasks} tasks", flush=True)
 
         # ---- ingest: encrypt in the pool, upload from this process ----
         tasks = [(c, False, a, b) for c, a, b in blocks] + [(c_count, True, 0, 0)]
@@ -548,7 +555,7 @@ def _run_case(
             sent += sum(len(c) for c in cols)
             n_up[0] += 1
             if n_up[0] % 10 == 1:
-                print(f"[t2.10 {preset} n={n}] uploaded {n_up[0]} blocks", flush=True)
+                print(f"[grpc-e2e {preset} n={n}] uploaded {n_up[0]} blocks", flush=True)
 
         for task in tasks:
             while len(pending) >= n_workers + 2:
@@ -572,7 +579,7 @@ def _run_case(
             "ingest_vectors_per_s": n / wall,
         }
         print(
-            f"[t2.10 {preset} n={n}] ingest {wall:.0f}s, "
+            f"[grpc-e2e {preset} n={n}] ingest {wall:.0f}s, "
             f"{result['storage']['bytes_on_disk_apparent'] / 2**30:.1f} GiB on disk",
             flush=True,
         )
@@ -643,7 +650,7 @@ def _run_case(
             }
             lat = result["variants"][vname]["latency_s"]["total"]
             print(
-                f"[t2.10 {preset} n={n}] {vname}: total p50 {lat['p50'] * 1000:.0f} ms "
+                f"[grpc-e2e {preset} n={n}] {vname}: total p50 {lat['p50'] * 1000:.0f} ms "
                 f"p95 {lat['p95'] * 1000:.0f} ms, recall gaps "
                 + ", ".join(
                     f"{p_}:{np.mean(enc_r[p_]) - np.mean(pla_r[p_]):+.3f}" for p_ in NPROBES
@@ -666,7 +673,7 @@ def _run_case(
         server.stop()
 
 
-def run_t210(
+def run_grpc(
     out: Path,
     presets: tuple[str, ...],
     sizes: tuple[int, ...],

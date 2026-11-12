@@ -1,6 +1,6 @@
-"""T1.15: every core driver refuses a context that fails the security floor.
+"""Every core driver refuses a context that fails the security floor.
 
-Hard rule 1 forbids building an insecure context, even in tests. Instead the drivers read
+The 128-bit floor forbids building an insecure context, even in tests. Instead the drivers read
 OMBRA_TEST_LOG2QP_LIMIT, which can only LOWER the log2(QP) limit. With it set to 1 a valid preset
 context must be refused by each driver (non-zero exit, clear error, before any other work). A
 control run without the variable shows the same context passes the check (the driver then fails
