@@ -10,9 +10,11 @@ server refuses (key tag, preset, sizes, F_max, block layouts, blob buckets).
 
 - CPython 3.11, 3.12 or 3.13 on Linux (x86-64 or aarch64) or macOS (arm64 or x86-64). The
   `ombra` wheel carries the compiled expansion and the OpenFHE libraries, so it needs no compiler.
-- openfhe-python 1.6.1 for keys and encryption. The `openfhe` wheel on PyPI is a CPython 3.12
-  x86-64 Linux build only, so `pip install "ombra[local]"` pulls it in there and nowhere else;
-  on other platforms install openfhe-python 1.6.1 yourself (CMake, against OpenFHE 1.6.1).
+- openfhe-python 1.6.1 for keys and encryption. `pip install "ombra[local]"` installs it as
+  `ombra-openfhe`, our build of openfhe-python 1.6.1.0 with OpenFHE inside, for the same
+  platforms as the `ombra` wheel. It has the same import name (`openfhe`) as the `openfhe`
+  package on PyPI, so the two conflict: install only `ombra-openfhe`, and uninstall `openfhe`
+  first if you have it.
 - No GPU.
 
 ## Speed limits (d = 768, "fast" preset, 10,000 vectors, 4 logical CPUs of a Ryzen 5 5600H)

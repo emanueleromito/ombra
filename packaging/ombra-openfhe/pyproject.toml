@@ -1,0 +1,50 @@
+[build-system]
+requires = ["scikit-build-core>=0.10", "pybind11>=2.12"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "ombra-openfhe"
+version = "1.6.1.0"  # openfhe-python 1.6.1.0 on OpenFHE 1.6.1; a rebuild would be 1.6.1.0.post1
+description = "openfhe-python 1.6.1 with OpenFHE 1.6.1 bundled, built for the platforms Ombra supports"
+readme = "README.md"
+requires-python = ">=3.11"
+license-files = ["licenses/*"]
+dependencies = ["numpy"]
+
+[tool.scikit-build]
+cmake.build-type = "Release"
+wheel.packages = []
+minimum-version = "build-system.requires"
+
+# Wheels (.github/workflows/wheels.yml). Run from the repository root:
+# `cibuildwheel packaging/ombra-openfhe`. OpenFHE is built by ci/wheel/build_openfhe.sh and the
+# openfhe-python sources are fetched by ci/wheel/fetch_openfhe_python.sh, both in before-all.
+[tool.cibuildwheel]
+build = "cp311-* cp312-* cp313-*"
+skip = "*-musllinux_*"
+build-verbosity = 1
+test-command = "python {project}/packaging/ombra-openfhe/smoke_test.py"
+
+[tool.cibuildwheel.linux]
+manylinux-x86_64-image = "manylinux_2_28"
+manylinux-aarch64-image = "manylinux_2_28"
+before-all = "bash ci/wheel/build_openfhe.sh /usr/local && bash ci/wheel/fetch_openfhe_python.sh packaging/ombra-openfhe/openfhe-python-src"
+repair-wheel-command = "LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH auditwheel repair -w {dest_dir} {wheel}"
+
+[tool.cibuildwheel.linux.environment]
+CMAKE_PREFIX_PATH = "/usr/local"
+
+# OpenMP: Apple clang ships no libomp, so Homebrew's is used and delocate copies it into the wheel.
+# Its build targets the runner's macOS, so the deployment target is the runner's.
+[tool.cibuildwheel.macos]
+before-all = "bash ci/wheel/build_openfhe.sh $HOME/ombra-openfhe && bash ci/wheel/fetch_openfhe_python.sh packaging/ombra-openfhe/openfhe-python-src"
+repair-wheel-command = "DYLD_LIBRARY_PATH=$HOME/ombra-openfhe/lib:$(brew --prefix libomp)/lib delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}"
+
+[tool.cibuildwheel.macos.environment]
+MACOSX_DEPLOYMENT_TARGET = "14.0"
+CMAKE_PREFIX_PATH = "$HOME/ombra-openfhe"
+
+[[tool.cibuildwheel.overrides]]
+select = "*-macosx_x86_64"
+inherit.environment = "append"
+environment.MACOSX_DEPLOYMENT_TARGET = "13.0"

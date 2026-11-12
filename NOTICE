@@ -20,7 +20,7 @@ Python runtime dependencies of the `ombra` client (client/pyproject.toml):
 | numpy | BSD-3-Clause | https://github.com/numpy/numpy |
 | cryptography | Apache-2.0 OR BSD-3-Clause | https://github.com/pyca/cryptography |
 | faiss-cpu (faiss) | MIT | https://github.com/facebookresearch/faiss |
-| openfhe-python 1.6.1.0.24.4 (extra `local`, `grpc`) | BSD-2-Clause | https://github.com/openfheorg/openfhe-python |
+| ombra-openfhe 1.6.1.0 (extras `local`, `grpc`): openfhe-python 1.6.1.0 and OpenFHE 1.6.1, redistributed in our wheels (licenses in the wheel) | BSD-2-Clause | https://github.com/openfheorg/openfhe-python, https://github.com/openfheorg/openfhe-development |
 | protobuf (extra `local`) | BSD-3-Clause | https://github.com/protocolbuffers/protobuf |
 | grpcio (extra `grpc`) | Apache-2.0 | https://github.com/grpc/grpc |
 | grpcio-tools (extras `local`, `grpc`) | Apache-2.0 | https://github.com/grpc/grpc |

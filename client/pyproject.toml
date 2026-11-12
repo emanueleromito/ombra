@@ -13,19 +13,11 @@ dependencies = ["numpy", "cryptography", "faiss-cpu"]
 ombra-recall = "ombra.recall:main"
 
 [project.optional-dependencies]
-# The openfhe wheel on PyPI holds a CPython 3.12 x86-64 Linux build only (its tag says "any", its
-# Requires-Python says >=3.12), so it is pinned for that platform alone. Elsewhere install
-# openfhe-python 1.6.1 yourself (docs/local-mode.md).
-local = [
-    "openfhe==1.6.1.0.24.4; python_version == '3.12' and sys_platform == 'linux' and platform_machine == 'x86_64'",
-    "protobuf",
-    "grpcio-tools",
-]
-grpc = [
-    "openfhe==1.6.1.0.24.4; python_version == '3.12' and sys_platform == 'linux' and platform_machine == 'x86_64'",
-    "grpcio",
-    "grpcio-tools",
-]
+# ombra-openfhe is openfhe-python 1.6.1.0 with OpenFHE inside, built for every platform of the
+# wheels (packaging/ombra-openfhe/). It has the same import name as the `openfhe` package on PyPI,
+# which is a CPython 3.12 x86-64 Linux build only: do not install both.
+local = ["ombra-openfhe==1.6.1.0", "protobuf", "grpcio-tools"]
+grpc = ["ombra-openfhe==1.6.1.0", "grpcio", "grpcio-tools"]
 langchain = ["langchain-core"]
 
 [tool.scikit-build]
@@ -43,10 +35,9 @@ build-verbosity = 1
 # is in use and that the result level equals the server's.
 test-requires = ["protobuf", "grpcio-tools"]
 test-command = "python {project}/tests/wheel_check.py"
-# openfhe-python is needed by the test (the client process imports it for keys and encryption;
-# the child process of local mode never does). Built from the pinned tag against the OpenFHE of
-# before-all, because PyPI has no wheel for most of this matrix.
-before-test = "bash {project}/ci/wheel/install_openfhe_python.sh"
+# The client process imports openfhe-python for keys and encryption (the child process of local
+# mode never does). It is the ombra-openfhe wheel built by the same workflow, in openfhe-wheels/.
+before-test = "pip install --find-links {project}/openfhe-wheels ombra-openfhe==1.6.1.0"
 
 [tool.cibuildwheel.linux]
 manylinux-x86_64-image = "manylinux_2_28"
@@ -66,7 +57,6 @@ repair-wheel-command = "DYLD_LIBRARY_PATH=$HOME/ombra-openfhe/lib:$(brew --prefi
 [tool.cibuildwheel.macos.environment]
 MACOSX_DEPLOYMENT_TARGET = "14.0"
 CMAKE_PREFIX_PATH = "$HOME/ombra-openfhe"
-OMBRA_OPENFHE_PREFIX = "$HOME/ombra-openfhe"
 OMBRA_REQUIRE_NATIVE = "1"
 
 [[tool.cibuildwheel.overrides]]
@@ -76,4 +66,3 @@ environment.MACOSX_DEPLOYMENT_TARGET = "13.0"
 
 [tool.cibuildwheel.linux.environment]
 OMBRA_REQUIRE_NATIVE = "1"
-OMBRA_OPENFHE_PREFIX = "/usr/local"
