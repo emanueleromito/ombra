@@ -27,7 +27,8 @@ RPATH = "@loader_path/../openfhe/.dylibs"
 
 
 def run(*cmd: str) -> str:
-    return subprocess.run(cmd, check=True, capture_output=True, text=True).stdout
+    # Fixed tool names (otool, install_name_tool, codesign); paths come from the build.
+    return subprocess.run(cmd, check=True, capture_output=True, text=True).stdout  # noqa: S603
 
 
 def deps(lib: Path) -> list[str]:
@@ -37,9 +38,7 @@ def deps(lib: Path) -> list[str]:
 def rpaths(lib: Path) -> list[str]:
     lines = run("otool", "-l", str(lib)).splitlines()
     return [
-        lines[i + 2].split()[1]
-        for i, line in enumerate(lines)
-        if line.strip() == "cmd LC_RPATH"
+        lines[i + 2].split()[1] for i, line in enumerate(lines) if line.strip() == "cmd LC_RPATH"
     ]
 
 
@@ -62,16 +61,18 @@ def main() -> None:
         lib = natives[0]
         for dep in deps(lib):
             if SHARED.match(os.path.basename(dep)):
-                run("install_name_tool", "-change", dep, f"@rpath/{real_name(dep, libdirs)}", str(lib))
+                run(
+                    "install_name_tool",
+                    "-change",
+                    dep,
+                    f"@rpath/{real_name(dep, libdirs)}",
+                    str(lib),
+                )
         for rp in rpaths(lib):
             run("install_name_tool", "-delete_rpath", rp, str(lib))
         run("install_name_tool", "-add_rpath", RPATH, str(lib))
         run("codesign", "--force", "--sign", "-", str(lib))
-        left = [
-            d
-            for d in deps(lib)
-            if not d.startswith(("/usr/lib/", "/System/", "@rpath/"))
-        ]
+        left = [d for d in deps(lib) if not d.startswith(("/usr/lib/", "/System/", "@rpath/"))]
         if left:
             raise SystemExit(f"repair_macos: unresolved libraries in {lib}: {left}")
         print(f"repair_macos: {lib} -> {RPATH}")
