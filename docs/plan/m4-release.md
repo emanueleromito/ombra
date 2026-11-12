@@ -41,7 +41,7 @@ T4.3, T4.5 and T4.7 can start at once. T4.1 and T4.4 both edit the workflows fro
 **Depends on:** none
 **Steps:** create `dev` from `main`; make `dev` the default branch for PRs and protect both (PR required, CI required once T4.2 lands); `main` takes only release merges from `dev`; delete merged remote branches; enable automatic deletion of head branches; update the PR target in `CLAUDE.md`.
 **Done when:** `dev` exists and is the default branch, both branches are protected, no merged branch remains on the remote, auto-delete is on, and `CLAUDE.md` says PRs target `dev`.
-**Status:** in progress (`dev` created and default, both branches protected, auto-delete on, `CLAUDE.md` updated; deleting the merged remote branches is left to the user; CI as a required check comes with T4.2)
+**Status:** done
 
 ### T4.4 Docker images, compose and release workflow
 
@@ -143,7 +143,7 @@ T4.6 is split into subtasks so different implementers can run them in parallel. 
 **Depends on:** none
 **Steps:** `SECURITY.md` with a reporting address and response times; Dependabot for pip, GitHub Actions and Docker; enable secret scanning and push protection; run gitleaks over the full history and fix or document every hit; `NOTICE` listing third-party licenses (OpenFHE, faiss, gRPC and the rest of the shipped dependencies); CLA Assistant on PRs; triage the low-severity findings from the M1 to M3 reviews (fix, or record why not).
 **Done when:** `SECURITY.md`, `NOTICE` and the Dependabot config are merged; secret scanning is on; the gitleaks report over the full history has no unresolved hit; CLA Assistant comments on a test PR; every low-severity finding has a recorded outcome.
-**Status:** todo
+**Status:** done (`SECURITY.md`, `NOTICE`, Dependabot, secret scanning and push protection, private vulnerability reporting, CLA Assistant; gitleaks: 2 false positives, `results/gitleaks-report.md`; triage in `results/m4-low-findings-triage.md`, with F16, F17, F22 and F24 waiting for a decision)
 
 ### T4.8 Export script for the public repository
 
