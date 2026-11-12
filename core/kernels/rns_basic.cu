@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Kernel family: pointwise modular add / multiply on RNS towers in evaluation (NTT) form.
 //
 // In evaluation form, polynomial multiplication mod (X^N+1) is a pointwise product per tower.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Host wrappers for the RNS add / multiply kernels (kernels: core/kernels/rns_basic.cu).
 // Internal code returns Status; the public functions convert to exceptions at the boundary.
 

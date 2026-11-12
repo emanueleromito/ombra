@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """The end-to-end latency measurement path on tiny synthetic data.
 
 Runs core/bench/e2e.py (client in this process, `ombra_bench_e2e` as the server) at d = 16 with

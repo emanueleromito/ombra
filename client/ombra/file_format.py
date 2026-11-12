@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Ombra file envelope v1: a small header around an OpenFHE BINARY payload.
 
 Little-endian layout, mirrored by core/include/ombra/core/file_envelope.hpp:

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 # GPU cluster cache. The pure logic (offset allocator, LRU with pinning, metrics) is plain C++
 # and tested on the CPU. The CUDA part is built only with OMBRA_ENABLE_CUDA=ON.
 add_library(ombra_cache_logic STATIC src/range_allocator.cpp src/arena_lru.cpp)

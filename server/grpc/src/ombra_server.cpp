@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // ombra_server --data-dir D --listen HOST:PORT [--openfhe-version V]
 //                [--gpu-budget-mb N] [--host-budget-mb N] [--compact-interval-ms N]
 //                [--tls-cert F --tls-key F] [--rest-port N [--rest-host H]]

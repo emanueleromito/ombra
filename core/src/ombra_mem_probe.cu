@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // ombra_mem_probe: measures what the driver really reserves for many ciphertext-sized allocations.
 //
 // Usage: ombra_mem_probe <bytes_per_buffer> <count>

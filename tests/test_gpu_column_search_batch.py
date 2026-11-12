@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Batched column-packed search (Q queries in one pass) against OpenFHE.
 
 Same setup as tests/test_gpu_column_search.py, with Q distinct queries. The C++ driver

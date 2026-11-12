@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """gRPC transport to a real Ombra server. Carries ciphertexts and public keys only."""
 
 from __future__ import annotations

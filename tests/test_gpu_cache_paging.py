@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """The GPU cluster cache pages blocks without changing search results.
 
 Python generates keys and seeded synthetic data (both presets), packs the stored vectors column-

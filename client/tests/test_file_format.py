@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """File envelope. Synthetic bytes only; no OpenFHE."""
 
 from __future__ import annotations

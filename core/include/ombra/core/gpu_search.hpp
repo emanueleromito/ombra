@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // GPU-only search pipeline: multiply-and-add over d dimensions, relinearize, rescale, mask
 // multiply (with relinearization), rescale. After the uploads, run() executes every step on the
 // GPU; no OpenFHE call is made between the search kernel and the final ciphertexts.

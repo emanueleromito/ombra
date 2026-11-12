@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // The ombra.v1.Ombra gRPC service over Store + SearchEngine.
 //
 // Security: API keys with scopes are checked on every RPC; TLS is set up in main. No message

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Blob file: one encrypted blob of the blob store, immutable once written. Little-endian
 // container, version 1:
 //   0   4  magic "OBLB"

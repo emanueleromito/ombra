@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Product presets and parameter derivation.
 
 Users pick a preset name and a vector dimension; they never pick ring sizes or moduli (the 128-bit

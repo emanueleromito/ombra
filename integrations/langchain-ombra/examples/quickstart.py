@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """End to end in local mode: encrypt, store and search a few documents with LangChain.
 
     python quickstart.py [DIRECTORY]

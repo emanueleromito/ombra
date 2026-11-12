@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 # Search engine library. The pure logic (layout, tombstone penalty vector) is plain C++ and
 # tested on the CPU. The engine itself needs OpenFHE and CUDA and is built only with
 # OMBRA_ENABLE_CUDA=ON.

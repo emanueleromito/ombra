@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Parallel decrypt + top-k gives the same result as the serial path.
 
 Synthetic data only. Blocks are real CKKS ciphertexts at level 2 with a few forced ties.

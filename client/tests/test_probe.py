@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Probe policy and cluster statistics: pure logic, no OpenFHE, no server."""
 
 import numpy as np

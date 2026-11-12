@@ -16,7 +16,7 @@ Security buyers need to audit the cryptography, so the code must be public. But 
 
 ## Decision
 
-D. PolyForm Noncommercial 1.0.0 in `LICENSE`, commercial terms in `COMMERCIAL.md`. Fallback if we want small startups free later: PolyForm Small Business.
+D. PolyForm Noncommercial 1.0.0 in `LICENSE`, commercial terms in `LICENSING.md`. Fallback if we want small startups free later: PolyForm Small Business.
 
 ## Consequences
 

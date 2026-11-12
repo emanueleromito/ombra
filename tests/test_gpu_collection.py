@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Collection create, re-clustering and repack against the real gRPC server.
 
 Synthetic data only. d = 384 (the smallest supported dimension) on the "fast" preset, one filter

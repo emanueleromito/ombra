@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // CPU reference operations for the expansion tree on OpenFHE (shared by ombra_expand and
 // ombra_expand_gpu): EvalAutomorphism (base-leveledshe.cpp:382), EvalAdd / EvalSub and an exact
 // multiplication by X^(-k) on the coefficients of every RNS tower. No keys other than the public

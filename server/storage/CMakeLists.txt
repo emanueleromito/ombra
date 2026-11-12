@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 # Storage engine: segments, write-ahead log, SQLite catalog, recovery. No OpenFHE, no GPU.
 include(FetchContent)
 if(POLICY CMP0135)

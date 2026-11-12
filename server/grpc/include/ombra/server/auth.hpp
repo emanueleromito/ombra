@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // API keys and scopes. An API key is an access token for the data API, not an FHE key; the server
 // never sees a secret key. Tokens are random, shown once at creation and stored only as salted
 // SHA-256 in <data-dir>/api_keys.v1 (mode 0600). Nothing here logs a token.

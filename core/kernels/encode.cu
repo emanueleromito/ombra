@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Kernel family: GPU CKKS encoding of real plaintext columns (plaintext-DB mode).
 //
 // Mirrors OpenFHE v1.6.1 CKKSPackedEncoding::Encode (pke/lib/encoding/ckkspackedencoding.cpp) for

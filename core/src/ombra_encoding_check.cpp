@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // ombra_encoding_check: reads the polynomial coefficients OpenFHE produces when it encodes given
 // real slot values (expansion encoding test).
 //

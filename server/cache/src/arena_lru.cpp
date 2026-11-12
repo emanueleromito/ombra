@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 #include "ombra/cache/arena_lru.hpp"
 
 #include <stdexcept>

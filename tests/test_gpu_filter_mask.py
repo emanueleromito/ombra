@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Encrypted 0/1 filter mask on GPU-produced scores (no new kernel, no parameter change).
 
 Real pipeline with preset m0_depth2: GPU query expansion (`ombra_expand_gpu`), GPU column-packed

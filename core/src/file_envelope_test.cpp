@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Unit test of the file envelope. No OpenFHE, no GPU. Synthetic bytes only.
 // argv[1] = path of tests/fixtures/envelope_v1_ciphertext.bin, written by the Python writer.
 #include "ombra/core/file_envelope.hpp"

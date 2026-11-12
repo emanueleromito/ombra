@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Small test client for the Ombra gRPC server: the client side of the protocol.
 
 Holds the secret key (it never leaves this process; no message of the API has a field for it),

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """The Modal upload filter excludes every secret pattern from .gitignore (F12)."""
 
 from __future__ import annotations

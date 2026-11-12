@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Owning device buffer (RAII). Allocation reports a Status instead of throwing.
 #pragma once
 

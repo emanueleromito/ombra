@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // CPU unit tests of the search layout and penalty logic. Synthetic data only.
 #include "ombra/search/layout.hpp"
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Client-side cluster statistics and the probe policy for filtered search.
 
 Stopping at k matches in the first round lost recall at about 1% selectivity, so the client plans

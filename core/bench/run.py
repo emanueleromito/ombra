@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Benchmark runner for core/ kernels (run via `make bench`, on an A100 in Modal).
 
     python core/bench/run.py --task column-search --out <dir>      # or --task all

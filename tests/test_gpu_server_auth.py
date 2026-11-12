@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """TLS, API keys with scopes and the REST admin port of `ombra_server`.
 
 The server runs with TLS (a self-signed certificate made with the `openssl` CLI in tmp_path) and

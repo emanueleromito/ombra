@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // ombra._native: the CPU (OpenFHE) work of the local-mode server.
 //
 // Imported ONLY by the child process of local mode, never by the client process: the client

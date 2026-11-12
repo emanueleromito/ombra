@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Recall tool on your own data: what does encryption cost in recall@10?
 
     python -m ombra.recall vectors.npy [--filter-field f.npy] [--queries q.npy | --n-queries 100]

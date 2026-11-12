@@ -1,5 +1,7 @@
 # Ombra
 
+Ombra is available under the [PolyForm Noncommercial License 1.0.0](LICENSE) or a commercial license. See [LICENSING.md](LICENSING.md) for which one applies to you.
+
 A vector database where your vectors and your search queries stay encrypted with fully homomorphic encryption (FHE). The server stores and searches only ciphertexts, so it never sees your data or what you search for.
 
 > **Status:** early design and prototyping. Nothing here is usable yet.
@@ -37,4 +39,4 @@ make bench       # benchmarks on Modal (A100)
 
 ## License
 
-Free for personal, academic and non-commercial use under the [PolyForm Noncommercial License 1.0.0](LICENSE). **Companies need a commercial license**: see [COMMERCIAL.md](COMMERCIAL.md).
+Free for personal, academic and non-commercial use under the [PolyForm Noncommercial License 1.0.0](LICENSE). **Companies need a commercial license**: see [LICENSING.md](LICENSING.md).

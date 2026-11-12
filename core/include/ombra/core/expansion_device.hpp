@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // GPU query expansion on raw RNS words. No OpenFHE or CUDA types in this header.
 //
 // The host glue (expansion_gpu.hpp) extracts every table from OpenFHE objects into

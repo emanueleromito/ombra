@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Kernel family: ciphertext x plaintext column-packed search.
 //
 // Packing as in column_search.cu: one plaintext per dimension j per block, one vector per slot;

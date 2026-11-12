@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 # CI image: OpenFHE 1.6.1, openfhe-python 1.6.1.0, the C++ toolchain, clang-format and Python 3.12
 # with the test packages. No CUDA: GPU tests run on Modal (see .github/workflows/gpu.yml).
 #
@@ -8,6 +9,7 @@
 FROM ubuntu:24.04
 
 LABEL org.opencontainers.image.source="https://github.com/erailabs/ombra"
+LABEL org.opencontainers.image.licenses="PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial"
 
 ARG OPENFHE_TAG=v1.6.1
 ARG OPENFHE_PYTHON_TAG=v1.6.1.0

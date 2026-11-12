@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """The same search against an Ombra server: python server_search.py HOST:PORT CA_CERT"""
 
 import os

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Small CUDA RAII helpers for the cache: stream, device array, bandwidth probe.
 // Internal code returns core::Status; the public functions throw at the boundary.
 

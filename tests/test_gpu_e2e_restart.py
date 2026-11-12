@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """End-to-end through the gRPC server, with a RESTART of the server on the same data dir.
 
 tests/test_gpu_e2e_grpc.py already covers create, key upload, insert, search with and

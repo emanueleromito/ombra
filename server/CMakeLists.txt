@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 # Server components. Storage needs neither OpenFHE nor a GPU, so it builds on the CPU.
 add_subdirectory(storage)
 # Cluster cache: pure logic builds on the CPU, the CUDA part only with OMBRA_ENABLE_CUDA.

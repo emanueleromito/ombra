@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Storage engine: segments + write-ahead log + catalog, with crash recovery.
 //
 // Layout under root: catalog.db, wal.log, segments/<name>.oseg, keys/<name>, blobs/<name>.oblob.

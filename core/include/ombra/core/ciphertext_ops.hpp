@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // GPU versions of OpenFHE ciphertext operations (CKKS, FIXEDMANUAL, evaluation form).
 //
 // Public material only: these functions take ciphertexts and an encoded plaintext, never keys.

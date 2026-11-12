@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Planning of block repacking. Pure logic, no I/O, no crypto.
 
 A deleted vector is one slot in every column of its block, so only the client can drop deleted

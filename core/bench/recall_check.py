@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Pass/fail rule of the recall-based preset acceptance check. Standard library only.
 
 A preset passes when, on at least MIN_DATASETS public embedding datasets with at least MIN_QUERIES

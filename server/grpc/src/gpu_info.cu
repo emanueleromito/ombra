@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // GPU memory totals for /metrics: two numbers, nothing else.
 #include <cuda_runtime_api.h>
 

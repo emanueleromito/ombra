@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Client query encoding (client/ombra/query.py).
 
 CPU-only checks of the numpy side (symmetric coefficients, embedding, indices, expansion tree on

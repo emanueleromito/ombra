@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Synchronous and asynchronous Ombra clients with identical public methods.
 
     client = Client("host:443", api_key="...")   # a GPU server (pip install ombra[grpc])

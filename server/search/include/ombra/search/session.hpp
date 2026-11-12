@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Search engine API, what the gRPC service calls. Needs OpenFHE and CUDA.
 //
 //   SearchEngine engine(store, config);        // GPU cluster cache, one compute stream

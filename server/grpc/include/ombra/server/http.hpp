@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Minimal HTTP/1.1 request parsing for the REST admin port. Network-facing, so it is small
 // and strict: the header block is capped, one request per connection, no request bodies.
 #pragma once

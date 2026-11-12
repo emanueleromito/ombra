@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """The recall tool end to end in local mode on a small synthetic corpus."""
 
 from __future__ import annotations

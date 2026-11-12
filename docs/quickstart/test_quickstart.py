@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """The quickstart page and its sample files stay in sync, and the local sample runs.
 
 The CPU tests run in `make test` (and so in CI). The end-to-end test needs OpenFHE and
@@ -22,6 +23,12 @@ SNIPPETS: set[str] = set()
 BLOCK = re.compile(r"^```python\n(.*?)^```$", re.DOTALL | re.MULTILINE)
 
 
+def sample_text(path: Path) -> str:
+    """Sample source without its SPDX header line, which stays off the documentation page."""
+    lines = path.read_text().splitlines(keepends=True)
+    return "".join(ln for ln in lines if not ln.startswith("# SPDX-License-Identifier:"))
+
+
 def page_blocks() -> list[str]:
     return BLOCK.findall(PAGE.read_text())
 
@@ -35,7 +42,7 @@ def test_samples_exist():
 
 
 def test_every_python_block_is_a_sample_or_a_listed_snippet():
-    samples = {s.read_text() for s in SAMPLES}
+    samples = {sample_text(s) for s in SAMPLES}
     for block in page_blocks():
         assert block in samples or block in SNIPPETS, (
             "a python block of docs/quickstart.md differs from every file in docs/quickstart/:\n"
@@ -45,7 +52,7 @@ def test_every_python_block_is_a_sample_or_a_listed_snippet():
 
 @pytest.mark.parametrize("sample", SAMPLES, ids=lambda p: p.name)
 def test_sample_is_on_the_page_and_compiles(sample):
-    assert sample.read_text() in page_blocks(), f"{sample.name} is not on the page"
+    assert sample_text(sample) in page_blocks(), f"{sample.name} is not on the page"
     compile(sample.read_text(), str(sample), "exec")
 
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Crash-recovery matrix: a forked child opens the store, sets a crash point and does one insert or
 // delete; it _exit()s at the point. The parent reopens the store and checks consistency.
 #include <sys/wait.h>

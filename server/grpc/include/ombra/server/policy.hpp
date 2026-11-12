@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Request policy of the gRPC server: limits and collection-spec validation. Pure C++, no
 // gRPC, no OpenFHE and no GPU, so it is unit-tested on the CPU.
 //

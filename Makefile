@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 # Ombra development commands. Run `make help` for the list.
 
 PYTHON      ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
