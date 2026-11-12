@@ -16,7 +16,7 @@ updates:
     schedule:
       interval: weekly
   - package-ecosystem: docker
-    directory: /
+    directory: /ci
     target-branch: dev
     schedule:
       interval: weekly
