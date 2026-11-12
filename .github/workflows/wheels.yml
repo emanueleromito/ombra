@@ -1,0 +1,54 @@
+# Builds the ombra client wheels (client/) with cibuildwheel and tests each one after installing it:
+# Linux x86_64 and aarch64 (manylinux_2_28) and macOS arm64 and x86_64, CPython 3.11 to 3.13.
+# Every wheel carries ombra._native (the C++ OpenFHE expansion of core/) and the OpenFHE 1.6.1
+# libraries, so installing one needs no compiler and no OpenFHE. The settings are in
+# client/pyproject.toml ([tool.cibuildwheel]); OpenFHE is built by ci/wheel/build_openfhe.sh.
+# The release workflow calls this one (workflow_call) and publishes the wheels-* artifacts.
+name: Wheels
+
+on:
+  pull_request:
+    paths:
+      - "client/**"
+      - "core/**"
+      - "ci/wheel/**"
+      - "tests/wheel_check.py"
+      - ".github/workflows/wheels.yml"
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wheels-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  wheels:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Native runners for every architecture; no QEMU.
+          - {name: "Linux x86_64", os: ubuntu-24.04, archs: x86_64}
+          - {name: "Linux aarch64", os: ubuntu-24.04-arm, archs: aarch64}
+          - {name: "macOS arm64", os: macos-14, archs: arm64}
+          # macos-13 is retired by GitHub; macos-15-intel is its Intel replacement.
+          - {name: "macOS x86_64", os: macos-15-intel, archs: x86_64}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pypa/cibuildwheel@v4.3.5
+        with:
+          package-dir: client
+          output-dir: wheelhouse
+        env:
+          CIBW_ARCHS: ${{ matrix.archs }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wheels-${{ matrix.os }}-${{ matrix.archs }}
+          path: wheelhouse/*.whl
+          if-no-files-found: error

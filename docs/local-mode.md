@@ -8,8 +8,11 @@ server refuses (key tag, preset, sizes, F_max, block layouts, blob buckets).
 
 ## Requirements
 
-- CPython 3.12 on x86-64 Linux (the `openfhe` wheel on PyPI is built for it), libstdc++ from
-  GCC 13 or newer (Ubuntu 24.04) and `libgomp1`.
+- CPython 3.11, 3.12 or 3.13 on Linux (x86-64 or aarch64) or macOS (arm64 or x86-64). The
+  `ombra` wheel carries the compiled expansion and the OpenFHE libraries, so it needs no compiler.
+- openfhe-python 1.6.1 for keys and encryption. The `openfhe` wheel on PyPI is a CPython 3.12
+  x86-64 Linux build only, so `pip install "ombra[local]"` pulls it in there and nowhere else;
+  on other platforms install openfhe-python 1.6.1 yourself (CMake, against OpenFHE 1.6.1).
 - No GPU.
 
 ## Speed limits (measured on Modal, 4 vCPU, "fast" preset, d = 384)
@@ -25,9 +28,10 @@ one ciphertext product per entry and block. The GPU server needs about two key s
 entry. Local mode is for trying Ombra, tests and small collections (some thousands of vectors),
 not for production. The "balanced" preset (ring 16384) is about 4 times slower.
 
-## Why the expansion differs from the GPU server
+## The expansion
 
-openfhe-python cannot multiply a ciphertext exactly by X^-k, which the server's expansion tree
-needs. Local mode gets the same entries with a real plaintext product and a subgroup trace over
-the same automorphism keys (see the module docstring); results agree to about 1e-6 and the
-top-k after exact re-ranking is identical (the end-to-end test runs on both backends).
+Local mode runs the server's exact expansion tree (`core/include/ombra/core/expansion_tree.hpp`
+with the CPU operations of `core/src/openfhe_expand_ops.hpp`) in `ombra._native`, a C++ OpenFHE
+extension in the wheel. It uses the same levels as the GPU server, and the score blocks come back
+at the same ciphertext level (`tests/wheel_check.py` checks it on every wheel, and
+`tests/test_gpu_local_parity.py` compares the top-k with the server's).

@@ -76,9 +76,9 @@ def _native() -> Any:
         from ombra import _native
     except ImportError as exc:
         raise ImportError(
-            "local mode needs the compiled extension ombra._native (OpenFHE 1.6.1 C++, Linux "
-            "x86-64, Python 3.12): install a wheel of ombra, or build client/ with OpenFHE "
-            "1.6.1 installed (docs/local-mode.md)"
+            "local mode needs the compiled extension ombra._native (OpenFHE 1.6.1 C++): install "
+            "a wheel of ombra for your platform, or build client/ with OpenFHE 1.6.1 "
+            "installed (docs/local-mode.md)"
         ) from exc
     return _native
 

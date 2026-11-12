@@ -34,5 +34,10 @@ target_include_directories(
                   ${OpenFHE_INCLUDE}/pke ${OpenFHE_INCLUDE}/binfhe)
 target_link_directories(_native PRIVATE ${OpenFHE_LIBDIR})
 target_link_libraries(_native PRIVATE ${OpenFHE_SHARED_LIBRARIES})
+# The source calls omp_*; on Linux the -fopenmp of OpenFHE's flags links it, Apple clang needs libomp.
+find_package(OpenMP COMPONENTS CXX QUIET)
+if(OpenMP_CXX_FOUND)
+  target_link_libraries(_native PRIVATE OpenMP::OpenMP_CXX)
+endif()
 set_target_properties(_native PROPERTIES INSTALL_RPATH "${OpenFHE_LIBDIR}" BUILD_WITH_INSTALL_RPATH ON)
 install(TARGETS _native DESTINATION ombra)
