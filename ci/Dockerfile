@@ -5,7 +5,7 @@
 # a hash of this file and ci/requirements.txt. Change either file and the next run builds a new tag.
 #
 # The OpenFHE and openfhe-python steps are the ones in modal_app.py. Change the versions in both.
-FROM ubuntu:24.04
+FROM ubuntu:25.10
 
 LABEL org.opencontainers.image.source="https://github.com/emanueleromito/ombra"
 
