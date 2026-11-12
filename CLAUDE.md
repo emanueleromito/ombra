@@ -55,7 +55,7 @@ These are not style preferences. Breaking one is a bug.
 5. **Crypto changes need tests first.** Do not change key handling, parameter selection or ciphertext layout without adding or updating tests in the same change.
 6. **Versioned formats.** Every ciphertext, key file and collection format carries a version header. Do not change a format without bumping its version.
 7. **Ampere only, for now.** Compile for `sm_80` and `sm_86`. Do not add other architectures without a task asking for it.
-8. **Wording.** Never call this project "open source". It is "source-available" (see `COMMERCIAL.md`).
+8. **Wording.** Never call this project "open source". It is "source-available" (see `LICENSING.md`).
 
 ## Conventions
 
