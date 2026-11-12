@@ -27,7 +27,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY ci/requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
-# OpenFHE (C++), installed to /usr/local. Same flags as modal_app.py.
+# OpenFHE (C++), installed to /usr/local. Same flags as modal_app.py. ldconfig puts its libraries in
+# the linker cache, so processes started with a minimal environment (no LD_LIBRARY_PATH) find them.
 RUN git clone --depth 1 --branch ${OPENFHE_TAG} \
         https://github.com/openfheorg/openfhe-development /opt/openfhe-src \
     && cmake -S /opt/openfhe-src -B /opt/openfhe-build \
@@ -35,6 +36,7 @@ RUN git clone --depth 1 --branch ${OPENFHE_TAG} \
         -DBUILD_BENCHMARKS=OFF \
     && cmake --build /opt/openfhe-build -j \
     && cmake --install /opt/openfhe-build \
+    && ldconfig \
     && rm -rf /opt/openfhe-src /opt/openfhe-build
 
 # openfhe-python, built against the OpenFHE above and installed into /opt/venv.
