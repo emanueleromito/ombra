@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // GPU cluster cache. Unit of caching = one segment (cluster block) as device-ready RNS words
 // (the layout the column search kernel reads), keyed by (collection, segment).
 //

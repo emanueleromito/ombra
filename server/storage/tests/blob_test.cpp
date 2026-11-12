@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Blob store: put/get/replace/delete, refusals, drop with the collection, file corruption,
 // and a crash matrix (forked child _exit()s at a crash point; the parent reopens the store).
 #include <sys/wait.h>

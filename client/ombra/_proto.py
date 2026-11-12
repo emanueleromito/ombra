@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Protobuf (and gRPC) modules of ombra.v1, generated at first use from the packaged .proto.
 
 The package ships `resources/ombra.proto`, a copy of proto/ombra/v1/ombra.proto (a test checks

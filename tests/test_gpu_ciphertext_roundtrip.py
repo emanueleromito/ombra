@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Ciphertext round trip through the CUDA kernels.
 
 Python generates keys and synthetic seeded data, encrypts, and writes only public material (the

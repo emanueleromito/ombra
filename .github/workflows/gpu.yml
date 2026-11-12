@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 # GPU tests (make test-gpu) on Modal, on an A10. Runs by hand ("Run workflow" on the Actions tab,
 # choosing the branch) and every night on the default branch. Never on pull requests: Modal costs
 # money and a PR from a fork must not get the tokens. Run it on a branch before merging any change

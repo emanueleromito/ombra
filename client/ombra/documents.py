@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Encrypted record and document blobs.
 
 Each blob has its own fresh AES-256-GCM key, wrapped with the document master key

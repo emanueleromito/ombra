@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Kernel family: hybrid key-switched automorphism and the expansion split.
 //
 // Mirrors OpenFHE v1.6.1 LeveledSHEBase::EvalAutomorphismCore (base-leveledshe.cpp:400), HYBRID

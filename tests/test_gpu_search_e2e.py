@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Insert, delete and search through the client library against the real gRPC server.
 
 Synthetic data only; d = 384 on the "fast" preset, one filter field with 3 values, 6 clusters of

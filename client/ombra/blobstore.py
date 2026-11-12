@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Blob store access for encrypted records and documents.
 
 The server stores opaque blobs keyed by (collection, kind, id); this module is the client side

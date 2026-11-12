@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """GPU environment for Ombra on Modal.
 
 Development runs on an A10 (Ampere, sm_86); benchmarks on an A100 (Ampere, sm_80).

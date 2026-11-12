@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // CPU unit test of the request policy: limits, preset headroom derived from the preset JSON.
 #include "ombra/server/policy.hpp"
 

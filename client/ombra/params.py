@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Load CKKS parameter presets from core/params/ckks_presets.json.
 
 All parameter numbers live in that JSON file; this module only reads them. A preset below

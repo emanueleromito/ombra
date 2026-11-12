@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Batched GPU query expansion (the trees of Q queries together) against OpenFHE.
 
 Python makes keys (preset m0_depth2), Q seeded synthetic queries, the automorphism keys, and

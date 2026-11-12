@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Segment file: one cluster block, immutable once written. Little-endian container, version 1:
 //   0   4  magic "OSEG"
 //   4   2  container version (u16, 1)

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Kernel family: CKKS rescale and ciphertext x ciphertext tensor product.
 //
 // Mirrors OpenFHE v1.6.1, FIXEDMANUAL scaling, evaluation-form RNS words (exact modular

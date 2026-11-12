@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Host wrapper for the column-packed search kernel (kernel: core/kernels/column_search.cu).
 // Internal code returns Status; the public functions convert to exceptions at the boundary.
 

@@ -1,13 +1,15 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 # CI image: OpenFHE 1.6.1, openfhe-python 1.6.1.0, the C++ toolchain, clang-format and Python 3.12
 # with the test packages. No CUDA: GPU tests run on Modal (see .github/workflows/gpu.yml).
 #
-# Built by .github/workflows/ci-image.yml and pushed to ghcr.io/emanueleromito/ombra-ci, tagged with
+# Built by .github/workflows/ci-image.yml and pushed to ghcr.io/erailabs/ombra-ci, tagged with
 # a hash of this file and ci/requirements.txt. Change either file and the next run builds a new tag.
 #
 # The OpenFHE and openfhe-python steps are the ones in modal_app.py. Change the versions in both.
 FROM ubuntu:24.04
 
-LABEL org.opencontainers.image.source="https://github.com/emanueleromito/ombra"
+LABEL org.opencontainers.image.source="https://github.com/erailabs/ombra"
+LABEL org.opencontainers.image.licenses="PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial"
 
 ARG OPENFHE_TAG=v1.6.1
 ARG OPENFHE_PYTHON_TAG=v1.6.1.0

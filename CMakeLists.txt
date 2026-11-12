@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 cmake_minimum_required(VERSION 3.22)
 
 project(ombra LANGUAGES CXX C)

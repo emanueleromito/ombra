@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """LangChain's own vector store integration tests, against Ombra's local mode (needs OpenFHE).
 
 Run: pytest integrations -m openfhe   (slow: every test makes keys and each search takes seconds)

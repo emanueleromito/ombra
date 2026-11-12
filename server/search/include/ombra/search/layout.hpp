@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Pure logic of the search path, no OpenFHE and no CUDA: the query/column layout of a
 // collection (additive penalty) and the tombstone penalty vector.
 //

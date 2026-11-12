@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Recall-based acceptance check of a preset (measurement and acceptance rule): recall@10 of the
 encrypted pipeline against plaintext search.
 

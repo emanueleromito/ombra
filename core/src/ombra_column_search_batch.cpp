@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // ombra_column_search_batch: oracle driver for the batched column-packed search kernel.
 //
 // Usage: ombra_column_search_batch <context.bin> <in_dir> <out_dir> <dims> <blocks> <queries>

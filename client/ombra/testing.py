@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """`FakeClient`: an in-memory test double with the API of `ombra.Client`, for unit tests of code
 that uses Ombra.
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """The encrypted blob store through the gRPC server `ombra_server`.
 
 Blobs are opaque bytes (synthetic here, not ciphertexts: the server never parses them). Cases: put,

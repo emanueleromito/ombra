@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // ombra_expand_gpu_batch: batched GPU query expansion checked exactly against OpenFHE.
 //
 // Usage: ombra_expand_gpu_batch <context.bin> <autokeys.bin> <d> <queries> <dir>

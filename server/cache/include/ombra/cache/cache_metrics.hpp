@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Cache counters. Counters only: no ids, no segment keys, no data.
 #pragma once
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Column-packed encrypted search on raw RNS words (no OpenFHE or CUDA dependency).
 //
 // See core/kernels/column_search.cu for what is computed and the memory layout. All words are

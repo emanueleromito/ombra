@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Decrypt stage-2 result blocks and pick the top-k, serially or across processes.
 
 Each block is one serialized OpenFHE ciphertext file holding `slots` scores. A block is

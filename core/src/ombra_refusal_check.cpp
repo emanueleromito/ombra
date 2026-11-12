@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // ombra_refusal_check: shows that the GPU entry points refuse inputs that do not belong together
 // (review findings F4, F5, F6). Public material only, no secret key.
 //

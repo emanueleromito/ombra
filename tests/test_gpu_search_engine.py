@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """The search engine (expansion, stage 1, stage 2 with filter columns, tombstones) is exact.
 
 Python builds a small collection with synthetic data for both presets: d = 16, two filter fields

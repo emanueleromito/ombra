@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 # Builds the CI image (ci/Dockerfile) and pushes it to GHCR, tagged with a hash of the files it is
 # built from. If that tag is already in GHCR the job does nothing, so a normal PR run does not build
 # OpenFHE. Runs when ci/Dockerfile or ci/requirements.txt change on dev, on manual dispatch (use

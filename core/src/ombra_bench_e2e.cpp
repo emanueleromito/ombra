@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // ombra_bench_e2e: server side of the end-to-end query latency measurement.
 //
 // Usage: ombra_bench_e2e <context.bin> <autokeys.bin> <evalmultkey.bin> <dir> <d>

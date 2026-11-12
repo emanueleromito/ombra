@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // SQLite catalog (schema_version 2, api_version 1; schema 1 catalogs are migrated, version 2 adds
 // the blob table). journal_mode=WAL, synchronous=FULL, foreign_keys=ON. Opening a catalog with
 // another stored api_version or schema_version is refused.

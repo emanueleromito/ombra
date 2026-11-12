@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // CPU unit tests of SHA-256, API key file (format, mode, hashing, verification), scope table,
 // HTTP request parsing limits, metrics JSON (allow-listed keys only).
 #include <sys/stat.h>

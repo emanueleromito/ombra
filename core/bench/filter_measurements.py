@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """The filter measurements, through the real gRPC server (A100, Modal).
 
     # writes <dir>/filter-measurements-<preset>-a100.json

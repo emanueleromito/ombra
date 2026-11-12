@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 # core/: GPU kernels and OpenFHE glue. Built only with CUDA (needs OpenFHE and a CUDA toolchain);
 # the CPU-only build (`make test`) skips everything here.
 # Pure-number unit test of the security floor (header only, no OpenFHE, builds on CPU).

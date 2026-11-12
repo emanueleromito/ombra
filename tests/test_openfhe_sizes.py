@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Object sizes at preset m0_depth2 for d = 384, 768, 1536 (sizes only, no data printed).
 
 Measures with real OpenFHE objects (seeded synthetic data):

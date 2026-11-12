@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Ombra file envelope v1. Header only, no OpenFHE. Little-endian layout:
 //   0  4  magic "OMBR"
 //   4  2  format version (u16, 1)

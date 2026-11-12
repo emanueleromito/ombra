@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Column-packed search kernel against OpenFHE.
 
 Python generates keys and seeded synthetic data (preset m0_depth2), packs the stored vectors

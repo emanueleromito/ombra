@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Runs the (unchanged) column search kernel over blocks served by the GPU cluster cache.
 // Header only, no CUDA types, no OpenFHE: shared by the paging test driver and the benchmark.
 #pragma once

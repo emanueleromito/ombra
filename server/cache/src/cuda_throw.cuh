@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Boundary helper: one CUDA call under the project macro, throwing core::CudaError on failure.
 #pragma once
 

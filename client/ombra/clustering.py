@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Spherical k-means for the coarse stage of the two-stage search.
 
 Vectors are unit length, so cosine similarity is a dot product and the centers are unit vectors

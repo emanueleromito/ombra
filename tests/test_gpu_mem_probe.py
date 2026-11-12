@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Nominal versus actual device memory of ciphertext-sized allocations.
 
 Runs `ombra_mem_probe`, which allocates many buffers of one ciphertext's size with separate

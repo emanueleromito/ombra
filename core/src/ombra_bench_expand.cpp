@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // ombra_bench_expand: GPU query expansion timing.
 //
 // Usage: ombra_bench_expand <context.bin> <public_key.bin> <autokeys.bin> <d> <warmup> <iters>

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Preset and dimension mapping, refusals, and agreement with the C++ side."""
 
 from __future__ import annotations

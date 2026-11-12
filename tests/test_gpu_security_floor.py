@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Every core driver refuses a context that fails the security floor.
 
 The 128-bit floor forbids building an insecure context, even in tests. Instead the drivers read

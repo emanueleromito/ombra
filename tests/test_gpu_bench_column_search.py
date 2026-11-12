@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """The column-search benchmark runs end to end at a tiny size (d = 4) on the test GPU.
 
 Runs core/bench/run.py, which builds the context from the preset, writes only the context and the

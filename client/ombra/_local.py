@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Local mode: a CPU server in a child process behind the same API as the gRPC server.
 
 `LocalTransport` (client process) starts the child with the `spawn` method and talks to it over a

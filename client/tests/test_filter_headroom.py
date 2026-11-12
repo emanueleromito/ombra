@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """How large a value a filtered score can hold and still decrypt.
 
 With the additive penalty, a decrypted slot is `score + LAMBDA * c`, with |score| <= 1 and

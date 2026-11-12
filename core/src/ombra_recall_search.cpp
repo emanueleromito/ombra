@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // ombra_recall_search: end-to-end GPU search driver for the accuracy measurement.
 //
 // Usage: ombra_recall_search <context.bin> <autokeys.bin> <data_dir> <out_dir> <d> <blocks>

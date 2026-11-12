@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Host side of the GPU query expansion (kernels: core/kernels/ntt.cu and keyswitch.cu).
 // Internal code returns Status; the public functions convert to exceptions at the boundary.
 //

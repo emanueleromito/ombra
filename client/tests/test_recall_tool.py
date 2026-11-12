@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Argument parsing and verdict logic of the recall tool (no OpenFHE needed)."""
 
 from __future__ import annotations

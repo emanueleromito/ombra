@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 # The compiled part of the client: ombra._native, the OpenFHE CPU code of the
 # local-mode server. Built when OpenFHE 1.6.1 (C++) is found; without it the pure-Python client
 # still installs, and local mode says what is missing. OMBRA_REQUIRE_NATIVE=1 makes it an error.

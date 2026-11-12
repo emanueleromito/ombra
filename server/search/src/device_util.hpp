@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Two CUDA calls the search session needs and the cache/core headers do not expose. No CUDA types.
 #pragma once
 

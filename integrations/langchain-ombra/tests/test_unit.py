@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Unit tests of OmbraVectorStore on ombra.testing.FakeClient (no OpenFHE, nothing encrypted)."""
 
 import pytest

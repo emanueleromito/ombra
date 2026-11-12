@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """CKKS parameter security, and CPU round trip.
 
 All data is synthetic, seeded and normalized. Nothing prints plaintext values or keys; assertions

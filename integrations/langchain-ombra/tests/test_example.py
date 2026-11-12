@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """The quickstart example runs end to end in local mode (needs OpenFHE)."""
 
 import importlib.util

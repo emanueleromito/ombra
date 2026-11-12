@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // The 128-bit security floor, enforced on the C++ side (review finding F7).
 //
 // `check_security_floor` is a pure function on plain numbers (no OpenFHE), so the negative tests

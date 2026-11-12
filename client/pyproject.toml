@@ -5,6 +5,8 @@ build-backend = "scikit_build_core.build"
 [project]
 name = "ombra"
 version = "0.1.0"
+license = "PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial"
+license-files = ["LICENSE", "LICENSING.md"]
 description = "Client for Ombra, a vector database with fully homomorphic encryption"
 requires-python = ">=3.11"
 dependencies = ["numpy", "cryptography", "faiss-cpu"]

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Compact plaintext storage and ciphertext x plaintext column search.
 //
 // Plaintext-DB mode: the database holds the vectors as plain numbers (fp16 or int8, 2d or d bytes

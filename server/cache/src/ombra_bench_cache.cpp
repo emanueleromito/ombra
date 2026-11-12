@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // ombra_bench_cache: benchmark of the GPU cluster cache.
 //
 // Usage: ombra_bench_cache <context.bin> <public_key.bin> <dims> <budget_blocks>
