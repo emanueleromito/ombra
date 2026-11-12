@@ -1,4 +1,4 @@
-"""T3.6: insert, delete and search through the client library against the real gRPC server.
+"""Insert, delete and search through the client library against the real gRPC server.
 
 Synthetic data only; d = 384 on the "fast" preset, one filter field with 3 values, 6 clusters of
 well separated vectors. Checks that top-k with re-ranking equals a plaintext search at each
@@ -25,7 +25,7 @@ from ombra.params import ParamsError  # noqa: E402
 
 BACKENDS = [
     pytest.param("server", marks=pytest.mark.gpu),
-    pytest.param("local", marks=pytest.mark.openfhe),  # the in-process CPU server (T3.7)
+    pytest.param("local", marks=pytest.mark.openfhe),  # the in-process CPU server
 ]
 
 VERSION = "test-openfhe"
@@ -146,7 +146,7 @@ def test_insert_search_delete(tmp_path, backend) -> None:
             assert res.hits[0].metadata == {"i": int(res.hits[0].id[1:])}
         _check(col.search(queries[0], K, n_probe=2, workers=2), _plain(x, fields, live, queries[0]))
 
-        # with a filter (0019 amendment): at least the unfiltered clusters, exactly two rounds
+        # with a filter: at least the unfiltered clusters, exactly two rounds
         for q in queries:
             unf = col.search(q, K, n_probe=2)
             for v in (0, 1):

@@ -1,4 +1,4 @@
-"""T3.6: a KeyKit saved to the T3.2 key file can be reopened, in this and in a new process."""
+"""A KeyKit saved to a key file can be reopened, in this and in a new process."""
 
 from __future__ import annotations
 
@@ -19,9 +19,7 @@ pytestmark = pytest.mark.openfhe
 SCRYPT = (2**4, 8, 1)  # cheap for tests
 CLIENT = str(Path(__file__).resolve().parents[1] / "client")
 CHILD = """
-import sys
-from ombra import presets
-from ombra.collection import KeyKit
+import sys from ombra import presets from ombra.collection import KeyKit
 d = presets.derive("fast", 384)
 kit = KeyKit.load(sys.argv[1], "pw", d, "test-openfhe", 387)
 env = open(sys.argv[2], "rb").read()

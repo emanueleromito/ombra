@@ -1,5 +1,5 @@
 // ombra_refusal_check: shows that the GPU entry points refuse inputs that do not belong together
-// (T1.12, T1.13, T1.14; review findings F4, F5, F6). Public material only, no secret key.
+// (review findings F4, F5, F6). Public material only, no secret key.
 //
 // Usage:
 //   ombra_refusal_check keys  <context> <dir> <d>
@@ -102,7 +102,7 @@ int run_keys(const std::string& ctx, const std::string& dir, std::size_t d) {
   const auto& keys_a = CryptoContextImpl<DCRTPoly>::GetEvalAutomorphismKeyMap(a_root->GetKeyTag());
   const auto& keys_b = CryptoContextImpl<DCRTPoly>::GetEvalAutomorphismKeyMap(b_root->GetKeyTag());
 
-  // ---- T1.12: metadata on expansion upload ----
+  // ---- Metadata on expansion upload ----
   {
     GpuExpansion gx(cc, a_root, keys_a, d);
     run_case("expansion_upload_valid", [&] { gx.upload(a_root); });
@@ -115,7 +115,7 @@ int run_keys(const std::string& ctx, const std::string& dir, std::size_t d) {
     // A real ciphertext one level down (a mask): different level, tower count and scale.
     run_case("expansion_upload_level", [&] { gx.upload(a_mask); });
 
-    // ---- T1.13: keys ----
+    // ---- Keys ----
     run_case("expansion_upload_other_key", [&] { gx.upload(b_root); });
     run_case("expansion_upload_other_encoding", [&] {
       Ct enc = a_root->Clone();

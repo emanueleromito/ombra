@@ -5,7 +5,7 @@
 // Guarantee: an acknowledged write (insert() or remove() returned) survives a crash or power
 // loss. A write that was not acknowledged is either fully there (segment, all its ids, catalog
 // rows) or fully absent (no rows, no segment file); never partial. Single writer: methods are
-// serialised by a mutex. Logs carry sizes, counts and timings only (hard rule 4).
+// serialised by a mutex. Logs carry sizes, counts and timings only.
 //
 // Searches vs. block removal: a search takes snapshot() once per round. It sees the block list and
 // the tombstones of one instant and pins those segment files. drop_dead_blocks() and
@@ -173,7 +173,7 @@ class Store {
   std::string replace_segments(const std::string& collection,
                                const std::vector<std::string>& old_segments, const SegmentData& neu);
 
-  // ---- Blobs (T3.4): opaque encrypted bytes keyed by (collection, kind, id) --------------------
+  // ---- Blobs: opaque encrypted bytes keyed by (collection, kind, id) --------------------
   // put_blob: payload size must be a bucket size (BlobSizeError) and kind a known kind
   // (BlobKindError); unknown collection throws "unknown collection". Order: write the file
   // durably (temp, fsync, rename), one catalog transaction inserts or replaces the row, then the

@@ -1,4 +1,4 @@
-"""T3.3: preset and dimension mapping, refusals, and agreement with the C++ side."""
+"""Preset and dimension mapping, refusals, and agreement with the C++ side."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 JSON = ROOT / "core" / "params" / "ckks_presets.json"
 CMAKE = ROOT / "server" / "grpc" / "CMakeLists.txt"
 
-EXPECTED = {  # product name -> (core name, ring_dim, batch_size), from decisions 0009 and 0013
+EXPECTED = {  # product name -> (core name, ring_dim, batch_size)
     "fast": ("m0_compact_n8192", 8192, 4096),
     "balanced": ("m0_depth2", 16384, 8192),
 }

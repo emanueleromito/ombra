@@ -1,4 +1,4 @@
-# The compiled part of the client (T3.7, decision 0022): ombra._native, the OpenFHE CPU code of the
+# The compiled part of the client: ombra._native, the OpenFHE CPU code of the
 # local-mode server. Built when OpenFHE 1.6.1 (C++) is found; without it the pure-Python client
 # still installs, and local mode says what is missing. OMBRA_REQUIRE_NATIVE=1 makes it an error.
 cmake_minimum_required(VERSION 3.22)

@@ -162,7 +162,7 @@ Catalog::Catalog(const std::string& path) {
       tx.commit();
     }
     {
-      // Schema 1 -> 2 (T3.4): add the blob table. A stored version above 2 is refused below.
+      // Schema 1 -> 2: add the blob table. A stored version above 2 is refused below.
       Stmt v(db_, "SELECT value FROM meta WHERE key='schema_version'");
       if (v.step() && v.col_num(0) == 1) {
         Tx tx(db_);

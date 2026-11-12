@@ -1,4 +1,4 @@
-// ombra_bench_expand: GPU query expansion timing (T0.5).
+// ombra_bench_expand: GPU query expansion timing.
 //
 // Usage: ombra_bench_expand <context.bin> <public_key.bin> <autokeys.bin> <d> <warmup> <iters>
 //                           <out.json> [profile]

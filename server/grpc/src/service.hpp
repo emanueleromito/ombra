@@ -1,8 +1,8 @@
-// The ombra.v1.Ombra gRPC service over Store + SearchEngine (T2.7b).
+// The ombra.v1.Ombra gRPC service over Store + SearchEngine.
 //
-// Security: API keys with scopes are checked on every RPC (T2.9); TLS is set up in main. No message carries a secret
-// key and the service never asks for one (hard rule 2). Logs carry counts, sizes and timings, never
-// ids, ciphertext bytes or values (hard rule 4).
+// Security: API keys with scopes are checked on every RPC; TLS is set up in main. No message
+// carries a secret key and the service never asks for one. Logs carry counts, sizes and timings,
+// never ids, ciphertext bytes or values.
 #pragma once
 
 #include <mutex>

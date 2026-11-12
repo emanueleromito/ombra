@@ -1,4 +1,4 @@
-// The one exact ciphertext comparator the oracle drivers share (T1.13, review finding F5).
+// The one exact ciphertext comparator the oracle drivers share (review finding F5).
 //
 // Compares everything a GPU result must carry to equal OpenFHE's: level, noise-scale degree,
 // scaling factor, key tag, encoding type, slots, number of components, format, moduli and every

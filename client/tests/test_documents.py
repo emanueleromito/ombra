@@ -1,4 +1,4 @@
-"""T3.4 client: encrypted record/document blobs. Synthetic data only; no OpenFHE, no server."""
+"""Client side: encrypted record/document blobs. Synthetic data only; no OpenFHE, no server."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""T0.4: column-packed search kernel against OpenFHE.
+"""Column-packed search kernel against OpenFHE.
 
 Python generates keys and seeded synthetic data (preset m0_depth2), packs the stored vectors
 column-wise (one ciphertext per dimension, one vector per slot) and the query pre-expanded (the
@@ -23,12 +23,12 @@ np = pytest.importorskip("numpy")
 
 pytestmark = pytest.mark.gpu
 
-PRESETS = ["m0_depth2", "m0_compact_n8192"]  # T0.11: every test runs on both
+PRESETS = ["m0_depth2", "m0_compact_n8192"]  # Every test runs on both
 SEED = 20260104
 
 # Max error of the decrypted scores against numpy dot products, and between GPU and OpenFHE CPU.
 # Normalized vectors, scale 2^50 each (2^100 product, no rescale): the real error is far below.
-# Same agreed bound as T0.2/T0.3; do not loosen.
+# Same agreed bound as the CPU baseline; do not loosen.
 DECRYPT_TOLERANCE = 1e-6
 
 REPO_ROOT = Path(__file__).resolve().parents[1]

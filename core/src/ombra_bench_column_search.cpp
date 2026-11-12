@@ -1,4 +1,4 @@
-// ombra_bench_column_search: throughput benchmark of the column-packed search kernel (T0.4).
+// ombra_bench_column_search: throughput benchmark of the column-packed search kernel.
 //
 // Usage: ombra_bench_column_search <context.bin> <public_key.bin> <dims> <blocks> <warmup> <iters>
 //                                  <out.json>

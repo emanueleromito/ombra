@@ -1,5 +1,5 @@
-// Pure logic of the search path (T2.7), no OpenFHE and no CUDA: the query/column layout of a
-// collection (decision 0019, additive penalty) and the tombstone penalty vector.
+// Pure logic of the search path, no OpenFHE and no CUDA: the query/column layout of a
+// collection (additive penalty) and the tombstone penalty vector.
 //
 // A collection has d vector columns and F filter fields with cardinalities V_1..V_F. A data block
 // has D = d + sum(V) columns: the d vector columns first, then the one-hot columns field by field
@@ -18,7 +18,7 @@
 
 namespace ombra::search {
 
-// The weight of one matching filter field in a decrypted slot (decision 0019).
+// The weight of one matching filter field in a decrypted slot.
 inline constexpr double kFilterLambda = 4.0;
 // Proto limits (LIMIT_MAX_FILTER_FIELDS, LIMIT_MAX_FILTER_CARDINALITY).
 inline constexpr std::size_t kMaxFilterFields = 16;
@@ -43,7 +43,7 @@ struct QueryLayout {
   double tombstone_penalty() const { return -kFilterLambda * static_cast<double>(fields() + 1); }
 };
 
-// Largest F the headroom of a preset allows (decision 0019): a slot holds at most
+// Largest F the headroom of a preset allows: a slot holds at most
 // 1 + lambda * F and must stay below 2^(first_mod_bits - scale_bits - 1 - 3), also capped at
 // kMaxFilterFields. Returns 0 if even F = 1 does not fit.
 std::size_t max_filter_fields(std::size_t first_mod_bits, std::size_t scale_bits);

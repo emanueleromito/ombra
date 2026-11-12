@@ -1,4 +1,4 @@
-// Offset allocator over a fixed arena (T2.6). Pure bookkeeping: it hands out byte offsets inside a
+// Offset allocator over a fixed arena. Pure bookkeeping: it hands out byte offsets inside a
 // buffer of known capacity (a pinned host pool or a device buffer) and never touches memory, so it
 // is tested on the CPU. First fit, with coalescing of neighbouring free ranges on free().
 #pragma once

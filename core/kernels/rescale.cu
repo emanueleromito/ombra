@@ -1,4 +1,4 @@
-// Kernel family: CKKS rescale and ciphertext x ciphertext tensor product (T1.2).
+// Kernel family: CKKS rescale and ciphertext x ciphertext tensor product.
 //
 // Mirrors OpenFHE v1.6.1, FIXEDMANUAL scaling, evaluation-form RNS words (exact modular
 // arithmetic, so every output word equals OpenFHE's):

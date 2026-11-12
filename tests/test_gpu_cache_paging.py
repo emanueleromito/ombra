@@ -1,4 +1,4 @@
-"""T2.6: the GPU cluster cache pages blocks without changing search results.
+"""The GPU cluster cache pages blocks without changing search results.
 
 Python generates keys and seeded synthetic data (both presets), packs the stored vectors column-
 wise (one ciphertext per dimension) and the pre-expanded query, encrypts them, and writes only

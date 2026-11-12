@@ -1,4 +1,4 @@
-# T2.6 GPU cluster cache. The pure logic (offset allocator, LRU with pinning, metrics) is plain C++
+# GPU cluster cache. The pure logic (offset allocator, LRU with pinning, metrics) is plain C++
 # and tested on the CPU. The CUDA part is built only with OMBRA_ENABLE_CUDA=ON.
 add_library(ombra_cache_logic STATIC src/range_allocator.cpp src/arena_lru.cpp)
 target_include_directories(ombra_cache_logic PUBLIC include)

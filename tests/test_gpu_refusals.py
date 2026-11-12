@@ -1,4 +1,4 @@
-"""T1.12, T1.13, T1.14: GPU entry points refuse inputs that do not belong together.
+"""GPU entry points refuse inputs that do not belong together.
 
 The C++ driver `ombra_refusal_check` sends mixed keys, wrong metadata and mismatched shapes to
 every GPU entry point and prints one line per case ("REFUSED <message>" or "ACCEPTED"). Each
@@ -101,7 +101,7 @@ def keys_cases(tmp_path_factory: pytest.TempPathFactory) -> dict[str, str]:
     return _run(["keys", str(tmp_path / "context.bin"), str(tmp_path), str(D)])
 
 
-# ---- T1.12 ----------------------------------------------------------------------------------
+# ---- metadata ----------------------------------------------------------------------------------
 
 META = "level, noise degree or scale differ from the sample"
 
@@ -113,7 +113,7 @@ def test_expansion_upload_refuses_other_degree_scale_level(keys_cases: dict[str,
     _refused(keys_cases, "expansion_upload_level", META)
 
 
-# ---- T1.13 ----------------------------------------------------------------------------------
+# ---- keys ----------------------------------------------------------------------------------
 
 
 def test_valid_inputs_still_pass(keys_cases: dict[str, str]) -> None:
@@ -166,7 +166,7 @@ def test_mixed_keys_are_refused(keys_cases: dict[str, str], case: str, message: 
     _refused(keys_cases, case, message)
 
 
-# ---- T1.14 ----------------------------------------------------------------------------------
+# ---- shapes ----------------------------------------------------------------------------------
 
 
 def test_batched_search_refuses_query_with_other_ring_dimension(tmp_path: Path) -> None:

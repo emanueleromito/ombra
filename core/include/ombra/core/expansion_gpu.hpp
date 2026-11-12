@@ -1,4 +1,4 @@
-// GPU operations for the expansion tree (expansion_tree.hpp) on OpenFHE ciphertexts (T0.5).
+// GPU operations for the expansion tree (expansion_tree.hpp) on OpenFHE ciphertexts.
 //
 // Host glue: extracts every table the kernels need from OpenFHE's crypto parameters, key and
 // ciphertext objects (flat arrays; the kernels never see OpenFHE types) and exposes the `Ops`

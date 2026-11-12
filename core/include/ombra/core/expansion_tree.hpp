@@ -1,4 +1,4 @@
-// Query expansion tree (decision 0010, T0.5). Independent of OpenFHE and CUDA types so the same
+// Query expansion tree. Independent of OpenFHE and CUDA types so the same
 // tree can run with the CPU reference operations (ombra_expand.cpp) and, later, GPU operations.
 //
 // The input is one ciphertext whose plaintext polynomial is the symmetric
@@ -44,7 +44,7 @@ inline std::size_t expansion_depth(std::size_t d) {
 //                           std::size_t shift, bool want_odd);
 // returning (c + tau_galois(c), (c - tau_galois(c)) * X^(-shift)); the second is only needed when
 // want_odd is true (otherwise it may be left default-constructed).
-// Ops may additionally provide a level-at-once operation (T0.5b):
+// Ops may additionally provide a level-at-once operation:
 //   std::vector<std::pair<Ct, Ct>> split_level(const std::vector<Ct>& nodes, std::size_t level,
 //                                              std::uint32_t galois, std::size_t shift,
 //                                              const std::vector<char>& want_odd);
@@ -134,7 +134,7 @@ inline std::size_t expansion_peak_nodes(std::size_t d) {
     return peak;
 }
 
-// Expands the trees of several queries together (T0.7). The tree shape depends only on d, so node
+// Expands the trees of several queries together. The tree shape depends only on d, so node
 // k of every query is at the same level with the same residue: each level concatenates the nodes of
 // all queries (query-major) into one split_level call, which the GPU runs in batched launches with
 // the one Galois key and monomial of that level. Result: leaves[query][index], each exactly what

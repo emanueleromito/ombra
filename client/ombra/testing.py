@@ -1,5 +1,5 @@
-"""`FakeClient`: an in-memory test double with the API of `ombra.Client`, for the unit tests of
-code that uses Ombra (T3.7).
+"""`FakeClient`: an in-memory test double with the API of `ombra.Client`, for unit tests of code
+that uses Ombra.
 
 It is NOT a mode of Ombra and not a way to run it: nothing is encrypted, nothing is persisted,
 there is no network and no key file is written. Ranking is an exact cosine search over the vectors

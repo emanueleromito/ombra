@@ -30,7 +30,7 @@ cudaError_t launch_column_search(const u64* stored, const u64* query, u64* out,
                                  const TowerConst* tc, const ColumnSearchDims& dims,
                                  cudaStream_t stream);
 
-// Batched search (T0.7): `num_queries` queries over the same stored blocks. queries are
+// Batched search: `num_queries` queries over the same stored blocks. queries are
 // [q][dim][comp][P], out is [q][block][comp 0..2][P]; see the comment in column_search.cu.
 cudaError_t launch_column_search_batched(const u64* stored, const u64* queries, u64* out,
                                          const TowerConst* tc, const ColumnSearchDims& dims,
@@ -138,7 +138,7 @@ struct KsDims {
   u64 num_q;     // Q towers of the ciphertext
   u64 num_qp;    // Q towers + P towers
   u64 digits;    // key-switch digits in use
-  // T1.2: which component of the ciphertext is being key-switched (1 for the automorphism, 2 for
+  // Which component of the ciphertext is being key-switched (1 for the automorphism, 2 for
   // relinearization) and whether the inner product adds c0 * P (automorphism only).
   u32 src_comp = 1;
   u32 add_c0_p = 1;
@@ -158,7 +158,7 @@ cudaError_t launch_ks_inner_product(const u64* digits, const u64* key, const u64
                                     const u32* digit_of_tower, u64* ext, const TowerConst* tc,
                                     const KsDims& dims, u32 batch, cudaStream_t stream);
 
-// encode.cu (T0.11): GPU CKKS encoding of plaintext columns, see the comment above the kernels.
+// encode.cu: GPU CKKS encoding of plaintext columns, see the comment above the kernels.
 enum class CodeFormat : int { kDouble = 0, kFp16 = 1, kInt8 = 2 };
 // buf[col][k] = (decode(codes[col][k]), 0) for k < slots; int8 decodes as code / code_scale.
 // Test aid: reduces int64 coefficients [col][ring_dim] into every tower, [col][tower][ring_dim].
@@ -178,12 +178,12 @@ cudaError_t launch_encode_finish(const double2* buf, u64 cols, u64 slots, double
                                  double scaling_factor, const TowerConst* tc, u64 num_towers,
                                  u64 ring_dim, u64* out, int* err, cudaStream_t stream);
 
-// plain_search.cu (T0.11): ciphertext x plaintext column search, see the comment above the kernel.
+// plain_search.cu: ciphertext x plaintext column search, see the comment above the kernel.
 cudaError_t launch_plain_search(const u64* plain, const u64* query, u64* out, const TowerConst* tc,
                                 u64 dims, u64 blocks, u64 num_towers, u64 ring_dim,
                                 cudaStream_t stream);
 
-// rescale.cu (T1.2): CKKS FIXEDMANUAL rescale and the ciphertext x ciphertext tensor product, see
+// rescale.cu: CKKS FIXEDMANUAL rescale and the ciphertext x ciphertext tensor product, see
 // the comments above the kernels. Nodes are addressed through pointer arrays.
 struct RescaleDims {
   u64 ring_dim;  // N

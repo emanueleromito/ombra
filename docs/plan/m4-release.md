@@ -55,8 +55,8 @@ T4.3, T4.5 and T4.7 can start at once. T4.1 and T4.4 both edit the workflows fro
 
 **Why:** task IDs, milestone names and internal rule numbers mean nothing to outside readers.
 **Depends on:** none
-**Steps:** remove task IDs (`T1.4`), milestone names (`M2`) and references to "hard rule N" and to `CLAUDE.md` from code, comments, tests, test names, markers, error messages, file names and benchmark flags; where a reference explains why the code does something, replace it with the reason in plain words (for example "the server never receives the secret key" instead of "hard rule 2"); rename files, functions and flags by what they do. `docs/plan/` and `docs/decisions/` keep their IDs.
-**Done when:** a grep for task IDs, milestone names, "hard rule" and `CLAUDE.md` outside `CLAUDE.md`, `.claude/`, `docs/plan/` and `docs/decisions/` finds nothing; `make test`, `make lint`, `make test-openfhe` and `make test-gpu` pass.
+**Steps:** remove task IDs (`T1.4`), milestone names (`M2`), design decision references ("decision 0022", "the 0016 envelope", links into `docs/decisions/`) and references to "hard rule N" and to `CLAUDE.md` from code, comments, tests, test names, markers, error messages, file names and benchmark flags; where a reference explains why the code does something, replace it with the reason in plain words (for example "the server never receives the secret key" instead of "hard rule 2", "the versioned file envelope" instead of "the 0016 envelope"); rename files, functions and flags by what they do. Rewrite comments and docstrings so they are concise: say what the code does and why in few words, cut history and restatements of the code, keep invariants, security reasons, units and kernel launch shapes. `docs/plan/` and `docs/decisions/` keep their IDs.
+**Done when:** a grep for task IDs, milestone names, "hard rule", `CLAUDE.md`, `\b[Dd]ecisions? [0-9]{4}`, `\b0[0-9]{3}\b (envelope|mode)` and `docs/decisions` outside `CLAUDE.md`, `.claude/`, `docs/plan/` and `docs/decisions/` finds nothing; comments read concisely; `make test`, `make lint`, `make test-openfhe` and `make test-gpu` pass.
 **Status:** todo
 
 ### T4.6 Public docs

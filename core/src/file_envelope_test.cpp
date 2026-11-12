@@ -1,4 +1,4 @@
-// Decision 0016: unit test of the file envelope. No OpenFHE, no GPU. Synthetic bytes only.
+// Unit test of the file envelope. No OpenFHE, no GPU. Synthetic bytes only.
 // argv[1] = path of tests/fixtures/envelope_v1_ciphertext.bin, written by the Python writer.
 #include <fstream>
 #include <iostream>

@@ -1,4 +1,4 @@
-"""Decision 0016: file envelope. Synthetic bytes only; no OpenFHE."""
+"""File envelope. Synthetic bytes only; no OpenFHE."""
 
 from __future__ import annotations
 

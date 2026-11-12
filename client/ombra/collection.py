@@ -1,11 +1,11 @@
-"""Collection creation, re-clustering and repacking (T3.5), client side.
+"""Collection creation, re-clustering and repacking, client side.
 
 The client holds the secret key (never sent, never printed). It clusters the vectors, encrypts
 the data blocks and the cluster centers, generates the evaluation keys, uploads them once per
 collection and creates the collection on the server. Parameters come only from
-`ombra.presets.derive` (hard rule 1).
+`ombra.presets.derive`, which enforces the 128-bit floor.
 
-Layout (docs/architecture.md, decision 0019): a data block holds up to `slots` vectors of one
+Layout (docs/architecture.md): a data block holds up to `slots` vectors of one
 cluster as D column ciphertexts (slot i of column j = component j of vector i) followed by one
 one-hot column per filter value; the center block holds the centers as D columns, under cluster id
 `cluster_count` with `is_center` set.
@@ -108,7 +108,7 @@ class KeyKit:
         )
         self.key_tag = self._keys.publicKey.GetKeyTag()
 
-    # ---- persistence (T3.2 key file) ------------------------------------------------------
+    # ---- persistence (key file) ------------------------------------------------------
     _BLOB_MAGIC = b"OKSB"
     _BLOB_VERSION = 1
 
@@ -174,7 +174,7 @@ class KeyKit:
         )
 
     def encrypt_query(self, ext: np.ndarray) -> bytes:
-        """The symmetric coefficient-packed query (decision 0010), encrypted, as an envelope."""
+        """The symmetric coefficient-packed query, encrypted, as an envelope."""
         import openfhe as ofhe
 
         slots = oq.symmetric_slots(oq.prescale_query(ext), self.cc.GetRingDimension())
@@ -198,7 +198,7 @@ class KeyKit:
             return p.read_bytes()
 
     def key_files(self, pb: Any) -> dict[int, bytes]:
-        """Public key files in 0016 envelopes, by KeyKind. Nothing secret."""
+        """Public key files in versioned envelopes, by KeyKind. Nothing secret."""
         import openfhe as ofhe
 
         d, v = self.derived.preset, self.openfhe_version
@@ -326,13 +326,14 @@ class Collection:
     ) -> Collection:
         """Cluster, create the collection, upload the keys once, insert centers and data."""
         x = np.asarray(vectors, dtype=np.float64)
-        derived = presets.derive(preset, x.shape[1])  # hard rule 1: parameters only from here
+        # Parameters come only from the presets, which enforce the 128-bit floor.
+        derived = presets.derive(preset, x.shape[1])
         if len(ids) != len(x):
             raise ValueError("one id per vector")
         if not np.allclose(np.linalg.norm(x, axis=1), 1.0, atol=1e-6):
             raise ValueError("vectors must be normalized before they are encrypted")
         cards = tuple(cards)
-        presets.check_filter_schema(derived, cards)  # decision 0019: refuse above F_max
+        presets.check_filter_schema(derived, cards)  # Refuse above F_max
         if security_level not in _LEVELS:
             raise ValueError(f"security level must be one of {sorted(_LEVELS)}")
         f = _fields(fields, len(x), cards)

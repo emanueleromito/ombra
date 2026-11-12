@@ -1,4 +1,4 @@
-"""T3.5: collection create, re-clustering and repack against the real gRPC server.
+"""Collection create, re-clustering and repack against the real gRPC server.
 
 Synthetic data only. d = 384 (the smallest supported dimension) on the "fast" preset, one filter
 field with 3 values. Checks: (a) centers, clusters and keys exist after create; (b) search equals

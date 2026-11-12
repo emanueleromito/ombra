@@ -1,5 +1,5 @@
 // ombra_search_gpu: oracle driver for GPU relinearize, rescale and ciphertext mask multiply, and
-// for the GPU-only search pipeline (T1.2).
+// for the GPU-only search pipeline.
 //
 // Usage: ombra_search_gpu <context.bin> <evalmultkey.bin> <in_dir> <out_dir> <dims> <mask> [mask..]
 //                         [blocks=B] [inject=block]
@@ -19,7 +19,7 @@
 // OpenFHE call between the first and the last device step) against the OpenFHE chain
 // EvalMultNoRelin/EvalAdd -> Relinearize -> Rescale -> EvalMult(mask) -> Rescale, exact at every
 // stage. Writes gpu_final_<mask>.bin and cpu_final_<mask>.bin to <out_dir>.
-// Stage C (T1.10, only with the argument blocks=B): B stored blocks of different data (files
+// Stage C (only with the argument blocks=B): B stored blocks of different data (files
 // stored_<b>_<j>.bin) and a different mask per block (mask_blk_<b>.bin), run with
 // set_max_batch(3) so a ragged B chunks unevenly. Every block is compared at every stage (sum,
 // relinearize, rescale, mask, final rescale) with its own OpenFHE chain. The argument
@@ -197,8 +197,8 @@ int main(int argc, char** argv) {
       const Ct gpu_final = gs.download(SearchStage::kFinal, 0);
       check("pipeline final: rescale" + tag, gpu_final, ref_final);
       if (m == 0) {
-        // T1.3 handoff: the query columns reach the search kernel device to device (as the
-        // expansion leaves do), with no host copy into the search's query buffer. Same exact
+        // Device-to-device handoff: the query columns reach the search kernel device to device (as
+        // the expansion leaves do), with no host copy into the search's query buffer. Same exact
         // comparison with the OpenFHE chain.
         std::vector<ombra::core::CtHandle> handles;
         std::vector<const std::uint64_t*> ptrs;

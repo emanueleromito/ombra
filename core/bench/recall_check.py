@@ -1,4 +1,4 @@
-"""Pass/fail rule of the recall-based preset acceptance check (T1.6). Standard library only.
+"""Pass/fail rule of the recall-based preset acceptance check. Standard library only.
 
 A preset passes when, on at least MIN_DATASETS public embedding datasets with at least MIN_QUERIES
 queries each, recall@10 under encryption is within TOLERANCE of the plaintext recall at the same

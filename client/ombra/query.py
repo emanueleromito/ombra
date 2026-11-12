@@ -1,4 +1,4 @@
-"""Symmetric real query encoding for server-side expansion (decision 0010, T0.5).
+"""Symmetric real query encoding for server-side expansion.
 
 The query q (d normalized values) becomes the polynomial p(X) = q_0 + sum_{j>=1} q_j (X^j + X^-j)
 in R = Z[X]/(X^N+1), where X^-j = -X^(N-j): coefficient j is q_j, coefficient N-j is -q_j, all
@@ -10,12 +10,11 @@ touches key material beyond passing the public key to OpenFHE.
 Convention, read from OpenFHE v1.6.1: slot k of a full-slot plaintext is
 z_k = m(zeta^(5^k mod 2N)) with zeta = exp(2*pi*i / 2N)
 (DiscreteFourierTransform::PrecomputedValues, core/lib/math/dftransform.cpp:60-64 powers of five,
-:70-72 positive-angle roots). Because p is
-symmetric (p(X) = p(X^-1) as a function on roots of unity), its slots are real and do not depend on
-the sign convention of the root.
+:70-72 positive-angle roots). Because p is symmetric (p(X) = p(X^-1) as a function on roots of
+unity), its slots are real and do not depend on the sign convention of the root.
 
 Pre-scaling: the server's expansion tree multiplies every value by 2^L, L = expansion_depth(d), and
-does no EvalMult and no scale change to undo it (decision 0010). The client therefore encodes
+does no EvalMult and no scale change to undo it. The client therefore encodes
 q * 2^-L (exact: a power of two only changes the exponent), so each expanded leaf decrypts to q_j.
 The norm check is done on the unscaled q.
 """
@@ -26,7 +25,7 @@ from typing import Any
 
 import numpy as np
 
-# Vectors must be unit length to within this much (client/CLAUDE.md: normalize before encryption).
+# Vectors must be unit length to within this much (vectors are normalized before encryption).
 NORM_TOLERANCE = 1e-6
 # The embedding of a symmetric p is real up to floating-point error; its imaginary part must be
 # below this (absolute) or the encoding is refused.

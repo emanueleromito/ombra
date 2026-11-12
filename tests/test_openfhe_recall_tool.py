@@ -1,4 +1,4 @@
-"""T3.9: the recall tool end to end in local mode on a small synthetic corpus."""
+"""The recall tool end to end in local mode on a small synthetic corpus."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ def test_tool_prints_recalls_gap_and_verdict(tmp_path, capsys) -> None:
     code = recall.main([str(tmp_path / "v.npy"), "--n-queries", "20"])
     out = capsys.readouterr().out
     assert code == 0, out
-    for needle in ("plaintext recall@10", "encrypted recall@10", "gap", "0012 rule"):
+    for needle in ("plaintext recall@10", "encrypted recall@10", "gap", "recall rule"):
         assert needle in out
     assert "NOT ELIGIBLE" in out  # 20 queries are fewer than the rule's 1,000
     assert sorted(p.name for p in tmp_path.iterdir()) == ["v.npy"]  # nothing written out

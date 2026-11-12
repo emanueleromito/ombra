@@ -1,4 +1,4 @@
-// ombra_search_engine_check: oracle driver for the search engine (T2.7a).
+// ombra_search_engine_check: oracle driver for the search engine.
 //
 // Usage: ombra_search_engine_check <in_dir> <out_dir> <gpu_blocks> <host_blocks>
 //
@@ -202,7 +202,7 @@ int main(int argc, char** argv) {
     std::size_t sum_v = 0;
     for (auto v : m.cards) sum_v += v;
     const std::size_t D = m.d + sum_v;
-    const double penalty = -4.0 * static_cast<double>(F + 1);  // decision 0019, independent of the engine
+    const double penalty = -4.0 * static_cast<double>(F + 1);  // independent of the engine
     const std::set<std::string> deleted(m.deleted.begin(), m.deleted.end());
 
     // ---- Oracle context (public material only) ------------------------------------------------
@@ -377,7 +377,7 @@ int main(int argc, char** argv) {
       const auto s2 = session->score_clusters(all);
       verify("stage2", s2, n_data);
 
-      // A repeated round on the same session (selective filters, decision 0019): the same words.
+      // A repeated round on the same session (selective filters): the same words.
       const auto again = session->score_clusters({1, 0});
       std::vector<const ombra::search::BlockScores*> first_of;
       for (const auto& r : s2)

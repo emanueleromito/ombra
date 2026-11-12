@@ -1,4 +1,4 @@
-"""T3.7 install check: runs against the INSTALLED package (`pip install ./client[local]`) on a
+"""Install check: runs against the INSTALLED package (`pip install ./client[local]`) on a
 machine without a GPU: creates a tiny collection with Client.local and finds a vector. Synthetic
 data only. Run by `modal run modal_app.py::test_local_install`."""
 

@@ -1,4 +1,4 @@
-"""Probe policy and cluster statistics (T3.11): pure logic, no OpenFHE, no server."""
+"""Probe policy and cluster statistics: pure logic, no OpenFHE, no server."""
 
 import numpy as np
 import pytest
@@ -163,7 +163,7 @@ def test_decoy_round_sizes_do_not_depend_on_filter():
     assert decoy_round_sizes(10, 12) == (12, 0)
 
 
-def test_basic_policy_is_the_0019_rule():
+def test_basic_policy_is_the_original_rule():
     order = list(range(8))
     p = ProbePlanner(order, "basic", 3, 2)
     assert p.first_round() == [0, 1]

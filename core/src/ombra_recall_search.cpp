@@ -1,4 +1,4 @@
-// ombra_recall_search: end-to-end GPU search driver for the accuracy measurement (T0.8).
+// ombra_recall_search: end-to-end GPU search driver for the accuracy measurement.
 //
 // Usage: ombra_recall_search <context.bin> <autokeys.bin> <data_dir> <out_dir> <d> <blocks>
 //                            <queries> <stats.json>
@@ -8,8 +8,8 @@
 // stored_<b>_<j>.bin (dimension j of block b, b < blocks, j < d) and the encoded queries
 // query_<i>.bin (symmetric coefficient packing, i < queries). No secret key is read or needed.
 //
-// All blocks are uploaded to the GPU once. Per query: GPU expansion into d leaves (GpuExpansion,
-// T0.5/T0.5b), then the column-packed search kernel (T0.4) over every block, then one 3-component
+// All blocks are uploaded to the GPU once. Per query: GPU expansion into d leaves (GpuExpansion),
+// then the column-packed search kernel over every block, then one 3-component
 // degree-2 result ciphertext per block is written to <out_dir>/scores_<i>_<b>.bin. Relinearize,
 // rescale, masking and decryption happen in the Python client. The kernels are the ones whose
 // outputs are compared exactly with OpenFHE in ombra_expand_gpu and ombra_column_search; this

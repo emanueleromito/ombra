@@ -1,4 +1,4 @@
-"""T2.7a: the search engine (expansion, stage 1, stage 2 with filter columns, tombstones) is exact.
+"""The search engine (expansion, stage 1, stage 2 with filter columns, tombstones) is exact.
 
 Python builds a small collection with synthetic data for both presets: d = 16, two filter fields
 (cardinalities 3 and 4, so D = 23 columns per data block), three clusters (one with two blocks) and
@@ -14,8 +14,8 @@ and checks the refusals: wrong request key tag, query made under another key, ke
 belong to the collection's key tag, search before the keys are uploaded, wrong filter_leaves.
 
 This test then decrypts the engine's output with the secret key (held only here, never passed to the
-engine) and checks slot = score + 4 * c against numpy (c = number of matching filter fields,
-decision 0019), that the band decode recovers c, and that deleted vectors fall below every live
+engine) and checks slot = score + 4 * c against numpy (c = number of matching filter fields),
+that the band decode recovers c, and that deleted vectors fall below every live
 slot. The tolerances below are sanity bounds; exactness is the driver's job. Data is synthetic; only
 aggregates are printed.
 """
@@ -130,7 +130,7 @@ def test_search_engine_exact_and_correct(tmp_path: Path, preset: str) -> None:
                 oh = np.zeros(card)
                 oh[WANT[f]] = LAMBDA
             else:
-                oh = np.full(card, LAMBDA)  # all-ones for an unfiltered field (decision 0019)
+                oh = np.full(card, LAMBDA)  # all-ones for an unfiltered field
             parts.append(oh)
         return np.concatenate(parts)
 
@@ -212,7 +212,7 @@ def test_search_engine_exact_and_correct(tmp_path: Path, preset: str) -> None:
         worst["score"] = max(worst["score"], err)
         assert err < tol, (name, err)
         live = ~gone
-        # Band decode (decision 0019): c = floor((slot + 2) / lambda) recovers the match count.
+        # Band decode: c = floor((slot + 2) / lambda) recovers the match count.
         assert np.array_equal(np.floor((got[live] + 2.0) / LAMBDA).astype(int), c_true[live]), name
         assert np.all(got[gone] < -2.0), name  # deleted vectors fall below every live slot
         if filtered:

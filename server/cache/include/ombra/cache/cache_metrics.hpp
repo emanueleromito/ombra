@@ -1,4 +1,4 @@
-// Cache counters (T2.6). Counters only: no ids, no segment keys, no data (server/CLAUDE.md).
+// Cache counters. Counters only: no ids, no segment keys, no data.
 #pragma once
 
 #include <cstdint>

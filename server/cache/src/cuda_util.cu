@@ -1,4 +1,4 @@
-// Small CUDA RAII helpers for the cache (T2.6): stream, device array, bandwidth probe.
+// Small CUDA RAII helpers for the cache: stream, device array, bandwidth probe.
 // Internal code returns core::Status; the public functions throw at the boundary.
 
 #include <algorithm>

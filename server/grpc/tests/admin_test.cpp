@@ -1,4 +1,4 @@
-// CPU unit tests of T2.9: SHA-256, API key file (format, mode, hashing, verification), scope table,
+// CPU unit tests of SHA-256, API key file (format, mode, hashing, verification), scope table,
 // HTTP request parsing limits, metrics JSON (allow-listed keys only).
 #include <sys/stat.h>
 #include <unistd.h>
