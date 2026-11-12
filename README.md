@@ -1,6 +1,6 @@
 # Ombra
 
-Ombra is available under the [PolyForm Noncommercial License 1.0.0](LICENSE) or a commercial license. See [LICENSING.md](LICENSING.md) for which one applies to you.
+Ombra is available under the [PolyForm Noncommercial License 1.0.0](LICENSE) or a commercial license. See [License](#license) for which one applies to you.
 
 A vector database where your vectors and your search queries stay encrypted with fully homomorphic encryption (FHE). The server stores and searches only ciphertexts, so it never sees your data or what you search for.
 
@@ -39,4 +39,21 @@ make bench       # benchmarks on Modal (A100)
 
 ## License
 
-Free for personal, academic and non-commercial use under the [PolyForm Noncommercial License 1.0.0](LICENSE). **Companies need a commercial license**: see [LICENSING.md](LICENSING.md).
+Ombra is source-available and dual-licensed. You may use it under either:
+
+1. the [PolyForm Noncommercial License 1.0.0](LICENSE), free for noncommercial use, or
+2. a commercial license, required for any business use, including internal use inside a company. Contact: <CONTACT_LINK_PLACEHOLDER>
+
+You only need one of them. Source files carry the SPDX identifier `PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial`. The full legal text in [LICENSE](LICENSE) is what counts; this section is a summary.
+
+| Who | Free? | What you need |
+| --- | --- | --- |
+| Individuals, hobbyists, students | Yes | Nothing |
+| Universities and research institutes | Yes | Nothing |
+| Charities, public bodies, non-commercial organizations | Yes | Nothing |
+| Companies evaluating Ombra before buying | Yes, for a limited trial | A free evaluation license |
+| Any company using Ombra for business, including internally for its own AI, products or services | No | A paid commercial license |
+
+**What counts as commercial:** any use aimed at commercial advantage or private monetary compensation. For example, running Ombra in a product or service you sell, or inside a company for its own business operations. Personal use, research, education and use by charities and public bodies are noncommercial.
+
+**Contributions:** outside contributors sign a Contributor License Agreement (CLA) before their first pull request is merged, so their code can be included in commercial licenses.
