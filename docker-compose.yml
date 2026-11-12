@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
+# Starts the Ombra GPU server. Needs Docker, an NVIDIA GPU (Ampere: A100, A10, RTX 30xx) and the
+# NVIDIA container toolkit.
+#
+#   docker compose up -d
+#   docker compose logs ombra            # the admin API key is printed once, on the first start
+#   docker compose cp ombra:/data/tls/server.crt ./server.crt    # the certificate, for clients
+#
+# Collections, the API key file and the certificate live in the named volume "ombra-data", so they
+# survive `docker compose down`. `docker compose down -v` deletes them. Back the volume up.
+# The server has no secrets in this file: the API key is made on the first start and kept in the
+# volume. The image tag is set with OMBRA_VERSION (default 0.1.0).
+name: ombra
+
+services:
+  ombra:
+    image: ghcr.io/erailabs/ombra-server:${OMBRA_VERSION:-0.1.0}
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.server
+    ports:
+      - "50051:50051"  # gRPC
+      - "127.0.0.1:8080:8080"  # REST admin and metrics, on this machine only
+    volumes:
+      - ombra-data:/data
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    stop_grace_period: 10s
+
+volumes:
+  ombra-data:

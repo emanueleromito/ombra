@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
+# CPU image for local and test use. It has the Python client with local mode, which runs the
+# server's computation on the CPU inside your process. It has no ombra_server: the server needs
+# CUDA and a GPU, so a CPU machine cannot serve search over gRPC.
+# It installs the wheels from the named build context "wheels" (a folder; the release workflow
+# fills it with the built wheels). Pass an empty folder to install from PyPI instead.
+#   docker build -f docker/Dockerfile.cpu -t ombra-cpu --build-context wheels=wheelhouse .
+FROM python:3.12-slim-bookworm
+
+LABEL org.opencontainers.image.source="https://github.com/erailabs/ombra"
+LABEL org.opencontainers.image.licenses="PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial"
+LABEL org.opencontainers.image.title="ombra-cpu"
+LABEL org.opencontainers.image.version="0.1.0"
+
+ARG OMBRA_VERSION=0.1.0
+
+RUN useradd --create-home --uid 10001 ombra
+COPY --from=wheels / /wheels
+RUN pip install --no-cache-dir --find-links /wheels \
+        "ombra[local,grpc,langchain]==${OMBRA_VERSION}" langchain-ombra==${OMBRA_VERSION} \
+    && rm -rf /wheels
+
+USER ombra
+WORKDIR /home/ombra
+CMD ["python"]
