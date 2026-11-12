@@ -1,0 +1,16 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "langchain-ombra"
+version = "0.1.0"
+description = "LangChain VectorStore for Ombra, a vector database with fully homomorphic encryption"
+requires-python = ">=3.12,<3.13"  # follows ombra, which is built for 3.12 only until T4.1
+dependencies = ["ombra", "langchain-core>=0.3", "numpy"]
+
+[project.optional-dependencies]
+test = ["pytest", "langchain-tests"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["langchain_ombra"]

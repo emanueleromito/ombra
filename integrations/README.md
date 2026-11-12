@@ -1,3 +1,8 @@
 # integrations/
 
-LangChain and LlamaIndex adapters, published as separate packages (`langchain-ombra`, `llama-index-vector-stores-ombra`). Not started; planned for milestone M3.
+LangChain and LlamaIndex adapters, published as separate packages.
+
+| Package | Folder | Status |
+| --- | --- | --- |
+| `langchain-ombra` | `langchain-ombra/` | T3.8 |
+| `llama-index-vector-stores-ombra` | not started | after M3 |

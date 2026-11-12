@@ -78,7 +78,7 @@ T3.2 and T3.3 can run in parallel after T3.1. T3.6 needs the server API from M2 
 **Depends on:** T3.6
 **Steps:** package `langchain-ombra` with a `VectorStore` implementation (add texts, delete, similarity search with and without scores, `from_texts`); an example that runs end to end.
 **Done when:** the example runs against the local mode, and the package passes LangChain's own vector store tests that apply.
-**Status:** todo
+**Status:** done (`integrations/langchain-ombra`; example and LangChain's `VectorStoreIntegrationTests` run in local mode: 22 passed, 8 skipped (no `get_by_ids`: the client cannot fetch by id), 4 strict xfails (adding an id already stored is refused, no replace in place); filters are equality on declared integer fields only)
 
 ### T3.9 Recall tool on the user's own data
 
@@ -102,7 +102,7 @@ T3.2 and T3.3 can run in parallel after T3.1. T3.6 needs the server API from M2 
 **Depends on:** T3.7, T3.8
 **Steps:** a page that goes from install to first search (local mode first, then a server), using a 384-dimension embedding model, with copy-and-paste code; a short key-handling note (back up the key file); the limits stated in the threat model.
 **Done when:** someone who has not seen the project follows the page and runs a first search in 10 minutes, and the code samples run in CI.
-**Status:** todo
+**Status:** done (`docs/quickstart.md` with samples in `docs/quickstart/`; the CPU test that keeps page and samples identical runs in CI; running `local_search.py` in local mode is an `openfhe` test that CI does not run today, 22 s including the model load)
 
 ---
 
