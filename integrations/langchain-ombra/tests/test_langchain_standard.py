@@ -9,12 +9,12 @@ Skipped on purpose (see the properties below):
   skipped with it:
     test_get_by_ids, test_get_by_ids_missing, test_add_documents_documents,
     test_add_documents_with_existing_ids and their `_async` twins.
-- test_add_documents_by_id_with_mutation and its `_async` twin (2 cases, marked xfail strict: the
-  suite allows nothing else): they replace one id
-  while another live vector stays in the same segment. The server keeps a deleted id reserved
-  until compaction and refuses the re-insert with "duplicate id". Adding the same ids twice
-  (test_add_documents_with_ids_is_idempotent) passes, because there every vector of the segment
-  is replaced.
+- test_add_documents_by_id_with_mutation, test_add_documents_with_ids_is_idempotent and their
+  `_async` twins (4 cases, marked xfail strict: the suite allows nothing else): they add an id
+  that is already stored. The store does not replace ids in place (a delete before the insert
+  would lose the old version, because the server keeps a deleted id reserved until compaction
+  and refuses the re-insert with "duplicate id"), so the server refuses the insert and the old
+  version stays.
 Adapted, not skipped: the standard embedding has 6 dimensions, which Ombra refuses (it supports
 384, 768, 1536), so `get_embeddings` returns the same deterministic fake embedding at 384.
 """
@@ -36,7 +36,7 @@ from ombra import Client  # noqa: E402
 
 pytestmark = pytest.mark.openfhe
 
-REUSE_REASON = "deleted ids stay reserved until compaction, so replacing one id is refused"
+REUSE_REASON = "an id already stored is refused (no replace in place; deleted ids stay reserved)"
 
 
 class TestOmbraVectorStoreLocal(VectorStoreIntegrationTests):
@@ -68,6 +68,16 @@ class TestOmbraVectorStoreLocal(VectorStoreIntegrationTests):
     @pytest.mark.xfail(reason=REUSE_REASON, strict=True)
     async def test_add_documents_by_id_with_mutation_async(self, vectorstore: VectorStore) -> None:
         await super().test_add_documents_by_id_with_mutation_async(vectorstore)
+
+    @pytest.mark.xfail(reason=REUSE_REASON, strict=True)
+    def test_add_documents_with_ids_is_idempotent(self, vectorstore: VectorStore) -> None:
+        super().test_add_documents_with_ids_is_idempotent(vectorstore)
+
+    @pytest.mark.xfail(reason=REUSE_REASON, strict=True)
+    async def test_add_documents_with_ids_is_idempotent_async(
+        self, vectorstore: VectorStore
+    ) -> None:
+        await super().test_add_documents_with_ids_is_idempotent_async(vectorstore)
 
     @staticmethod
     def get_embeddings() -> Embeddings:

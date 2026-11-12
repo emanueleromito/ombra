@@ -46,11 +46,12 @@ def test_by_vector_matches_by_text(tmp_path):
     assert s.similarity_search_by_vector(EMB.embed_query("foo"), k=1)[0].page_content == "foo"
 
 
-def test_ids_replace_and_delete(tmp_path):
+def test_existing_id_refused_and_kept_then_delete(tmp_path):
     s = make(tmp_path)
     s.add_texts(["foo", "bar"], ids=["1", "2"])
-    s.add_texts(["new foo"], ids=["1"])
-    assert sorted(d.page_content for d in s.similarity_search("foo", k=5)) == ["bar", "new foo"]
+    with pytest.raises(ValueError):
+        s.add_texts(["new foo"], ids=["1"])  # no replace in place; the old version stays
+    assert sorted(d.page_content for d in s.similarity_search("foo", k=5)) == ["bar", "foo"]
     s.delete(["2", "missing"])
     assert [d.id for d in s.similarity_search("foo", k=5)] == ["1"]
     with pytest.raises(ValueError):

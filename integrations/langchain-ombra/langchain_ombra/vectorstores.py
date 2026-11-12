@@ -111,11 +111,10 @@ class OmbraVectorStore(VectorStore):
     ) -> list[str]:
         """Embed, encrypt and store `texts`; return their ids.
 
-        An id that already exists is replaced (delete, then insert), so adding the same ids
-        twice does not duplicate. Limitation: the server keeps a deleted id reserved until the
-        segment holding it is gone, so replacing one id next to live vectors in the same segment
-        can fail with "duplicate id" after the old version was deleted (see the error text).
-        Ids not given are generated.
+        Ids not given are generated. An id that is already stored is refused by the server
+        ("duplicate id") and nothing is overwritten. Ids cannot be replaced in place: Ombra keeps
+        a deleted id reserved until compaction, so to change a document, delete it and add the
+        new version under a new id.
         """
         texts = list(texts)
         if not texts:
@@ -155,19 +154,7 @@ class OmbraVectorStore(VectorStore):
             )
             self._exists = True
             return final_ids
-        explicit = [i for i in given if i is not None]
-        if explicit:
-            self._client.delete(self._name, explicit)
-        try:
-            self._client.insert(self._name, vectors, final_ids, metas)
-        except Exception as e:
-            if explicit:
-                raise RuntimeError(
-                    "insert failed after the previous versions of the given ids were deleted; "
-                    "they are not restored. Ombra keeps a deleted id reserved until compaction, "
-                    "so replacing an id can be refused with 'duplicate id'."
-                ) from e
-            raise
+        self._client.insert(self._name, vectors, final_ids, metas)
         return final_ids
 
     def delete(self, ids: list[str] | None = None, **kwargs: Any) -> bool | None:

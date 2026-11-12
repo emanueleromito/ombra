@@ -5,8 +5,12 @@ the server only computes on ciphertexts.
 
 ```python
 store = OmbraVectorStore.from_texts(
-    texts, embedding, client=Client.local("./ombra-data"),
-    collection_name="docs", key_file="docs.key", passphrase="...",
+    texts,
+    embedding,
+    client=Client.local("./ombra-data"),
+    collection_name="docs",
+    key_file="docs.key",
+    passphrase="...",
 )
 store.similarity_search_with_score("query", k=4)
 ```
@@ -18,6 +22,8 @@ Run `examples/quickstart.py` for a complete example (local mode, no model downlo
 - **Filters** are equality on integer fields declared with `filter_fields={"topic": 5}`; anything
   else raises `ValueError` (nothing is filtered on the client).
 - **Key file:** back it up. Without it the data is lost. The passphrase is never shown in `repr`.
-- **Not supported:** `get_by_ids`, MMR search, `delete()` without ids. Replacing an existing id can
-  be refused by the server ("duplicate id") because deleted ids stay reserved until compaction.
+- **Not supported:** `get_by_ids`, MMR search, `delete()` without ids. Adding an id that is already
+  stored is refused ("duplicate id") and the stored version is kept; ids cannot be replaced in
+  place, because deleted ids stay reserved until compaction. To change a document, delete it and
+  add it under a new id.
 - Async methods run the sync ones in a worker thread.
