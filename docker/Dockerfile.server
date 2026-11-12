@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
+# GPU server image: ombra_server built for sm_80 and sm_86 (Ampere), on the CUDA runtime.
+# Build from the repository root:  docker build -f docker/Dockerfile.server -t ombra-server .
+# Run it with the NVIDIA container toolkit (docker run --gpus all, or docker-compose.yml).
+# The OpenFHE build steps are the ones of ci/Dockerfile and modal_app.py; change the version in all.
+
+FROM nvidia/cuda:12.6.3-devel-ubuntu22.04 AS build
+
+ARG OPENFHE_TAG=v1.6.1
+ARG CUDA_ARCHS="80;86"
+
+ENV DEBIAN_FRONTEND=noninteractive CMAKE_GENERATOR=Ninja LD_LIBRARY_PATH=/usr/local/lib
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates git build-essential cmake ninja-build libomp-dev pkg-config \
+        libgrpc++-dev libprotobuf-dev protobuf-compiler protobuf-compiler-grpc libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# OpenFHE (C++), installed to /usr/local. Same flags as ci/Dockerfile.
+RUN git clone --depth 1 --branch ${OPENFHE_TAG} \
+        https://github.com/openfheorg/openfhe-development /opt/openfhe-src \
+    && cmake -S /opt/openfhe-src -B /opt/openfhe-build \
+        -DCMAKE_BUILD_TYPE=Release -DBUILD_UNITTESTS=OFF -DBUILD_EXAMPLES=OFF \
+        -DBUILD_BENCHMARKS=OFF \
+    && cmake --build /opt/openfhe-build -j \
+    && cmake --install /opt/openfhe-build \
+    && ldconfig \
+    && rm -rf /opt/openfhe-src /opt/openfhe-build
+
+# The server only: no Python extension, no tests.
+COPY CMakeLists.txt /src/CMakeLists.txt
+COPY core /src/core
+COPY server /src/server
+COPY proto /src/proto
+RUN cmake -S /src -B /build -DCMAKE_BUILD_TYPE=Release -DOMBRA_ENABLE_CUDA=ON \
+        "-DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCHS}" \
+    && cmake --build /build -j --target ombra_server
+
+FROM nvidia/cuda:12.6.3-runtime-ubuntu22.04
+
+LABEL org.opencontainers.image.source="https://github.com/erailabs/ombra"
+LABEL org.opencontainers.image.licenses="PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial"
+LABEL org.opencontainers.image.title="ombra-server"
+LABEL org.opencontainers.image.version="0.1.0"
+
+ENV DEBIAN_FRONTEND=noninteractive LD_LIBRARY_PATH=/usr/local/lib
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libgrpc++1 libprotobuf23 libssl3 libgomp1 openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --system --uid 10001 --create-home ombra \
+    && mkdir /data && chown ombra /data
+
+COPY --from=build /usr/local/lib/libOPENFHE*.so* /usr/local/lib/
+COPY --from=build /build/server/grpc/ombra_server /usr/local/bin/ombra_server
+COPY docker/entrypoint.sh /usr/local/bin/ombra-entrypoint
+RUN ldconfig && chmod +x /usr/local/bin/ombra-entrypoint
+
+USER ombra
+VOLUME /data
+EXPOSE 50051 8080
+ENTRYPOINT ["ombra-entrypoint"]

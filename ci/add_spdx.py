@@ -16,7 +16,7 @@ TAG = "SPDX-License-Identifier:"
 
 SLASH_EXT = {".cpp", ".hpp", ".h", ".cu", ".cuh", ".proto"}
 HASH_EXT = {".py", ".sh", ".cmake"}
-HASH_NAMES = {"CMakeLists.txt", "Makefile"}
+HASH_NAMES = {"CMakeLists.txt", "Makefile", "docker-compose.yml"}
 WORKFLOW_DIR = ".github/workflows/"
 
 # Skipped: generated code, redistributed third-party code, fixtures and data, and .claude/

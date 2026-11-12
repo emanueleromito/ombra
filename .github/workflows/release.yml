@@ -1,0 +1,216 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
+# Releases Ombra. A tag v* (for example v0.1.0) builds the wheels (wheels.yml), builds and pushes the
+# two images to GHCR, and publishes ombra, ombra-openfhe and langchain-ombra to PyPI.
+# Manual run with dry_run on (the default): the same, but the wheels go to TestPyPI and the images
+# get the tag dryrun-<commit>, so nothing lands on the real index or under a release tag.
+# Publishing uses PyPI trusted publishing (OIDC): no API token is stored. The one-time setup is in
+# docs/release.md.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Publish to TestPyPI and push images under a test tag
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # A tag push is a real release. A manual run is real only with dry_run switched off.
+  DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+
+jobs:
+  check:
+    name: Check versions
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      dry_run: ${{ steps.v.outputs.dry_run }}
+      owner: ${{ steps.v.outputs.owner }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - id: v
+        run: |
+          version=$(python3 -c 'import tomllib; print(tomllib.load(open("client/pyproject.toml","rb"))["project"]["version"])')
+          lc=$(python3 -c 'import tomllib; print(tomllib.load(open("integrations/langchain-ombra/pyproject.toml","rb"))["project"]["version"])')
+          cmake=$(sed -n 's/^project(ombra VERSION \([0-9.]*\) .*/\1/p' CMakeLists.txt)
+          init=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' client/ombra/__init__.py)
+          for other in "$lc" "$cmake" "$init"; do
+            if [ "$other" != "$version" ]; then
+              echo "::error::version mismatch: client $version, langchain-ombra $lc, CMake $cmake, __init__ $init"
+              exit 1
+            fi
+          done
+          if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} does not match version ${version}"
+            exit 1
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "dry_run=${DRY_RUN}" >> "$GITHUB_OUTPUT"
+          echo "owner=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+  wheels:
+    name: Wheels
+    needs: check
+    uses: ./.github/workflows/wheels.yml
+
+  langchain:
+    name: langchain-ombra
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: |
+          python -m pip install build
+          python -m build integrations/langchain-ombra --outdir dist-langchain
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist-langchain-ombra
+          path: dist-langchain/*
+          if-no-files-found: error
+
+  images:
+    name: Images
+    needs: [check, wheels, langchain]
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+      OWNER: ${{ needs.check.outputs.owner }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - id: tags
+        run: |
+          if [ "${{ needs.check.outputs.dry_run }}" = "true" ]; then
+            tag="dryrun-${GITHUB_SHA::7}"
+            echo "server=ghcr.io/${OWNER}/ombra-server:${tag}" >> "$GITHUB_OUTPUT"
+            echo "cpu=ghcr.io/${OWNER}/ombra-cpu:${tag}" >> "$GITHUB_OUTPUT"
+          else
+            minor="${VERSION%.*}"
+            {
+              echo "server<<EOF"
+              echo "ghcr.io/${OWNER}/ombra-server:${VERSION}"
+              echo "ghcr.io/${OWNER}/ombra-server:${minor}"
+              echo "ghcr.io/${OWNER}/ombra-server:latest"
+              echo "EOF"
+              echo "cpu<<EOF"
+              echo "ghcr.io/${OWNER}/ombra-cpu:${VERSION}"
+              echo "ghcr.io/${OWNER}/ombra-cpu:${minor}"
+              echo "ghcr.io/${OWNER}/ombra-cpu:latest"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Linux wheels of the three packages, for the CPU image to install without PyPI.
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: wheels-*-ubuntu-*
+          path: wheelhouse
+          merge-multiple: true
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist-langchain-ombra
+          path: wheelhouse
+
+      - name: GPU server image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile.server
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.tags.outputs.server }}
+          cache-from: type=gha,scope=server
+          cache-to: type=gha,scope=server,mode=max
+
+      - name: CPU image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile.cpu
+          build-contexts: wheels=./wheelhouse
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.tags.outputs.cpu }}
+          cache-from: type=gha,scope=cpu
+          cache-to: type=gha,scope=cpu,mode=max
+
+      # The runner has no GPU, so the server image is only started far enough to print its version.
+      - name: Smoke test
+        run: |
+          first_server=$(echo "${{ steps.tags.outputs.server }}" | head -n1)
+          first_cpu=$(echo "${{ steps.tags.outputs.cpu }}" | head -n1)
+          docker run --rm --entrypoint ombra_server "$first_server" --version | grep -q "ombra_server ${VERSION}"
+          docker run --rm "$first_cpu" python -c "import ombra; assert ombra.__version__ == '${VERSION}'"
+
+  publish-pypi:
+    name: Publish to PyPI
+    if: needs.check.outputs.dry_run != 'true'
+    needs: [check, wheels, langchain, images]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/ombra/
+    permissions:
+      id-token: write  # trusted publishing
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: "{wheels-*,dist-langchain-ombra}"
+          path: dist
+          merge-multiple: true
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
+
+  publish-testpypi:
+    name: Publish to TestPyPI
+    if: needs.check.outputs.dry_run == 'true'
+    needs: [check, wheels, langchain]
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/ombra/
+    permissions:
+      id-token: write  # trusted publishing
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: "{wheels-*,dist-langchain-ombra}"
+          path: dist
+          merge-multiple: true
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true

@@ -4,6 +4,7 @@
 //                [--tls-cert F --tls-key F] [--rest-port N [--rest-host H]]
 //                [--insecure] [--no-auth]
 // ombra_server --create-api-key --scope admin|read|write --data-dir D
+// ombra_server --version
 //
 // The ombra.v1 gRPC server over the storage engine and the GPU search engine, with TLS,
 // API keys and a REST admin port.
@@ -40,6 +41,10 @@
 #include "ombra/storage/store.hpp"
 #include "rest_server.hpp"
 #include "service.hpp"
+
+#ifndef OMBRA_VERSION
+#define OMBRA_VERSION "unknown"
+#endif
 
 #ifndef OMBRA_OPENFHE_VERSION
 #define OMBRA_OPENFHE_VERSION "unknown"
@@ -107,7 +112,10 @@ int main(int argc, char** argv) {
       }
       return argv[++i];
     };
-    if (a == "--data-dir")
+    if (a == "--version") {
+      std::printf("ombra_server %s\n", OMBRA_VERSION);
+      return 0;
+    } else if (a == "--data-dir")
       data_dir = next();
     else if (a == "--listen")
       listen = next();

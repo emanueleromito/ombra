@@ -111,6 +111,7 @@ add_executable(ombra_server src/ombra_server.cpp src/service.cpp src/rest_server
 target_include_directories(ombra_server PRIVATE src)
 target_link_libraries(ombra_server PRIVATE ombra_server_policy ombra_server_admin ombra_gpu_info
                                            ombra_search ombra_proto OpenSSL::SSL OpenSSL::Crypto)
+target_compile_definitions(ombra_server PRIVATE OMBRA_VERSION="${PROJECT_VERSION}")
 # Default OpenFHE version of the stored envelopes (overridable with --openfhe-version). The
 # variable of core/'s find_package is directory-scoped, so look the package up again here.
 find_package(OpenFHE QUIET)
