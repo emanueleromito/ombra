@@ -2,7 +2,7 @@
 // gRPC, no OpenFHE and no GPU, so it is unit-tested on the CPU.
 //
 // The preset numbers come from core/params/ckks_presets.json through a header that CMake generates
-// at configure time (preset_table.hpp); nothing is hand-picked here (the 128-bit security floor).
+// at configure time (preset_table.hpp); nothing is hand-picked here.
 #pragma once
 
 #include <cstddef>

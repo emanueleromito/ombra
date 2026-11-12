@@ -15,7 +15,7 @@ moved to another id, collection or kind, or with any byte changed, fails authent
 
 Reference mode: a body larger than `inline_threshold` (default 1 MiB) is not stored; the blob
 holds an encrypted reference to the customer's own storage, and `fetch_document` checks the sha256.
-Errors and reprs never carry plaintext, keys or ids (no plaintext in logs or errors).
+Errors and reprs never carry plaintext, keys or ids.
 """
 
 from __future__ import annotations

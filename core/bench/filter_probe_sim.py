@@ -5,10 +5,9 @@ filtered-recall benchmark.
         [--dataset arxiv-abstracts|banking77 ...] [--queries 1000] [--small]
 
 The filtered-recall benchmark showed encrypted recall == plaintext recall under the same cluster
-choices, so exact plaintext
-scores with the same clusters, queries and filter cells answer the question without the GPU. The
-loaders, embedding model, cluster counts, queries and filter cells are those of
-core/bench/filtered_recall.py. Embeddings are cached under the (gitignored) dataset dir.
+choices, so exact plaintext scores with the same clusters, queries and filter cells answer the
+question without the GPU. The loaders, embedding model, cluster counts, queries and filter cells are
+those of core/bench/filtered_recall.py. Embeddings are cached under the (gitignored) dataset dir.
 
 Policies (the same first-round floor as ceil(sqrt(clusters)) clusters), planned by
 ombra.probe.ProbePlanner, the same code the client runs:
@@ -23,14 +22,11 @@ ombra.probe.ProbePlanner, the same code the client runs:
               the real plus the decoy clusters' results, as the client does).
   Strict      all clusters in two rounds: recall is exact by construction (not simulated).
   B    the original rule with the stop at 3k matches (first round = floor, widen 2x up to 8x).
-  A0   (reference) the original rule, stop at k matches. Reproduces the filtered-recall
-  benchmark's recall.
-Superseded: "E" and "E+A" (the radius check never pruned; see the report).
+  A0   (reference) the original rule, stop at k matches; reproduces the benchmark's recall.
 For A0 and B (baselines) a query with fewer than k matches falls back to a full scan; E2 has no
 fallback (fixed round count; `incomplete` instead). Latency is MODELLED, not measured (see the
 report): a least-squares fit of the filtered-recall benchmark's measured per-cell latency on
-clusters searched and
-extra rounds.
+clusters searched and extra rounds.
 """
 
 from __future__ import annotations

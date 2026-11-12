@@ -9,12 +9,11 @@ every step of a query. Synthetic data only (a Gaussian mixture, as in filter_mea
 aggregates are printed or stored: times, byte counts, recalls. Never vectors, queries or scores.
 
 Setup per (preset, N): d = 384, two filter fields (8 values each, so 400 columns per block),
-client-side spherical k-means (Lloyd, a few iterations) into C = round(N / (2 * slots)) clusters,
-so a cluster holds about two blocks (2 to 3 with the usual imbalance) and a probe of nprobe
-clusters reads about 2 * nprobe blocks. Blocks are encrypted by a pool of forked worker processes
-(public key only; the same pool decrypts the answers, as in topk_parallel.py, and holds the secret
-key in its
-memory like client/ombra/topk.py). Collection is created, public keys uploaded, blocks inserted.
+client-side spherical k-means (Lloyd, a few iterations) into C = round(N / (2 * slots)) clusters, so
+a cluster holds about two blocks (2 to 3 with the usual imbalance) and a probe of nprobe clusters
+reads about 2 * nprobe blocks. Blocks are encrypted by a pool of forked worker processes (public key
+only; the same pool decrypts the answers and holds the secret key in memory, like
+client/ombra/topk.py). Collection is created, public keys uploaded, blocks inserted.
 
 Per query (timed, after a warm-up) the steps are:
   encrypt     client: build and encrypt the query ciphertext (leaves = d + 16)

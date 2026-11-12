@@ -1,8 +1,8 @@
 """The compact-configurations benchmark runs end to end at a tiny size (d = 16).
 
 Runs core/bench/run.py --task compact-configs, which creates the context, writes only public
-material and
-runs the C++ benchmark binaries and the GPU pipeline. Checks the output record, not the speed.
+material and runs the C++ benchmark binaries and the GPU pipeline. Checks the output record, not the
+speed.
 """
 
 from __future__ import annotations

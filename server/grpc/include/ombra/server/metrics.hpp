@@ -1,7 +1,6 @@
 // Metrics registry: atomic counters only. It holds no collection name, id, score, vector or
-// byte of data (server rule: no data in metrics); the JSON output is built from these totals and
-// from gauges the
-// server computes (counts, GPU memory, cache counters).
+// byte of data; the JSON output is built from these totals and from gauges the server computes
+// (counts, GPU memory, cache counters).
 #pragma once
 
 #include <atomic>

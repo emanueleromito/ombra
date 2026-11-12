@@ -198,8 +198,7 @@ int main(int argc, char** argv) {
       check("pipeline final: rescale" + tag, gpu_final, ref_final);
       if (m == 0) {
         // Device-to-device handoff: the query columns reach the search kernel device to device (as
-        // the
-        // expansion leaves do), with no host copy into the search's query buffer. Same exact
+        // the expansion leaves do), with no host copy into the search's query buffer. Same exact
         // comparison with the OpenFHE chain.
         std::vector<ombra::core::CtHandle> handles;
         std::vector<const std::uint64_t*> ptrs;

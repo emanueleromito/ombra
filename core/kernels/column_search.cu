@@ -14,10 +14,9 @@
 // base-leveledshe.cpp:621) accumulated over j with EvalAdd (EvalAddCoreInPlace, :575). The result
 // has 3 components.
 //
-// LIMITATION: no relinearization and no rescale. Relinearizing the 3-component sum once at
-// the end needs key switching (added with the expansion kernels); rescale is likewise left to the
-// caller. The
-// result therefore has noise-scale degree 2 and scaling factor scale_stored * scale_query.
+// LIMITATION: no relinearization and no rescale. Relinearizing the 3-component sum once at the end
+// needs key switching (added with the expansion kernels); rescale is likewise left to the caller.
+// The result therefore has noise-scale degree 2 and scaling factor scale_stored * scale_query.
 //
 // Memory layout (device, 64-bit words, contiguous; P = num_towers * ring_dim words per polynomial):
 //   stored: [block][dim][component 0..1][tower][coeff]    blocks * dims * 2 * P words

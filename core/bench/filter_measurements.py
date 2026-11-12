@@ -21,11 +21,10 @@ Three measurements per preset (`m0_depth2`, `m0_compact_n8192`):
     exactly, and the ratio of the F > 0 error to the F = 0 error.
  2. The recall rule with the extra columns (F = 2 fields of 8 values): same method as
     the recall acceptance checks (recall.py / recall_check.py): recall@10 of the encrypted pipeline
-    without
-    re-ranking against the plaintext recall of the same cluster setting (exact centers, exact
-    scores), gap within 0.005 for the full scan and every nprobe. One encrypted scan of all
-    clusters per query, restricted to the probed clusters afterwards (as recall.py does). Query
-    with the filter matching one value in each field, and with 'no filter' (all-ones).
+    without re-ranking against the plaintext recall of the same cluster setting (exact centers,
+    exact scores), gap within 0.005 for the full scan and every nprobe. One encrypted scan of all
+    clusters per query, restricted to the probed clusters afterwards (as recall.py does). Query with
+    the filter matching one value in each field, and with 'no filter' (all-ones).
  3. Filtered top-10 recall against brute-force filtered ground truth at selectivity 1%, 10% and
     50%, with the selective-filter client loop: first round p clusters, each
     extra round doubles the number of clusters, up to max_probe = mult * p clusters, then a Strict

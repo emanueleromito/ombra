@@ -3,7 +3,7 @@
 # gRPC for C++ (Ubuntu 22.04: libgrpc++-dev libprotobuf-dev protobuf-compiler
 # protobuf-compiler-grpc); without either, only the policy is built and the CPU build is unchanged.
 
-# ---- Preset table, generated from the preset JSON (the 128-bit security floor: no hand-picked numbers) ----------
+# ---- Preset table, generated from the preset JSON (no hand-picked numbers) ----------
 set(OMBRA_PRESET_JSON ${CMAKE_CURRENT_SOURCE_DIR}/../../core/params/ckks_presets.json)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${OMBRA_PRESET_JSON})
 file(READ ${OMBRA_PRESET_JSON} _presets_json)

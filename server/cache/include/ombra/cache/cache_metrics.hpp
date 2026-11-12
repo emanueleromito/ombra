@@ -1,5 +1,4 @@
-// Cache counters. Counters only: no ids, no segment keys, no data (server rule: no data in
-// metrics).
+// Cache counters. Counters only: no ids, no segment keys, no data.
 #pragma once
 
 #include <cstdint>

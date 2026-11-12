@@ -28,10 +28,8 @@ the reference. Filters per field: value sets built greedily to a target share of
 "spread" (values spread over many clusters first). The effective number of clusters the matches
 occupy is reported, so the reader can see how correlated each filter is with the clusters.
 
-Only aggregates are written. Secret keys stay in this process (the secret key stays on the client);
-no vectors, queries or
-scores are printed or stored (no plaintext in output; the data is public text, but the rule is
-kept).
+Only aggregates are written. Secret keys stay in this process; no vectors, queries or scores are
+printed or stored, although the data is public text.
 """
 
 from __future__ import annotations

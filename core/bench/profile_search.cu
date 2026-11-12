@@ -6,10 +6,10 @@
 // Usage: ombra_profile_search [--d D] [--blocks B] [--iters N] [--warmup W] [--ref-only]
 //                             [--no-verify] --ring N --bits b0,b1,...
 // Default: d = 384, 768, 1536 with blocks = 24576 / d (the column-search benchmark sizes: 19.3 GB
-// of stored data),
-// ring size and tower bit sizes are given by --ring and --bits (the Modal entry point reads them
-// from core/params/ckks_presets.json, preset m0_depth2: bits 60,50,50, P = 3 * ring words).
-// The moduli are fresh primes of those sizes, not the exact OpenFHE ones (timing is value-blind).
+// of stored data), ring size and tower bit sizes are given by --ring and --bits (the Modal entry
+// point reads them from core/params/ckks_presets.json, preset m0_depth2: bits 60,50,50, P = 3 *
+// ring words). The moduli are fresh primes of those sizes, not the exact OpenFHE ones (timing is
+// value-blind).
 //
 // Every variant uses the launch shape of column_search_kernel: block = 256 threads,
 // grid = (ceil(P / (256 * W)), ceil(blocks / 4)), 4 stored blocks per thread, W words per thread.
@@ -640,8 +640,7 @@ int main(int argc, char** argv) {
       std::fflush(stdout);
     }
     // the other two search kernels, kernel-only (before/after the optimisation): batched Q = 4 (one
-    // query
-    // tile; the query buffer holds 4 copies of the query) and ciphertext x plaintext
+    // query tile; the query buffer holds 4 copies of the query) and ciphertext x plaintext
     {
       const u64 nq = 4;
       u64 *bq = nullptr, *bout = nullptr, *plain_out = nullptr;

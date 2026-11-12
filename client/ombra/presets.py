@@ -68,7 +68,7 @@ def derive(preset: str, dimension: int, path: Path | None = None) -> Derived:
     )
 
 
-# Server limits (proto LIMIT_MAX_FILTER_FIELDS, LIMIT_MAX_FILTER_CARDINALITY) and the filter penalty design.
+# Server limits (proto LIMIT_MAX_FILTER_FIELDS and LIMIT_MAX_FILTER_CARDINALITY).
 MAX_FILTER_FIELDS = 16
 MAX_FILTER_CARDINALITY = 64
 FILTER_LAMBDA = 4  # the penalty weight of one filter entry

@@ -5,8 +5,7 @@
 // Guarantee: an acknowledged write (insert() or remove() returned) survives a crash or power
 // loss. A write that was not acknowledged is either fully there (segment, all its ids, catalog
 // rows) or fully absent (no rows, no segment file); never partial. Single writer: methods are
-// serialised by a mutex. Logs carry sizes, counts and timings only (no plaintext in logs or
-// errors).
+// serialised by a mutex. Logs carry sizes, counts and timings only.
 //
 // Searches vs. block removal: a search takes snapshot() once per round. It sees the block list and
 // the tombstones of one instant and pins those segment files. drop_dead_blocks() and

@@ -25,15 +25,14 @@ steps include deserialization (a real client must parse the bytes).
 
 Data: the cluster-center block and stored block 0 are real encrypted random unit vectors, so stage 1
 selection and the decrypted scores are real and checked against numpy (bound 1e-6, as in the
-filter-mask test). The
-other chosen blocks are device-to-device copies of block 0, because the kernel timing does not
-depend on the values (as in the column-search and batching benchmarks); the client still
-deserializes and decrypts one result
-ciphertext per chosen block. The chosen clusters are assumed packed contiguously into
-ceil(frac * N / slots) blocks (the last one masked to the valid slots); with clusters straddling
-block boundaries a real layout touches up to one extra block per chosen cluster, so per-block stage
-2 numbers are reported to scale from. Host-to-device time of the chosen blocks is reported apart:
-it is a stand-in for cluster paging and not part of the search latency.
+filter-mask test). The other chosen blocks are device-to-device copies of block 0, because the
+kernel timing does not depend on the values (as in the column-search and batching benchmarks); the
+client still deserializes and decrypts one result ciphertext per chosen block. The chosen clusters
+are assumed packed contiguously into ceil(frac * N / slots) blocks (the last one masked to the valid
+slots); with clusters straddling block boundaries a real layout touches up to one extra block per
+chosen cluster, so per-block stage 2 numbers are reported to scale from. Host-to-device time of the
+chosen blocks is reported apart: it is a stand-in for cluster paging and not part of the search
+latency.
 
 Only aggregates are printed or stored (times, sizes, max errors); data is synthetic.
 """

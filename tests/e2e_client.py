@@ -98,8 +98,8 @@ class ServerProcess:
         secure: bool = False,
     ) -> None:
         # Tests that do not exercise TLS and API keys run without TLS and keys; `secure=True` passes
-        # none of
-        # the two flags, so extra_args must bring --tls-cert/--tls-key (and keys must exist).
+        # none of the two flags, so extra_args must bring --tls-cert/--tls-key (and keys must
+        # exist).
         insecure_args = () if secure else ("--insecure", "--no-auth")
         self._log = open(log_path, "w")  # noqa: SIM115
         self.proc = subprocess.Popen(  # noqa: S603

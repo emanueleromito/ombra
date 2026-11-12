@@ -12,10 +12,9 @@
 // The tree puts a factor 2^L on every value; the client has already multiplied the query by 2^-L
 // before encoding (client/ombra/query.py), so the leaves are q_j with no server-side EvalMult, no
 // scale change and no level used. The driver checks that: every leaf must have NoiseScaleDeg 1 and
-// Level 0, else it exits 2.
-// Writes expanded_<j>.bin for j in [0, d) to <out_dir>. Never takes a secret key and prints no
-// data values: only depth, node counts and timing.
-// Exit code: 0 ok, 2 error.
+// Level 0, else it exits 2. Writes expanded_<j>.bin for j in [0, d) to <out_dir>. Never takes a
+// secret key and prints no data values: only depth, node counts and timing. Exit code: 0 ok, 2
+// error.
 
 #include <chrono>
 #include <cstdio>

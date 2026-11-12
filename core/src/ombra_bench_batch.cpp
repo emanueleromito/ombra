@@ -19,15 +19,15 @@
 //              cap = (budget - used - stored) / per query, where used = bytes in use at start.
 //   expansion: per query = (expansion_peak_nodes(d) + 1 root) ciphertexts (a level's parents live
 //              until the whole level is split); one chunk of scratch is reserved first.
-// When Q exceeds the cap the work runs as consecutive passes of at most `cap` queries (results of
-// a pass are dropped before the next, nothing accumulates) and the time counted is the total wall
+// When Q exceeds the cap the work runs as consecutive passes of at most `cap` queries (results of a
+// pass are dropped before the next, nothing accumulates) and the time counted is the total wall
 // time for all Q queries. Peak device memory is read with cudaMemGetInfo after the first pass:
 // buffers are never returned during a case (the pool keeps its peak, the stored blocks and scratch
-// are static), so the reading is the peak of the case. It is recorded next to the budget.
-// Timing: median of `iters` runs after `warmup` runs. Search: wall clock around all passes (each
-// pass waits for completion) and the sum of the CUDA-event kernel times. Expansion: wall clock
-// around all passes, synchronized after every pass.
-// Writes one JSON object with sizes, memory and timings only; no data, no keys.
+// are static), so the reading is the peak of the case. It is recorded next to the budget. Timing:
+// median of `iters` runs after `warmup` runs. Search: wall clock around all passes (each pass waits
+// for completion) and the sum of the CUDA-event kernel times. Expansion: wall clock around all
+// passes, synchronized after every pass. Writes one JSON object with sizes, memory and timings
+// only; no data, no keys.
 
 #include <algorithm>
 #include <chrono>

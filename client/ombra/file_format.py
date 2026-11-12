@@ -3,7 +3,7 @@
 Little-endian layout, mirrored by core/include/ombra/core/file_envelope.hpp:
   magic "OMBR" | u16 version (1) | u16 kind | u16 preset length | preset |
   u16 OpenFHE version length | OpenFHE version | u64 payload length | payload (file ends here)
-There is no kind for a secret key (the secret key stays on the client). No OpenFHE dependency.
+There is no kind for a secret key (the secret key never leaves the client). No OpenFHE dependency.
 """
 
 from __future__ import annotations

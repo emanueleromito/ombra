@@ -1,8 +1,8 @@
 // Ombra gRPC API, version 1 (package ombra.v1).
 //
-// The secret key stays on the client: no message here has a field for a secret key, and none may get one. The server
-// receives ciphertexts (inside the versioned envelope) and public evaluation keys only. Ids are opaque
-// bytes chosen by the client; documents and metadata values never appear in any message.
+// The secret key stays on the client: no message has a field for it, and none may get one. The
+// server receives ciphertexts (in the versioned envelope) and public evaluation keys only. Ids are
+// opaque bytes chosen by the client; documents and metadata values never appear in any message.
 // Version rule: every message that the server stores carries `api_version`; the server refuses a
 // stored-message value other than 1 with ERROR_UNSUPPORTED_VERSION. A new incompatible API gets
 // a new package (ombra.v2), not a changed field.

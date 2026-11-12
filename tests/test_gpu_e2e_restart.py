@@ -12,8 +12,7 @@ shutdown) and started again on the same data directory, and searching again must
   * the same collection info (vector and deleted counts, keys uploaded).
 
 Both presets, d = 16, 300 vectors in 6 clusters (the Deployment of the gRPC server test). The secret
-key
-stays in the test process; the restarted server gets no key again (it must have kept the public
+key stays in the test process; the restarted server gets no key again (it must have kept the public
 keys on disk). Synthetic data only.
 """
 

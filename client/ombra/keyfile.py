@@ -6,8 +6,7 @@ The file envelope deliberately has no kind for a secret key, so this file has it
   nonce (12) | AES-256-GCM ciphertext+tag
 The whole header (everything before the ciphertext, so the KDF parameters and salt too) is the
 GCM associated data. Plaintext: master key (32 bytes) | secret key blob. Key bytes and the
-passphrase never appear in errors or reprs (the secret key stays on the client; no plaintext in logs
-or errors). No OpenFHE dependency.
+passphrase never appear in errors or reprs. No OpenFHE dependency.
 """
 
 from __future__ import annotations

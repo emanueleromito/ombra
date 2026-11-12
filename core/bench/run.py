@@ -3,19 +3,17 @@
     python core/bench/run.py --task column-search --out <dir>      # or --task all
 
 Column search: column-packed search throughput for d = 384, 768, 1536. This script creates the CKKS
-context
-from the `m0_depth2` preset and a key pair, writes ONLY the context and the public key to a
+context from the `m0_depth2` preset and a key pair, writes ONLY the context and the public key to a
 temporary directory (the secret key is never serialized or used), and runs the C++ benchmark binary
 `ombra_bench_column_search` once per dimension. It merges the binary's per-run JSON into
 `<out>/column-search-a100.json`. Nothing written contains plaintext or keys.
 
 expansion: GPU query expansion time for d = 384, 768, 1536 (`ombra_bench_expand`, one run per d).
-Per d
-this script generates the automorphism keys for N/2^k + 1, k < ceil(log2(2d)), in-process (that
-needs the secret key, which stays in this process and is never written), and writes ONLY the
-context, the public key and the automorphism keys (public evaluation keys) to a temporary
-directory. Output: `<out>/expansion-a100.json` with d, L, nodes, automorphisms, keys, key_bytes,
-gpu_seconds and iterations per d.
+Per d this script generates the automorphism keys for N/2^k + 1, k < ceil(log2(2d)), in-process
+(that needs the secret key, which stays in this process and is never written), and writes ONLY the
+context, the public key and the automorphism keys (public evaluation keys) to a temporary directory.
+Output: `<out>/expansion-a100.json` with d, L, nodes, automorphisms, keys, key_bytes, gpu_seconds
+and iterations per d.
 
     python core/bench/run.py --task expansion --out <dir>
 
@@ -29,9 +27,8 @@ achieved memory bandwidth, and the per-(d, Q) memory plan (queries per pass, pas
 memory). Output `<out>/batching-a100.json`; speedups are relative to the Q = 1 row of the same run.
 Runs only when asked for (`--task batching`), not as part of `--task all`.
 
-End-to-end query latency per step (client encrypt, expansion, stage 1, stage 2, client
-decrypt and top-k), see core/bench/e2e.py. Output `<out>/e2e-latency-a100.json`. Runs only when
-asked for
+End-to-end query latency per step (client encrypt, expansion, stage 1, stage 2, client decrypt and
+top-k), see core/bench/e2e.py. Output `<out>/e2e-latency-a100.json`. Runs only when asked for
 (`--task e2e-latency`), not as part of `--task all`.
 
 GPU cluster cache (`ombra_bench_cache`, built from server/cache): paging bandwidth pinned vs
@@ -39,10 +36,9 @@ pageable, serial vs overlapped search over a collection 3x the GPU budget, hit r
 Zipf access. Output `<out>/gpu-cache-a100.json`. Runs only when asked for (`--task gpu-cache`).
 
 Filter measurements: the filter measurements through the gRPC server
-(core/bench/filter_measurements.py): score
-error with filter columns, the recall rule with the extra columns, filtered recall
-with the selective-filter loop. Output `<out>/filter-measurements-<preset>-a100.json` for each
-preset in
+(core/bench/filter_measurements.py): score error with filter columns, the recall rule with the extra
+columns, filtered recall with the selective-filter loop. Output
+`<out>/filter-measurements-<preset>-a100.json` for each preset in
 `--presets-filter`. Runs only when asked for (`--task filter-measurements`).
 gRPC end-to-end (`--task grpc-e2e`): end-to-end over gRPC at 100k and 1M, see grpc_e2e.py.
 
@@ -86,8 +82,7 @@ BATCHING_QUERIES = (1, 8, 32, 128)
 # batching stored data: STORED_CTS ciphertexts per d (blocks = STORED_CTS // d), 4 * 1536 * 786,432
 # B =
 # 4.8 GB. Smaller than column-search's 19 GB on purpose: expanded queries are 1.2 GB each at d =
-# 1536, so a
-# large stored set would leave room for only a handful of them in 40 GB.
+# 1536, so a large stored set would leave room for only a handful of them in 40 GB.
 BATCHING_STORED_CTS = 4 * 1536
 # Device-memory budget for everything the process holds (CUDA context, keys, stored blocks,
 # queries, scratch). Under the A100-40GB's 40 GiB so that planning error and the driver's own use

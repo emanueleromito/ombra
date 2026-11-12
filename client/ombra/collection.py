@@ -3,7 +3,7 @@
 The client holds the secret key (never sent, never printed). It clusters the vectors, encrypts
 the data blocks and the cluster centers, generates the evaluation keys, uploads them once per
 collection and creates the collection on the server. Parameters come only from
-`ombra.presets.derive` (the 128-bit security floor).
+`ombra.presets.derive`, which enforces the 128-bit floor.
 
 Layout (docs/architecture.md): a data block holds up to `slots` vectors of one
 cluster as D column ciphertexts (slot i of column j = component j of vector i) followed by one
@@ -326,9 +326,8 @@ class Collection:
     ) -> Collection:
         """Cluster, create the collection, upload the keys once, insert centers and data."""
         x = np.asarray(vectors, dtype=np.float64)
-        derived = presets.derive(
-            preset, x.shape[1]
-        )  # the 128-bit security floor: parameters only from here
+        # Parameters come only from the presets, which enforce the 128-bit floor.
+        derived = presets.derive(preset, x.shape[1])
         if len(ids) != len(x):
             raise ValueError("one id per vector")
         if not np.allclose(np.linalg.norm(x, axis=1), 1.0, atol=1e-6):

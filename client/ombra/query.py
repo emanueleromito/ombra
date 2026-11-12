@@ -10,9 +10,8 @@ touches key material beyond passing the public key to OpenFHE.
 Convention, read from OpenFHE v1.6.1: slot k of a full-slot plaintext is
 z_k = m(zeta^(5^k mod 2N)) with zeta = exp(2*pi*i / 2N)
 (DiscreteFourierTransform::PrecomputedValues, core/lib/math/dftransform.cpp:60-64 powers of five,
-:70-72 positive-angle roots). Because p is
-symmetric (p(X) = p(X^-1) as a function on roots of unity), its slots are real and do not depend on
-the sign convention of the root.
+:70-72 positive-angle roots). Because p is symmetric (p(X) = p(X^-1) as a function on roots of
+unity), its slots are real and do not depend on the sign convention of the root.
 
 Pre-scaling: the server's expansion tree multiplies every value by 2^L, L = expansion_depth(d), and
 does no EvalMult and no scale change to undo it. The client therefore encodes

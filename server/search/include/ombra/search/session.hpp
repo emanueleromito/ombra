@@ -14,9 +14,8 @@
 // number of filter fields that vector matches). Tombstoned slots get -lambda * (F + 1) added with
 // an OpenFHE plaintext (no level), so they decrypt below every live slot. No mask multiply.
 //
-// Key handling (the secret key stays on the client): the engine reads the public context and the
-// public EvalMult and
-// automorphism keys. It never accepts or derives a secret key. Every request carries a key tag that
+// Key handling: the engine reads the public context and the public EvalMult and automorphism
+// keys. It never accepts or derives a secret key. Every request carries a key tag that
 // is checked against the collection's, and so is the key tag inside every ciphertext (query and
 // stored columns); a mismatch throws KeyTagMismatch.
 //

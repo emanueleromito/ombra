@@ -65,8 +65,8 @@ image = (
     )
     .env({"LD_LIBRARY_PATH": "/usr/local/lib"})
     # Recall check: reads the Hugging Face parquet embedding shards. A layer after the OpenFHE
-    # build, so
-    # OpenFHE is not rebuilt. (ann-benchmarks.com does not host the dbpedia hdf5, so no h5py.)
+    # build, so OpenFHE is not rebuilt. (ann-benchmarks.com does not host the dbpedia hdf5, so no
+    # h5py.)
     .pip_install("pyarrow==17.0.0")
     # gRPC for C++ (the server) and Python (tests/e2e_client.py). Layers after the OpenFHE
     # build, so OpenFHE is not rebuilt.
@@ -237,16 +237,14 @@ def bench_topk(blocks: int = 25, runs: int = 5, preset: str = "m0_depth2") -> No
 
 
 # memory: the column search benchmark holds one block (about 1.2 GB at d = 1536) as OpenFHE
-# ciphertexts plus
-# its flattened copy on the host at a time, so about 3 to 4 GB peak; 16 GiB leaves headroom.
-# The filter measurements (`--task filter-measurements`) runs
-# here too: it starts ombra_server
-# (built with everything else) and drives it over localhost; 16 GiB covers the client's cached
-# ciphertexts (about 1 GB) and the server's pinned pool (2 GiB budget).
-# The end-to-end latency benchmark needs the 40 GB card (the plain "A100" sometimes lands on the 80
-# GB PCIe one) and more time:
-# 12 cases, each with 23 queries, plus encrypting two blocks per d. Host memory: block 0 flattened
-# (1.2 GB at d = 1536) plus its OpenFHE ciphertexts and the Python client; 16 GiB is enough.
+# ciphertexts plus its flattened copy on the host at a time, so about 3 to 4 GB peak; 16 GiB leaves
+# headroom. The filter measurements (`--task filter-measurements`) runs here too: it starts
+# ombra_server (built with everything else) and drives it over localhost; 16 GiB covers the client's
+# cached ciphertexts (about 1 GB) and the server's pinned pool (2 GiB budget). The end-to-end
+# latency benchmark needs the 40 GB card (the plain "A100" sometimes lands on the 80 GB PCIe one)
+# and more time: 12 cases, each with 23 queries, plus encrypting two blocks per d. Host memory:
+# block 0 flattened (1.2 GB at d = 1536) plus its OpenFHE ciphertexts and the Python client; 16 GiB
+# is enough.
 @app.function(gpu="A100-40GB", memory=16384, timeout=14400, volumes={DATA_DIR: volume})
 def bench(task: str = "all", extra: str = "") -> None:
     """Build in Release and run benchmarks on an A100; results go to the volume."""
@@ -264,10 +262,10 @@ def bench(task: str = "all", extra: str = "") -> None:
 
 
 # The gRPC end-to-end benchmark (`--task grpc-e2e`): the client encrypts about 50k to 100k
-# ciphertexts per preset at 1M vectors
-# in parallel processes, and the server keeps about 40 GB of ciphertexts per (preset, size) on the
-# container's local disk (deleted after each run). The run refuses, and says so in its JSON, if the
-# free disk is below the estimate. Run presets/sizes as separate invocations to stay within limits:
+# ciphertexts per preset at 1M vectors in parallel processes, and the server keeps about 40 GB of
+# ciphertexts per (preset, size) on the container's local disk (deleted after each run). The run
+# refuses, and says so in its JSON, if the free disk is below the estimate. Run presets/sizes as
+# separate invocations to stay within limits:
 #   modal run modal_app.py::bench_e2e --extra "--presets-grpc m0_depth2 --sizes-grpc 1000000"
 @app.function(gpu="A100-40GB", cpu=16.0, memory=65536, timeout=86400, volumes={DATA_DIR: volume})
 def bench_e2e(extra: str = "") -> None:
@@ -313,11 +311,10 @@ def cpu_run8(cmd: str) -> None:
 
 
 # Local mode: a machine WITHOUT a GPU: a plain Python 3.12 image, OpenFHE 1.6.1 (C++) installed the
-# way
-# the docs describe, then `pip install ./client[local]`: openfhe-python comes from PyPI (a wheel for
-# CPython 3.12), and ombra._native is compiled by pip against the OpenFHE above (wheels will ship
-# wheels, then no compiler is needed). Only the client folder, the headers of core/ the extension
-# shares with the server, and the check script are uploaded.
+# way the docs describe, then `pip install ./client[local]`: openfhe-python comes from PyPI (a wheel
+# for CPython 3.12), and ombra._native is compiled by pip against the OpenFHE above (wheels will
+# ship wheels, then no compiler is needed). Only the client folder, the headers of core/ the
+# extension shares with the server, and the check script are uploaded.
 _CORE_FILES = ("src/security_floor.cpp", "src/openfhe_expand_ops.hpp")
 
 
@@ -516,8 +513,7 @@ def profile_search(ncu: bool = True, micro: bool = True) -> None:
 #   modal run modal_app.py::filtered_recall --dry-run     (tiny sizes, 5 queries)
 # One A10 run for two checks, so the image build and startup are paid once (user-approved budget:
 # under $1; the 40-minute timeout caps it): the local mode parity test (local mode vs the server,
-# same
-# top-k) and the encrypted confirmation on banking77 (all cells, 200 queries).
+# same top-k) and the encrypted confirmation on banking77 (all cells, 200 queries).
 #   modal run modal_app.py::confirm_a10
 @app.function(gpu="A10", cpu=4.0, memory=16384, timeout=2400, volumes={DATA_DIR: volume})
 def confirm_a10(queries: int = 200, bench_only: bool = False) -> None:

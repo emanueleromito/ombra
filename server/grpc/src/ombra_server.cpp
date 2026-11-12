@@ -10,7 +10,7 @@
 // Safe defaults: the server refuses to start without TLS unless --insecure is given, and without an
 // API key file (D/api_keys.v1, made with --create-api-key) unless --no-auth is given. Both flags
 // log a loud warning and are limited to loopback addresses. An API key is an access token; the
-// server never accepts a secret key (the secret key stays on the client) and never logs a token.
+// server never accepts a secret key and never logs a token.
 //
 // Every --compact-interval-ms (default 60000, 0 disables) a background thread drops, in every
 // collection, the blocks whose vectors are all deleted; it logs counts only.

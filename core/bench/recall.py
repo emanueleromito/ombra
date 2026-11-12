@@ -20,7 +20,7 @@ then OpenFHE Relinearize, Rescale, an all-ones encrypted mask at level 1, Rescal
 real final level 2); the client decrypts and ranks. Only public material (context, public
 evaluation keys, ciphertexts) is written to disk; the secret key stays in this process and is never
 serialized. Only aggregates are printed or stored: recall, times, counts, max errors. Never
-vectors, queries, documents or scores (no plaintext in logs or errors).
+vectors, queries, documents or scores.
 
 Settings (recall@10 against the exact plaintext top-10 over the same subset):
   * full scan (one cluster), with and without client re-ranking;
