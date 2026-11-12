@@ -22,6 +22,9 @@ One short file per design decision, so the reasoning survives. New decisions cop
 | [0016](0016-ciphertext-file-envelope.md) | Ciphertext and key file envelope (magic, version, kind, preset, OpenFHE version); drivers keep raw files | accepted |
 | [0017](0017-decryption-noise-position.md) | Position on decryption noise: keep the default, pin it, do not claim IND-CPA-D | accepted |
 | [0018](0018-plaintext-db-disclosure.md) | Plaintext-DB mode: only for corpora any client may read | accepted |
-| [0019](0019-filter-evaluation-within-depth-2.md) | Filter evaluation within depth 2: additive penalty folded into the query | accepted |
+| [0019](0019-filter-evaluation-within-depth-2.md) | Filter evaluation within depth 2: additive penalty folded into the query | accepted; amendment 1 (filter-aware cluster choice) accepted |
+| [0020](0020-client-key-file-and-balanced-preset.md) | Client key file format and the "balanced" preset | accepted |
+| [0021](0021-blob-store-and-recluster-generations.md) | Encrypted blob store and re-clustering by generation | accepted |
+| [0022](0022-local-mode-cpp-expansion.md) | Local mode uses the server's C++ expansion | accepted |
 
 Smaller decisions (key management, threat model, accuracy, deletes, migrations, key rotation, parameter presets, format versioning, storage, API, client packaging) are recorded directly in [product-requirements.md](../product-requirements.md) and [architecture.md](../architecture.md).

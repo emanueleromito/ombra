@@ -1,0 +1,1156 @@
+{
+  "task": "T3.11 probe policies (plaintext simulation)",
+  "k": 10,
+  "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "latency_model": {
+    "base_ms": 71.4599380246921,
+    "per_cluster_ms": 10.846130103887129,
+    "per_extra_round_ms": 0.0,
+    "rmse_ms": 17.51298655967566,
+    "cells": 20
+  },
+  "small": false,
+  "results": [
+    {
+      "dataset": "arxiv-abstracts",
+      "n_vectors": 40000,
+      "clusters": 20,
+      "first_round": 5,
+      "queries": 1000,
+      "cells": [
+        {
+          "filter": null,
+          "share": 1.0,
+          "label": "unfiltered",
+          "policies": {
+            "A0 (0019, stop at k)": {
+              "recall_at_10": 0.9834,
+              "clusters_searched_mean": 5.0,
+              "rounds_mean": 1.0,
+              "rounds_max": 1,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 125.69058854412773
+            },
+            "B (0019, stop at 3k)": {
+              "recall_at_10": 0.9834,
+              "clusters_searched_mean": 5.0,
+              "rounds_mean": 1.0,
+              "rounds_max": 1,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 125.69058854412773
+            },
+            "E2 (Fast)": {
+              "recall_at_10": 0.9997999999999999,
+              "clusters_searched_mean": 15.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 234.15188958299902
+            },
+            "E2 (Decoy)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 20.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 288.38254010243463
+            }
+          }
+        },
+        {
+          "filter": {
+            "field": 0,
+            "field_name": "primary_category",
+            "placement": "clustered",
+            "target": 0.01,
+            "values": [
+              27,
+              41
+            ],
+            "share": 0.0107,
+            "matching": 428,
+            "effective_clusters": 2.3527080480277647
+          },
+          "share": 0.0107,
+          "label": "primary_category clustered",
+          "policies": {
+            "A0 (0019, stop at k)": {
+              "recall_at_10": 0.7948,
+              "clusters_searched_mean": 13.93,
+              "rounds_mean": 2.04,
+              "rounds_max": 3,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 222.5465303718398
+            },
+            "B (0019, stop at 3k)": {
+              "recall_at_10": 0.935,
+              "clusters_searched_mean": 14.9,
+              "rounds_mean": 2.205,
+              "rounds_max": 3,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 233.06727657261033
+            },
+            "E2 (Fast)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 6.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 136.53671864801487
+            },
+            "E2 (Decoy)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 20.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 288.38254010243463
+            }
+          }
+        },
+        {
+          "filter": {
+            "field": 0,
+            "field_name": "primary_category",
+            "placement": "clustered",
+            "target": 0.1,
+            "values": [
+              27,
+              41,
+              21,
+              31,
+              4,
+              39,
+              59,
+              11,
+              50,
+              54,
+              22,
+              53,
+              52
+            ],
+            "share": 0.08245,
+            "matching": 3298,
+            "effective_clusters": 9.34165145942104
+          },
+          "share": 0.08245,
+          "label": "primary_category clustered",
+          "policies": {
+            "A0 (0019, stop at k)": {
+              "recall_at_10": 0.8876000000000002,
+              "clusters_searched_mean": 5.0,
+              "rounds_mean": 1.0,
+              "rounds_max": 1,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 125.69058854412773
+            },
+            "B (0019, stop at 3k)": {
+              "recall_at_10": 0.8876000000000002,
+              "clusters_searched_mean": 5.0,
+              "rounds_mean": 1.0,
+              "rounds_max": 1,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 125.69058854412773
+            },
+            "E2 (Fast)": {
+              "recall_at_10": 0.995,
+              "clusters_searched_mean": 15.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 234.15188958299902
+            },
+            "E2 (Decoy)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 20.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 288.38254010243463
+            }
+          }
+        },
+        {
+          "filter": {
+            "field": 0,
+            "field_name": "primary_category",
+            "placement": "clustered",
+            "target": 0.5,
+            "values": [
+              27,
+              41,
+              21,
+              31,
+              4,
+              39,
+              59,
+              11,
+              50,
+              54,
+              22,
+              53,
+              52,
+              17,
+              43,
+              35,
+              16,
+              47,
+              19,
+              12,
+              1,
+              24,
+              44,
+              29,
+              3,
+              57,
+              18,
+              46,
+              33,
+              38,
+              55,
+              8,
+              9,
+              49,
+              26,
+              10,
+              2,
+              15,
+              0,
+              5,
+              42,
+              7
+            ],
+            "share": 0.40315,
+            "matching": 16126,
+            "effective_clusters": 15.728286292649432
+          },
+          "share": 0.40315,
+          "label": "primary_category clustered",
+          "policies": {
+            "A0 (0019, stop at k)": {
+              "recall_at_10": 0.971,
+              "clusters_searched_mean": 5.0,
+              "rounds_mean": 1.0,
+              "rounds_max": 1,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 125.69058854412773
+            },
+            "B (0019, stop at 3k)": {
+              "recall_at_10": 0.971,
+              "clusters_searched_mean": 5.0,
+              "rounds_mean": 1.0,
+              "rounds_max": 1,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 125.69058854412773
+            },
+            "E2 (Fast)": {
+              "recall_at_10": 0.9990999999999999,
+              "clusters_searched_mean": 15.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 234.15188958299902
+            },
+            "E2 (Decoy)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 20.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 288.38254010243463
+            }
+          }
+        },
+        {
+          "filter": {
+            "field": 0,
+            "field_name": "primary_category",
+            "placement": "spread",
+            "target": 0.01,
+            "values": [
+              32,
+              48
+            ],
+            "share": 0.009075,
+            "matching": 363,
+            "effective_clusters": 11.173929066594033
+          },
+          "share": 0.009075,
+          "label": "primary_category spread",
+          "policies": {
+            "A0 (0019, stop at k)": {
+              "recall_at_10": 0.7571,
+              "clusters_searched_mean": 5.34,
+              "rounds_mean": 1.034,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 129.37827277944936
+            },
+            "B (0019, stop at 3k)": {
+              "recall_at_10": 0.8296000000000001,
+              "clusters_searched_mean": 6.49,
+              "rounds_mean": 1.149,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 141.85132239891956
+            },
+            "E2 (Fast)": {
+              "recall_at_10": 0.9913,
+              "clusters_searched_mean": 15.201,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 236.33196173388035
+            },
+            "E2 (Decoy)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 20.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 288.38254010243463
+            }
+          }
+        },
+        {
+          "filter": {
+            "field": 0,
+            "field_name": "primary_category",
+            "placement": "spread",
+            "target": 0.1,
+            "values": [
+              32,
+              48,
+              30,
+              14,
+              58,
+              45,
+              36,
+              20,
+              62,
+              23,
+              51,
+              40,
+              28,
+              60,
+              25,
+              61
+            ],
+            "share": 0.081325,
+            "matching": 3253,
+            "effective_clusters": 15.640429184554002
+          },
+          "share": 0.081325,
+          "label": "primary_category spread",
+          "policies": {
+            "A0 (0019, stop at k)": {
+              "recall_at_10": 0.9312,
+              "clusters_searched_mean": 5.0,
+              "rounds_mean": 1.0,
+              "rounds_max": 1,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 125.69058854412773
+            },
+            "B (0019, stop at 3k)": {
+              "recall_at_10": 0.9312,
+              "clusters_searched_mean": 5.0,
+              "rounds_mean": 1.0,
+              "rounds_max": 1,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 125.69058854412773
+            },
+            "E2 (Fast)": {
+              "recall_at_10": 0.9977999999999999,
+              "clusters_searched_mean": 15.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 234.15188958299902
+            },
+            "E2 (Decoy)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 20.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 288.38254010243463
+            }
+          }
+        },
+        {
+          "filter": {
+            "field": 0,
+            "field_name": "primary_category",
+            "placement": "spread",
+            "target": 0.5,
+            "values": [
+              63
+            ],
+            "share": 0.476325,
+            "matching": 19053,
+            "effective_clusters": 19.53986367797966
+          },
+          "share": 0.476325,
+          "label": "primary_category spread",
+          "policies": {
+            "A0 (0019, stop at k)": {
+              "recall_at_10": 0.9794,
+              "clusters_searched_mean": 5.0,
+              "rounds_mean": 1.0,
+              "rounds_max": 1,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 125.69058854412773
+            },
+            "B (0019, stop at 3k)": {
+              "recall_at_10": 0.9794,
+              "clusters_searched_mean": 5.0,
+              "rounds_mean": 1.0,
+              "rounds_max": 1,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 125.69058854412773
+            },
+            "E2 (Fast)": {
+              "recall_at_10": 0.9996,
+              "clusters_searched_mean": 15.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 234.15188958299902
+            },
+            "E2 (Decoy)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 20.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 288.38254010243463
+            }
+          }
+        },
+        {
+          "filter": {
+            "field": 1,
+            "field_name": "year_bin",
+            "placement": "clustered",
+            "target": 0.01,
+            "values": [
+              0,
+              1
+            ],
+            "share": 0.01025,
+            "matching": 410,
+            "effective_clusters": 9.388389452689434
+          },
+          "share": 0.01025,
+          "label": "year_bin clustered",
+          "policies": {
+            "A0 (0019, stop at k)": {
+              "recall_at_10": 0.8058,
+              "clusters_searched_mean": 5.18,
+              "rounds_mean": 1.018,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 127.64289196282742
+            },
+            "B (0019, stop at 3k)": {
+              "recall_at_10": 0.8967999999999999,
+              "clusters_searched_mean": 6.84,
+              "rounds_mean": 1.184,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 145.64746793528005
+            },
+            "E2 (Fast)": {
+              "recall_at_10": 0.9969000000000001,
+              "clusters_searched_mean": 15.315,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 237.56842056572347
+            },
+            "E2 (Decoy)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 20.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 288.38254010243463
+            }
+          }
+        },
+        {
+          "filter": {
+            "field": 1,
+            "field_name": "year_bin",
+            "placement": "clustered",
+            "target": 0.1,
+            "values": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "share": 0.105125,
+            "matching": 4205,
+            "effective_clusters": 11.89784942041618
+          },
+          "share": 0.105125,
+          "label": "year_bin clustered",
+          "policies": {
+            "A0 (0019, stop at k)": {
+              "recall_at_10": 0.9199,
+              "clusters_searched_mean": 5.0,
+              "rounds_mean": 1.0,
+              "rounds_max": 1,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 125.69058854412773
+            },
+            "B (0019, stop at 3k)": {
+              "recall_at_10": 0.9199,
+              "clusters_searched_mean": 5.0,
+              "rounds_mean": 1.0,
+              "rounds_max": 1,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 125.69058854412773
+            },
+            "E2 (Fast)": {
+              "recall_at_10": 0.9951,
+              "clusters_searched_mean": 15.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 234.15188958299902
+            },
+            "E2 (Decoy)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 20.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 288.38254010243463
+            }
+          }
+        },
+        {
+          "filter": {
+            "field": 1,
+            "field_name": "year_bin",
+            "placement": "clustered",
+            "target": 0.5,
+            "values": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              15,
+              9
+            ],
+            "share": 0.40565,
+            "matching": 16226,
+            "effective_clusters": 17.75907814117049
+          },
+          "share": 0.40565,
+          "label": "year_bin clustered",
+          "policies": {
+            "A0 (0019, stop at k)": {
+              "recall_at_10": 0.9805,
+              "clusters_searched_mean": 5.0,
+              "rounds_mean": 1.0,
+              "rounds_max": 1,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 125.69058854412773
+            },
+            "B (0019, stop at 3k)": {
+              "recall_at_10": 0.9805,
+              "clusters_searched_mean": 5.0,
+              "rounds_mean": 1.0,
+              "rounds_max": 1,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 125.69058854412773
+            },
+            "E2 (Fast)": {
+              "recall_at_10": 0.9995,
+              "clusters_searched_mean": 15.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 234.15188958299902
+            },
+            "E2 (Decoy)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 20.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 288.38254010243463
+            }
+          }
+        },
+        {
+          "filter": {
+            "field": 1,
+            "field_name": "year_bin",
+            "placement": "spread",
+            "target": 0.01,
+            "values": [
+              1
+            ],
+            "share": 0.00845,
+            "matching": 338,
+            "effective_clusters": 9.763466619933357
+          },
+          "share": 0.00845,
+          "label": "year_bin spread",
+          "policies": {
+            "A0 (0019, stop at k)": {
+              "recall_at_10": 0.8005,
+              "clusters_searched_mean": 5.18,
+              "rounds_mean": 1.018,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 127.64289196282742
+            },
+            "B (0019, stop at 3k)": {
+              "recall_at_10": 0.8976000000000001,
+              "clusters_searched_mean": 7.03,
+              "rounds_mean": 1.203,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 147.7082326550186
+            },
+            "E2 (Fast)": {
+              "recall_at_10": 0.9964,
+              "clusters_searched_mean": 15.345,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 237.8938044688401
+            },
+            "E2 (Decoy)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 20.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 288.38254010243463
+            }
+          }
+        },
+        {
+          "filter": {
+            "field": 1,
+            "field_name": "year_bin",
+            "placement": "spread",
+            "target": 0.1,
+            "values": [
+              12
+            ],
+            "share": 0.110975,
+            "matching": 4439,
+            "effective_clusters": 19.52374162850534
+          },
+          "share": 0.110975,
+          "label": "year_bin spread",
+          "policies": {
+            "A0 (0019, stop at k)": {
+              "recall_at_10": 0.9718000000000001,
+              "clusters_searched_mean": 5.0,
+              "rounds_mean": 1.0,
+              "rounds_max": 1,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 125.69058854412773
+            },
+            "B (0019, stop at 3k)": {
+              "recall_at_10": 0.9718000000000001,
+              "clusters_searched_mean": 5.0,
+              "rounds_mean": 1.0,
+              "rounds_max": 1,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 125.69058854412773
+            },
+            "E2 (Fast)": {
+              "recall_at_10": 0.9994000000000001,
+              "clusters_searched_mean": 15.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 234.15188958299902
+            },
+            "E2 (Decoy)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 20.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 288.38254010243463
+            }
+          }
+        },
+        {
+          "filter": {
+            "field": 1,
+            "field_name": "year_bin",
+            "placement": "spread",
+            "target": 0.5,
+            "values": [
+              12,
+              13,
+              11,
+              10
+            ],
+            "share": 0.424175,
+            "matching": 16967,
+            "effective_clusters": 19.57989640032789
+          },
+          "share": 0.424175,
+          "label": "year_bin spread",
+          "policies": {
+            "A0 (0019, stop at k)": {
+              "recall_at_10": 0.9821,
+              "clusters_searched_mean": 5.0,
+              "rounds_mean": 1.0,
+              "rounds_max": 1,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 125.69058854412773
+            },
+            "B (0019, stop at 3k)": {
+              "recall_at_10": 0.9821,
+              "clusters_searched_mean": 5.0,
+              "rounds_mean": 1.0,
+              "rounds_max": 1,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 125.69058854412773
+            },
+            "E2 (Fast)": {
+              "recall_at_10": 0.9997999999999999,
+              "clusters_searched_mean": 15.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 234.15188958299902
+            },
+            "E2 (Decoy)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 20.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 288.38254010243463
+            }
+          }
+        }
+      ]
+    },
+    {
+      "dataset": "banking77",
+      "n_vectors": 10003,
+      "clusters": 6,
+      "first_round": 3,
+      "queries": 1000,
+      "cells": [
+        {
+          "filter": null,
+          "share": 1.0,
+          "label": "unfiltered",
+          "policies": {
+            "A0 (0019, stop at k)": {
+              "recall_at_10": 0.9933000000000001,
+              "clusters_searched_mean": 3.0,
+              "rounds_mean": 1.0,
+              "rounds_max": 1,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 103.99832833635348
+            },
+            "B (0019, stop at 3k)": {
+              "recall_at_10": 0.9933000000000001,
+              "clusters_searched_mean": 3.0,
+              "rounds_mean": 1.0,
+              "rounds_max": 1,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 103.99832833635348
+            },
+            "E2 (Fast)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 6.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 136.53671864801487
+            },
+            "E2 (Decoy)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 6.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 136.53671864801487
+            }
+          }
+        },
+        {
+          "filter": {
+            "field": 0,
+            "field_name": "intent_bucket",
+            "placement": "clustered",
+            "target": 0.01,
+            "values": [
+              29
+            ],
+            "share": 0.012096371088673398,
+            "matching": 121,
+            "effective_clusters": 1.0
+          },
+          "share": 0.012096371088673398,
+          "label": "intent_bucket clustered",
+          "policies": {
+            "A0 (0019, stop at k)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 4.005,
+              "rounds_mean": 1.335,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 114.89868909076004
+            },
+            "B (0019, stop at 3k)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 4.005,
+              "rounds_mean": 1.335,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 114.89868909076004
+            },
+            "E2 (Fast)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 1.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 82.30606812857923
+            },
+            "E2 (Decoy)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 6.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 136.53671864801487
+            }
+          }
+        },
+        {
+          "filter": {
+            "field": 0,
+            "field_name": "intent_bucket",
+            "placement": "clustered",
+            "target": 0.1,
+            "values": [
+              13,
+              19,
+              29,
+              30,
+              31,
+              36
+            ],
+            "share": 0.08047585724282715,
+            "matching": 805,
+            "effective_clusters": 3.8397971594579063
+          },
+          "share": 0.08047585724282715,
+          "label": "intent_bucket clustered",
+          "policies": {
+            "A0 (0019, stop at k)": {
+              "recall_at_10": 0.9277,
+              "clusters_searched_mean": 3.0,
+              "rounds_mean": 1.0,
+              "rounds_max": 1,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 103.99832833635348
+            },
+            "B (0019, stop at 3k)": {
+              "recall_at_10": 0.9277,
+              "clusters_searched_mean": 3.0,
+              "rounds_mean": 1.0,
+              "rounds_max": 1,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 103.99832833635348
+            },
+            "E2 (Fast)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 4.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 114.8444584402406
+            },
+            "E2 (Decoy)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 6.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 136.53671864801487
+            }
+          }
+        },
+        {
+          "filter": {
+            "field": 0,
+            "field_name": "intent_bucket",
+            "placement": "clustered",
+            "target": 0.5,
+            "values": [
+              13,
+              19,
+              29,
+              30,
+              31,
+              36,
+              37,
+              38,
+              39,
+              40,
+              41,
+              44,
+              52,
+              55,
+              43,
+              32,
+              51,
+              46,
+              21,
+              60,
+              9,
+              28,
+              33,
+              6,
+              17,
+              34,
+              63,
+              42,
+              14
+            ],
+            "share": 0.40527841647505747,
+            "matching": 4054,
+            "effective_clusters": 3.931866148769638
+          },
+          "share": 0.40527841647505747,
+          "label": "intent_bucket clustered",
+          "policies": {
+            "A0 (0019, stop at k)": {
+              "recall_at_10": 0.986,
+              "clusters_searched_mean": 3.0,
+              "rounds_mean": 1.0,
+              "rounds_max": 1,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 103.99832833635348
+            },
+            "B (0019, stop at 3k)": {
+              "recall_at_10": 0.986,
+              "clusters_searched_mean": 3.0,
+              "rounds_mean": 1.0,
+              "rounds_max": 1,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 103.99832833635348
+            },
+            "E2 (Fast)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 6.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 136.53671864801487
+            },
+            "E2 (Decoy)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 6.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 136.53671864801487
+            }
+          }
+        },
+        {
+          "filter": {
+            "field": 0,
+            "field_name": "intent_bucket",
+            "placement": "spread",
+            "target": 0.01,
+            "values": [
+              62
+            ],
+            "share": 0.010296910926721983,
+            "matching": 103,
+            "effective_clusters": 4.274470790551611
+          },
+          "share": 0.010296910926721983,
+          "label": "intent_bucket spread",
+          "policies": {
+            "A0 (0019, stop at k)": {
+              "recall_at_10": 0.7554000000000001,
+              "clusters_searched_mean": 3.0,
+              "rounds_mean": 1.0,
+              "rounds_max": 1,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 103.99832833635348
+            },
+            "B (0019, stop at 3k)": {
+              "recall_at_10": 0.8383,
+              "clusters_searched_mean": 3.414,
+              "rounds_mean": 1.138,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 108.48862619936276
+            },
+            "E2 (Fast)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 6.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 136.53671864801487
+            },
+            "E2 (Decoy)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 6.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 136.53671864801487
+            }
+          }
+        },
+        {
+          "filter": {
+            "field": 0,
+            "field_name": "intent_bucket",
+            "placement": "spread",
+            "target": 0.1,
+            "values": [
+              62,
+              2,
+              7,
+              54
+            ],
+            "share": 0.08107567729681096,
+            "matching": 811,
+            "effective_clusters": 5.178366936557702
+          },
+          "share": 0.08107567729681096,
+          "label": "intent_bucket spread",
+          "policies": {
+            "A0 (0019, stop at k)": {
+              "recall_at_10": 0.9061000000000001,
+              "clusters_searched_mean": 3.0,
+              "rounds_mean": 1.0,
+              "rounds_max": 1,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 103.99832833635348
+            },
+            "B (0019, stop at 3k)": {
+              "recall_at_10": 0.9061000000000001,
+              "clusters_searched_mean": 3.0,
+              "rounds_mean": 1.0,
+              "rounds_max": 1,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 103.99832833635348
+            },
+            "E2 (Fast)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 6.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 136.53671864801487
+            },
+            "E2 (Decoy)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 6.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 136.53671864801487
+            }
+          }
+        },
+        {
+          "filter": {
+            "field": 0,
+            "field_name": "intent_bucket",
+            "placement": "spread",
+            "target": 0.5,
+            "values": [
+              62,
+              2,
+              7,
+              54,
+              23,
+              8,
+              0,
+              1,
+              3,
+              4,
+              5,
+              24,
+              12,
+              56,
+              57,
+              15,
+              58,
+              11,
+              10,
+              25,
+              50
+            ],
+            "share": 0.40067979606118165,
+            "matching": 4008,
+            "effective_clusters": 5.191540451818386
+          },
+          "share": 0.40067979606118165,
+          "label": "intent_bucket spread",
+          "policies": {
+            "A0 (0019, stop at k)": {
+              "recall_at_10": 0.9787,
+              "clusters_searched_mean": 3.0,
+              "rounds_mean": 1.0,
+              "rounds_max": 1,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 103.99832833635348
+            },
+            "B (0019, stop at 3k)": {
+              "recall_at_10": 0.9787,
+              "clusters_searched_mean": 3.0,
+              "rounds_mean": 1.0,
+              "rounds_max": 1,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 103.99832833635348
+            },
+            "E2 (Fast)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 6.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 136.53671864801487
+            },
+            "E2 (Decoy)": {
+              "recall_at_10": 1.0,
+              "clusters_searched_mean": 6.0,
+              "rounds_mean": 2.0,
+              "rounds_max": 2,
+              "strict_share": 0.0,
+              "modelled_latency_ms": 136.53671864801487
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

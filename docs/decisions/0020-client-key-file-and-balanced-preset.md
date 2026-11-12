@@ -1,6 +1,6 @@
 # 0020. Client key file format and the "balanced" preset
 
-- **Status:** proposed
+- **Status:** accepted (user, 2026-11-12)
 - **Date:** 2026-11-10
 
 ## Context

@@ -8,7 +8,7 @@ Milestones, in order. Each milestone has its own file with small tasks; every ta
 | [M1: Core library](m1-core.md) | Reviewed `core/` library running a full encrypted query on the GPU; end-to-end latency, speedups and product presets | done ([report](results/m1-report.md)) |
 | [M2: Minimal server](m2-server.md) | Single-node gRPC server with storage and clustered search | not started |
 | [M3: Client and LangChain](m3-client.md) | Python client (sync + async), key file, top-k, re-ranking, LangChain adapter | not started |
-| M4: First release | Docker images, compose file, docs, licensing page | not started |
+| [M4: First release](m4-release.md) | Docker images, compose file, docs, licensing page, client wheels | not started |
 
 Benchmark results go in [results/](results/), one file per run, so numbers are never only in chat.
 

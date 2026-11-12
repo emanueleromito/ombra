@@ -39,8 +39,17 @@ def _sample(pattern: str) -> str:
 
 def test_secret_section_parsed() -> None:
     pats = _secret_patterns()
-    for expected in (".env", ".env.*", "*.key", "*.pem", "*.keyfile", "*.ombrakey", "keys/",
-                     "secrets/", ".modal.toml"):
+    for expected in (
+        ".env",
+        ".env.*",
+        "*.key",
+        "*.pem",
+        "*.keyfile",
+        "*.ombrakey",
+        "keys/",
+        "secrets/",
+        ".modal.toml",
+    ):
         assert expected in pats
 
 
@@ -53,8 +62,15 @@ def test_secret_patterns_excluded(pattern: str, folder: str) -> None:
 
 @pytest.mark.parametrize(
     "path",
-    [".claude/settings.json", "data/x.txt", ".git/config", "core/build/a.o",
-     "client/__pycache__/a.pyc", "docs/plan/m1-core.md", "core/data/v.npy"],
+    [
+        ".claude/settings.json",
+        "data/x.txt",
+        ".git/config",
+        "core/build/a.o",
+        "client/__pycache__/a.pyc",
+        "docs/plan/m1-core.md",
+        "core/data/v.npy",
+    ],
 )
 def test_other_paths_excluded(path: str) -> None:
     assert is_excluded(path)
@@ -62,9 +78,18 @@ def test_other_paths_excluded(path: str) -> None:
 
 @pytest.mark.parametrize(
     "path",
-    ["core/CMakeLists.txt", "CMakeLists.txt", "pyproject.toml", "conftest.py", "Makefile",
-     "modal_app.py", "modal_upload.py", "tests/test_modal_upload.py", "client/ombra/__init__.py",
-     "core/params/ckks_presets.json"],
+    [
+        "core/CMakeLists.txt",
+        "CMakeLists.txt",
+        "pyproject.toml",
+        "conftest.py",
+        "Makefile",
+        "modal_app.py",
+        "modal_upload.py",
+        "tests/test_modal_upload.py",
+        "client/ombra/__init__.py",
+        "core/params/ckks_presets.json",
+    ],
 )
 def test_required_files_included(path: str) -> None:
     assert not is_excluded(path)

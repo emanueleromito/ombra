@@ -5,8 +5,8 @@ lambda * one-hot entries for each filter field (all lambda for a field that is n
 server cannot tell filtered from unfiltered queries). Stage 1 returns encrypted center scores; the
 client decrypts them and picks clusters. Each round's slot value is score + lambda * c, with c the
 number of fields the vector matches; the client decodes the band, keeps the vectors with c = F,
-and counts them. Fewer than k matches: widen 2x per round on the same stream up to max_probe, then
-fall back to Strict if allowed, else report `incomplete`. The candidates are re-ranked with the
+and counts them. The number of rounds is fixed per security level (see `run_search`); fewer than
+k matches after them is reported as `incomplete`. The candidates are re-ranked with the
 exact vectors from their record blobs (only the best `rerank_factor * k` are fetched).
 
 What the server learns: the cluster choices (real, plus decoys at the Decoy level) and how many
@@ -30,6 +30,7 @@ import numpy as np
 from ombra.blobstore import KIND_RECORD
 from ombra.file_format import Kind, read_envelope
 from ombra.presets import FILTER_LAMBDA
+from ombra.probe import FIELDS_KEY, ProbePlanner, decoy_round_sizes, strict_halves
 from ombra.topk import ParallelTopk
 
 API_VERSION = 1
@@ -51,7 +52,7 @@ class SearchResult:
     probed: list[int]  # clusters chosen for real, in order (decoys are not listed)
     rounds: int
     matches: int  # candidates that passed the filter
-    strict_fallback: bool  # the Strict fallback was used
+    strict_fallback: bool  # expected selectivity < 0.5%: all clusters scanned in two rounds
 
 
 class _Stream:
@@ -149,10 +150,8 @@ def run_search(
     *,
     filter: Mapping[int, int | Sequence[int]] | None = None,
     level: str | None = None,
-    decoys: int | None = None,
     n_probe: int | None = None,
     max_probe_factor: int = 8,
-    strict_fallback: bool = True,
     rerank_factor: int = 3,
     workers: int = 1,
     seed: int | None = None,
@@ -162,10 +161,21 @@ def run_search(
     `filter` maps a field index to one allowed value or a list of them (OR inside a field, AND
     across fields). `level` overrides the collection's security level for this query. `n_probe`
     is the first round's cluster count (default ceil(sqrt(clusters))); a filtered query starts
-    with the same count, so it probes at least what the unfiltered query would. At the Decoy
-    level, `decoys` random clusters are added to each round (default: as many as the real ones;
-    0 is refused, since it would make Decoy the same as Fast). `rerank_factor * k` record blobs
-    are fetched for re-ranking (default 3, the 2-3x k of the requirements).
+    with at least that many. `rerank_factor * k` record blobs are fetched for re-ranking
+    (default 3, the 2-3x k of the requirements).
+
+    Round count is fixed so the server cannot tell filtered from unfiltered queries by it:
+    * Strict: every query scans all clusters in two rounds (halves by cluster id).
+    * Decoy: every query does exactly two rounds, and each round is padded with random decoys to a
+      requested-cluster count that depends only on `n_probe` and the cluster count, not on the
+      filter: min(C, 2 * first) in round 1, then min(C - round 1, 4 * first) in round 2.
+    * Fast: a filtered query does exactly two rounds (when round 2 has no new cluster to ask it is
+      counted but nothing is sent); an unfiltered query keeps the 0019 rule (one round, widened
+      2x only below k matches, up to `max_probe_factor` times the first round).
+    A filtered query with statistics uses policy "e2" (ombra.probe); expected selectivity below
+    0.5% turns it into a full scan in the level's two rounds (the server sees this). No cluster is
+    requested twice on a stream. Fewer than k matches after the rounds: `incomplete`, never
+    padded and never a third round.
     """
     pb = col.pb
     level = level or col.security_level
@@ -173,8 +183,6 @@ def run_search(
         raise ValueError(f"security level must be one of {list(LEVELS)}")
     if k < 1 or rerank_factor < 1 or max_probe_factor < 1:
         raise ValueError("k, rerank_factor and max_probe_factor must be positive")
-    if decoys is not None and (decoys < 1 if level == "decoy" else decoys < 0):
-        raise ValueError("the Decoy level needs at least one decoy per round")
     q = np.asarray(query, dtype=np.float64)
     if q.shape != (col.derived.dimension,):
         raise ValueError("query has the wrong dimension")
@@ -204,34 +212,40 @@ def run_search(
     asked_all: set[int] = set()  # every cluster requested on this stream, real or decoy
     rounds = 0
 
-    def run_round(chosen: list[int]) -> None:
+    def run_round(chosen: list[int], pad_to: int | None = None) -> None:
         nonlocal rounds
         # A cluster is never requested twice on one stream: a repeat would tell the server which
         # earlier choices were decoys. Results of a cluster asked earlier are already in `cand`.
         asked = [c for c in dict.fromkeys(chosen) if c not in asked_all]
+        if pad_to is not None and len(asked) < pad_to:  # Decoy: fixed requested count
+            left = [c for c in range(total) if c not in asked_all and c not in set(asked)]
+            asked += rng.sample(left, min(pad_to - len(asked), len(left)))
         asked_all.update(asked)
-        if not asked:
-            rounds += 1
-            return
-        stream.send(pb.SearchRequest(chosen=pb.SearchChosen(cluster_ids=asked)))
-        msgs = [stream.next().scores for _ in asked]
-        envs, counts, owners = [], [], []
-        for m in msgs:
-            blocks = sizes.get(m.cluster_id, [])
-            if len(m.score_blocks) != len(blocks) or len(m.ids) != sum(blocks):
-                raise RuntimeError("block layout changed during the search")
-            pos = 0
-            for env, n in zip(m.score_blocks, blocks, strict=True):
-                envs.append(bytes(env))
-                counts.append(n)
-                owners.append([bytes(i) for i in m.ids[pos : pos + n]])
-                pos += n
-        for vals, ids in zip(_decrypt_round(col, envs, counts, workers), owners, strict=True):
-            c, score = decode_band(vals)
-            for j, ident in enumerate(ids):
-                if c[j] == n_fields:  # live (c >= 0) and every field matches
-                    cand[ident] = float(score[j])
         rounds += 1
+        for part in _chunks(asked):
+            stream.send(pb.SearchRequest(chosen=pb.SearchChosen(cluster_ids=part)))
+            msgs = [stream.next().scores for _ in part]
+            envs, counts, owners = [], [], []
+            for m in msgs:
+                blocks = sizes.get(m.cluster_id, [])
+                if len(m.score_blocks) != len(blocks) or len(m.ids) != sum(blocks):
+                    raise RuntimeError("block layout changed during the search")
+                pos = 0
+                for env, n in zip(m.score_blocks, blocks, strict=True):
+                    envs.append(bytes(env))
+                    counts.append(n)
+                    owners.append([bytes(i) for i in m.ids[pos : pos + n]])
+                    pos += n
+            for vals, ids in zip(_decrypt_round(col, envs, counts, workers), owners, strict=True):
+                c, score = decode_band(vals)
+                for j, ident in enumerate(ids):
+                    if c[j] == n_fields:  # live (c >= 0) and every field matches
+                        cand[ident] = float(score[j])
+
+    def scan_all() -> None:
+        for part in strict_halves(total):
+            run_round(part)
+            probed.extend(part)
 
     fell_back = False
     try:
@@ -240,31 +254,41 @@ def run_search(
         order = [int(i) for i in np.argsort(-cs, kind="stable")]
         first = max(1, math.ceil(math.sqrt(total))) if n_probe is None else max(1, n_probe)
         first = min(first, total)
-        cap = min(total, math.ceil(first * max_probe_factor))
         if level == "strict":
-            for part in _chunks(order):
-                run_round(part)
-            probed = list(order)
+            scan_all()
         else:
-            size, pos = first, 0
-            while True:
-                real = order[pos : min(pos + size, cap)]
-                pos += len(real)
-                probed += real
-                extra: list[int] = []
-                if level == "decoy":
-                    rest = [c for c in range(total) if c not in asked_all and c not in set(real)]
-                    n_decoys = len(real) if decoys is None else decoys
-                    extra = rng.sample(rest, min(n_decoys, len(rest)))
-                run_round(real + extra)  # decoy results are valid candidates too
-                if len(cand) >= k or pos >= cap:
-                    break
-                size *= 2
-            if len(cand) < k and strict_fallback and pos < total:
-                for part in _chunks(order[pos:]):
-                    run_round(part)
-                probed += order[pos:]
+            if filter and col.stats is not None:
+                policy = "e2"
+            elif level == "fast" and not filter:
+                policy = "basic"
+            else:
+                policy = "plain2"
+            plan = ProbePlanner(
+                order,
+                policy,
+                k,
+                first,
+                stats=col.stats,
+                filter=filter,
+                cap1=2 * first if level == "decoy" else None,
+                max_probe_factor=max_probe_factor,
+            )
+            real = plan.first_round()
+            if real is None:  # expected selectivity too low: a full scan is the better plan
+                scan_all()
                 fell_back = True
+            elif policy == "basic":
+                while real:
+                    probed += real
+                    run_round(real)
+                    real = plan.next_round(len(cand), asked_all)
+            else:
+                r1, r2 = decoy_round_sizes(first, total) if level == "decoy" else (None, None)
+                probed += real
+                run_round(real, r1)
+                real = plan.next_round(len(cand), asked_all)
+                probed += real
+                run_round(real, r2)  # may be empty: the round still counts (Decoy: all decoys)
     finally:
         stream.close()
 
@@ -284,6 +308,7 @@ def _rerank(col: Any, q: np.ndarray, top: list[tuple[bytes, float]], k: int) -> 
     for ident, _ in top:
         rec = col.codec.open_record(ident, col.blobs.get(col.name, KIND_RECORD, ident))
         v = np.frombuffer(rec.vector, dtype="<f4").astype(np.float64)
-        scored.append(Hit(ident, float(v @ q), rec.metadata))
+        meta = {k: m for k, m in rec.metadata.items() if k != FIELDS_KEY}
+        scored.append(Hit(ident, float(v @ q), meta))
     scored.sort(key=lambda h: (-h.score, h.id))
     return scored[:k]

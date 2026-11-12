@@ -23,7 +23,10 @@ from ombra.blobstore import KIND_DOCUMENT, KIND_RECORD, BlobStoreError  # noqa: 
 from ombra.collection import Collection, KeyKit  # noqa: E402
 from ombra.params import ParamsError  # noqa: E402
 
-pytestmark = pytest.mark.gpu
+BACKENDS = [
+    pytest.param("server", marks=pytest.mark.gpu),
+    pytest.param("local", marks=pytest.mark.openfhe),  # the in-process CPU server (T3.7)
+]
 
 VERSION = "test-openfhe"
 D = 384
@@ -55,14 +58,23 @@ def _check(res, want):
     assert np.allclose([h.score for h in res.hits], scores, atol=SCORE_TOL)
 
 
-def test_insert_search_delete(tmp_path) -> None:
-    binary = ec.find_server_binary()
-    if binary is None:
-        pytest.fail("ombra_server not found")
-    pb, pbg = ec.load_stubs(tmp_path / "stubs")
-    server = ec.ServerProcess(binary, tmp_path / "data", VERSION, tmp_path / "server.log")
-    api = ec.OmbraClient(pb, pbg, server.address, "m0_compact_n8192", VERSION)
-    stub = api.stub
+@pytest.mark.parametrize("backend", BACKENDS)
+def test_insert_search_delete(tmp_path, backend) -> None:
+    version = VERSION
+    if backend == "server":
+        binary = ec.find_server_binary()
+        if binary is None:
+            pytest.fail("ombra_server not found")
+        pb, pbg = ec.load_stubs(tmp_path / "stubs")
+        server = ec.ServerProcess(binary, tmp_path / "data", version, tmp_path / "server.log")
+        api = ec.OmbraClient(pb, pbg, server.address, "m0_compact_n8192", version)
+        stub, stop = api.stub, lambda: (api.close(), server.stop())
+    else:
+        from ombra._local import LocalTransport
+
+        transport = LocalTransport(tmp_path / "local")
+        pb, stub, version = transport.pb, transport.stub, transport.openfhe_version
+        stop = transport.close
     col = None
     try:
         rng = np.random.default_rng(11)
@@ -87,7 +99,7 @@ def test_insert_search_delete(tmp_path) -> None:
                 preset="fast",
                 fields=np.zeros((1, 17)),
                 cards=[2] * 17,
-                openfhe_version=VERSION,
+                openfhe_version=version,
             )
         with pytest.raises(ParamsError):
             Collection.create(
@@ -99,7 +111,7 @@ def test_insert_search_delete(tmp_path) -> None:
                 preset="balanced",
                 fields=np.zeros((1, 15)),
                 cards=[2] * 15,
-                openfhe_version=VERSION,
+                openfhe_version=version,
             )
 
         col = Collection.create(
@@ -112,7 +124,7 @@ def test_insert_search_delete(tmp_path) -> None:
             fields=fields[: n - 30],
             cards=CARDS,
             n_clusters=CLUSTERS,
-            openfhe_version=VERSION,
+            openfhe_version=version,
             metadata=[{"i": i} for i in range(n - 30)],
             documents=[f"doc {i}" for i in range(n - 30)],
         )
@@ -125,34 +137,33 @@ def test_insert_search_delete(tmp_path) -> None:
         for q in queries:
             want = _plain(x, fields, live, q)
             _check(col.search(q, K, n_probe=2), want)  # fast (the collection's level)
-            _check(col.search(q, K, level="decoy", decoys=2, n_probe=2, seed=1), want)
+            res = col.search(q, K, level="decoy", n_probe=2, seed=1)
+            _check(res, want)
+            assert res.rounds == 2  # Decoy: two rounds, filtered or not
             res = col.search(q, K, level="strict")
             _check(res, want)
-            assert sorted(res.probed) == list(range(col.cluster_count))
+            assert sorted(res.probed) == list(range(col.cluster_count)) and res.rounds == 2
             assert res.hits[0].metadata == {"i": int(res.hits[0].id[1:])}
         _check(col.search(queries[0], K, n_probe=2, workers=2), _plain(x, fields, live, queries[0]))
 
-        # with a filter; a filtered query probes at least what the unfiltered one does
+        # with a filter (0019 amendment): at least the unfiltered clusters, exactly two rounds
         for q in queries:
             unf = col.search(q, K, n_probe=2)
             for v in (0, 1):
                 fil = col.search(q, K, filter={0: v}, n_probe=2)
                 _check(fil, _plain(x, fields, live, q, v))
                 assert set(unf.probed) <= set(fil.probed)
-                assert fil.rounds == 1 and fil.probed == unf.probed  # K matches: no widening
+                assert fil.rounds == 2
             both = col.search(q, K, filter={0: [0, 1]}, n_probe=2)
             _check(
                 both, _plain(x, fields, live, q, None, [i for i in range(n) if fields[i, 0] < 2])
             )
 
-        # a selective filter (4 matches, K = 5) widens 2x per round up to max_probe, then stops
+        # a selective filter (4 matches, K = 5): every match is found, the answer is reported short
         q = queries[0]
         rare_want = _plain(x, fields, live, q, 2)
-        res = col.search(q, K, filter={0: 2}, n_probe=1, max_probe_factor=2, strict_fallback=False)
-        assert res.incomplete and len(res.probed) == 2 and res.rounds == 2
-        assert not res.strict_fallback and all(fields[int(h.id[1:]), 0] == 2 for h in res.hits)
-        res = col.search(q, K, filter={0: 2}, n_probe=1, max_probe_factor=2)  # Strict fallback
-        assert res.strict_fallback and res.incomplete and sorted(res.probed) == list(range(6))
+        res = col.search(q, K, filter={0: 2}, n_probe=1)
+        assert res.incomplete and res.rounds == 2
         assert [h.id for h in res.hits] == rare_want[0] and len(res.hits) == 4
 
         # a new vector comes back first, with its metadata and document
@@ -178,7 +189,7 @@ def test_insert_search_delete(tmp_path) -> None:
         # the keys come back from the key file: a collection can be reopened
         key_path = tmp_path / "docs.key"
         col.kit.save(key_path, "pw", scrypt_params=(2**4, 8, 1))
-        kit2 = KeyKit.load(key_path, "pw", presets.derive("fast", D), VERSION, col.kit.n_leaves)
+        kit2 = KeyKit.load(key_path, "pw", presets.derive("fast", D), version, col.kit.n_leaves)
         again = Collection.open(pb, stub, col.name, kit2)
         assert again.cards == CARDS and again.cluster_count == CLUSTERS
         assert np.allclose(again.centers, col.centers, atol=1e-2)
@@ -188,5 +199,4 @@ def test_insert_search_delete(tmp_path) -> None:
     finally:
         if col is not None:
             col.close()
-        api.close()
-        server.stop()
+        stop()
