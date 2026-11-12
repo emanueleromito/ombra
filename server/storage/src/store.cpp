@@ -70,7 +70,9 @@ Store::Store(std::string root, std::string openfhe_version)
   recover();
 }
 
-std::string Store::segment_path(const std::string& name) const { return segments_dir() + "/" + name; }
+std::string Store::segment_path(const std::string& name) const {
+  return segments_dir() + "/" + name;
+}
 
 void Store::create_collection(const CollectionSpec& spec) {
   std::lock_guard lk(mu_);
@@ -126,8 +128,10 @@ void SegmentPin::release() {
 
 void Store::unlink_or_defer(const std::string& file) {
   auto it = pins_.find(file);
-  if (it != pins_.end() && it->second > 0) deferred_.insert(file);
-  else ::unlink(segment_path(file).c_str());
+  if (it != pins_.end() && it->second > 0)
+    deferred_.insert(file);
+  else
+    ::unlink(segment_path(file).c_str());
 }
 
 void Store::unpin(const std::vector<std::string>& files) const {
@@ -207,10 +211,12 @@ std::string Store::replace_segments(const std::string& collection,
     auto l = catalog_->live_ids(collection, seg);
     live.insert(live.end(), l.begin(), l.end());
   }
-  if (neu.ids.empty()) throw BlockMismatch("no ids: a block with no live vector is dropped instead");
+  if (neu.ids.empty())
+    throw BlockMismatch("no ids: a block with no live vector is dropped instead");
   if (std::set<std::string>(neu.ids.begin(), neu.ids.end()).size() != neu.ids.size() ||
       neu.ids.size() != live.size() ||
-      std::set<std::string>(neu.ids.begin(), neu.ids.end()) != std::set<std::string>(live.begin(), live.end()))
+      std::set<std::string>(neu.ids.begin(), neu.ids.end()) !=
+          std::set<std::string>(live.begin(), live.end()))
     throw BlockMismatch("ids are not exactly the live ids of the old blocks");
   std::size_t bytes = 0;
   for (const auto& c : neu.column_envelopes) {
@@ -226,7 +232,8 @@ std::string Store::replace_segments(const std::string& collection,
     SegmentInfo info = write_segment(path, neu);
     maybe_crash(CrashPoint::ReplaceAfterNewFile);
     catalog_->replace_segments(collection, old_segments,
-                               {neu.cluster, name, info.n_vectors, info.n_columns, info.crc}, neu.ids);
+                               {neu.cluster, name, info.n_vectors, info.n_columns, info.crc},
+                               neu.ids);
   } catch (...) {
     if (!catalog_->has_segment(name)) {
       ::unlink(path.c_str());
@@ -281,7 +288,8 @@ std::string Store::insert(const std::string& collection, std::uint32_t cluster,
   try {
     SegmentData sd{cluster, ids, cols};
     SegmentInfo info = write_segment(path, sd);  // rename crash points fire inside
-    catalog_->add_segment(collection, {cluster, name, info.n_vectors, info.n_columns, info.crc}, ids);
+    catalog_->add_segment(collection, {cluster, name, info.n_vectors, info.n_columns, info.crc},
+                          ids);
   } catch (...) {
     // Not acknowledged: drop the file now; the dangling intent is discarded at next recovery.
     if (!catalog_->has_segment(name)) {
@@ -304,7 +312,8 @@ std::string Store::insert(const std::string& collection, std::uint32_t cluster,
 void Store::remove(const std::string& collection, const std::vector<std::string>& ids) {
   std::lock_guard lk(mu_);
   const auto t0 = std::chrono::steady_clock::now();
-  if (!catalog_->get_collection(collection, nullptr)) throw std::runtime_error("unknown collection");
+  if (!catalog_->get_collection(collection, nullptr))
+    throw std::runtime_error("unknown collection");
   WalRecord rec;
   rec.type = WalType::Delete;
   rec.collection = collection;
@@ -323,9 +332,12 @@ void Store::put_key_file(const std::string& collection, const std::string& kind,
   CollectionSpec spec;
   if (!catalog_->get_collection(collection, &spec)) throw std::runtime_error("unknown collection");
   core::EnvelopeKind k;
-  if (kind == kKeyContext) k = core::EnvelopeKind::Context;
-  else if (kind == kKeyEvalMult || kind == kKeyAutomorphism) k = core::EnvelopeKind::PublicEvalKey;
-  else throw std::runtime_error("unknown key file kind");
+  if (kind == kKeyContext)
+    k = core::EnvelopeKind::Context;
+  else if (kind == kKeyEvalMult || kind == kKeyAutomorphism)
+    k = core::EnvelopeKind::PublicEvalKey;
+  else
+    throw std::runtime_error("unknown key file kind");
   core::read_envelope(envelope, k, spec.preset, ofhe_);  // also refuses unknown versions
   std::string old;
   for (auto& [kk, f] : catalog_->key_files(collection))
@@ -336,16 +348,20 @@ void Store::put_key_file(const std::string& collection, const std::string& kind,
   if (!old.empty()) ::unlink((root_ + "/keys/" + old).c_str());
 }
 
-void Store::put_key_files(const std::string& collection,
-                          const std::vector<std::pair<std::string, std::vector<std::uint8_t>>>& files) {
+void Store::put_key_files(
+    const std::string& collection,
+    const std::vector<std::pair<std::string, std::vector<std::uint8_t>>>& files) {
   std::lock_guard lk(mu_);
   CollectionSpec spec;
   if (!catalog_->get_collection(collection, &spec)) throw std::runtime_error("unknown collection");
   for (const auto& [kind, envelope] : files) {
     core::EnvelopeKind k;
-    if (kind == kKeyContext) k = core::EnvelopeKind::Context;
-    else if (kind == kKeyEvalMult || kind == kKeyAutomorphism) k = core::EnvelopeKind::PublicEvalKey;
-    else throw std::runtime_error("unknown key file kind");
+    if (kind == kKeyContext)
+      k = core::EnvelopeKind::Context;
+    else if (kind == kKeyEvalMult || kind == kKeyAutomorphism)
+      k = core::EnvelopeKind::PublicEvalKey;
+    else
+      throw std::runtime_error("unknown key file kind");
     core::read_envelope(envelope, k, spec.preset, ofhe_);
   }
   std::map<std::string, std::string> old;
@@ -379,7 +395,8 @@ void Store::put_blob(const std::string& collection, std::uint32_t kind, const st
   const auto t0 = std::chrono::steady_clock::now();
   if (!is_blob_kind(kind)) throw BlobKindError("unknown blob kind");
   if (!is_blob_bucket(payload.size())) throw BlobSizeError("blob size is not a bucket size");
-  if (!catalog_->get_collection(collection, nullptr)) throw std::runtime_error("unknown collection");
+  if (!catalog_->get_collection(collection, nullptr))
+    throw std::runtime_error("unknown collection");
   const std::string file = hex_name('b', catalog_->next_segment_id(), ".oblob");
   const std::string path = blob_dir() + "/" + file;
   std::string old;
@@ -416,7 +433,8 @@ std::size_t Store::delete_blobs(const std::string& collection, std::uint32_t kin
   std::lock_guard lk(mu_);
   const auto t0 = std::chrono::steady_clock::now();
   if (!is_blob_kind(kind)) throw BlobKindError("unknown blob kind");
-  if (!catalog_->get_collection(collection, nullptr)) throw std::runtime_error("unknown collection");
+  if (!catalog_->get_collection(collection, nullptr))
+    throw std::runtime_error("unknown collection");
   const auto files = catalog_->delete_blobs(collection, kind, ids);
   maybe_crash(CrashPoint::BlobDeleteAfterCatalog);
   for (const auto& f : files) ::unlink((blob_dir() + "/" + f).c_str());
@@ -479,8 +497,8 @@ void Store::recover() {
       // Committed means the segment was durable; finish the catalog update (idempotent).
       SegmentInfo info;
       auto sd = ombra::storage::read_segment(path, spec.preset, ofhe_, &info);
-      catalog_->add_segment(r.collection, {sd.cluster, r.segment, info.n_vectors, info.n_columns, info.crc},
-                            sd.ids);
+      catalog_->add_segment(
+          r.collection, {sd.cluster, r.segment, info.n_vectors, info.n_columns, info.crc}, sd.ids);
       ++stats_.rolled_forward;
     } else if (in_catalog && !is_committed) {
       // The catalog already has it, so the whole write is there: complete it by logging the commit.
@@ -498,7 +516,8 @@ void Store::recover() {
     }
   }
 
-  // Sweep: temp files and any segment file the catalog does not know are leftovers of aborted writes.
+  // Sweep: temp files and any segment file the catalog does not know are leftovers of aborted
+  // writes.
   auto files = catalog_->all_segment_files();
   std::set<std::string> known(files.begin(), files.end());
   for (const auto& n : list_dir(segments_dir())) {

@@ -12,7 +12,8 @@ constexpr std::size_t kHeader = 10;
 void before_rename_hook() { maybe_crash(CrashPoint::BlobBeforeRename); }
 }  // namespace
 
-std::vector<std::uint8_t> encode_blob(std::uint32_t kind, const std::vector<std::uint8_t>& payload) {
+std::vector<std::uint8_t> encode_blob(std::uint32_t kind,
+                                      const std::vector<std::uint8_t>& payload) {
   std::vector<std::uint8_t> body;
   body.reserve(12 + payload.size());
   put_le(body, kind, 4);
@@ -34,7 +35,8 @@ void write_blob_file(const std::string& path, std::uint32_t kind,
 std::vector<std::uint8_t> read_blob_file(const std::string& path, std::uint32_t expected_kind) {
   auto b = read_file(path);
   if (b.size() < kHeader + 12) throw std::runtime_error("blob: truncated header");
-  if (b[0] != 'O' || b[1] != 'B' || b[2] != 'L' || b[3] != 'B') throw std::runtime_error("blob: bad magic");
+  if (b[0] != 'O' || b[1] != 'B' || b[2] != 'L' || b[3] != 'B')
+    throw std::runtime_error("blob: bad magic");
   auto version = get_le(b.data() + 4, 2);
   if (version != kBlobVersion)
     throw std::runtime_error("blob: unknown container version " + std::to_string(version));

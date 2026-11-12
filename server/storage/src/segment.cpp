@@ -86,8 +86,8 @@ SegmentData read_segment(const std::string& path, const std::string& expected_pr
     pos += 8;
     need(len);
     // Throws on unknown envelope version, wrong kind, wrong preset or OpenFHE version.
-    ombra::core::read_envelope(p + pos, len, ombra::core::EnvelopeKind::Ciphertext,
-                               expected_preset, expected_openfhe_version);
+    ombra::core::read_envelope(p + pos, len, ombra::core::EnvelopeKind::Ciphertext, expected_preset,
+                               expected_openfhe_version);
     s.column_envelopes.emplace_back(p + pos, p + pos + len);
     pos += len;
   }

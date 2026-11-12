@@ -1,11 +1,12 @@
 // GPU cluster cache: pinned host pool + GPU cache + asynchronous paging. See
-// include/ombra/cache/gpu_cache.hpp for the contract. The eviction policy and the offset bookkeeping
-// are in arena_lru.cpp / range_allocator.cpp (pure C++, unit tested on the CPU).
+// include/ombra/cache/gpu_cache.hpp for the contract. The eviction policy and the offset
+// bookkeeping are in arena_lru.cpp / range_allocator.cpp (pure C++, unit tested on the CPU).
 //
 // Ordering rules (all device work for the cache is on `copy_stream`, the caller's kernels on its
 // own compute stream):
 //   * copy -> compute: next() makes the compute stream wait on the block's `ready` event.
-//   * compute -> copy: releasing a lease records `last_use` on the compute stream; when that block is
+//   * compute -> copy: releasing a lease records `last_use` on the compute stream; when that block
+//   is
 //     evicted, the copy stream waits on `last_use` before the memory is reused.
 //   * host pool: a pinned host block stays pinned until the event recorded after its copy has
 //     completed, so a segment is never overwritten while the DMA reads it.
@@ -192,8 +193,10 @@ struct GpuClusterCache::Impl {
       r = host_lru.admit(key, bytes, off, ev);
       m.host_evictions += ev.size();
     }
-    if (r == AdmitResult::kTooLarge) throw CacheError("cache: a block is larger than the host pool");
-    if (r == AdmitResult::kBusy) throw CacheError("cache: host pool too small for the blocks in use");
+    if (r == AdmitResult::kTooLarge)
+      throw CacheError("cache: a block is larger than the host pool");
+    if (r == AdmitResult::kBusy)
+      throw CacheError("cache: host pool too small for the blocks in use");
     try {
       loader.load(key, reinterpret_cast<std::uint64_t*>(host_mem.get() + off), words);
     } catch (...) {
@@ -216,7 +219,8 @@ struct GpuClusterCache::Impl {
     const std::size_t words = loader.size_words(key);
     if (words == 0) throw CacheError("cache: empty block");
     const std::size_t bytes = words * kWordBytes;
-    if (bytes > gpu_lru.capacity()) throw CacheError("cache: a block is larger than the GPU budget");
+    if (bytes > gpu_lru.capacity())
+      throw CacheError("cache: a block is larger than the GPU budget");
 
     const unsigned char* host_ptr = host_acquire(key, words);
     std::size_t goff = 0;
@@ -225,7 +229,8 @@ struct GpuClusterCache::Impl {
     drop_gpu(ev, true);
     if (r != AdmitResult::kOk) {
       host_lru.unpin(key);
-      if (r == AdmitResult::kTooLarge) throw CacheError("cache: a block is larger than the GPU budget");
+      if (r == AdmitResult::kTooLarge)
+        throw CacheError("cache: a block is larger than the GPU budget");
       if (demand) throw CacheError("cache: GPU budget too small for the blocks in use");
       return false;
     }
@@ -237,8 +242,8 @@ struct GpuClusterCache::Impl {
     entry.bytes = bytes;
     Inflight fl{key, {}};
     fl.done.create();
-    OMBRA_CUDA_THROW(cudaMemcpyAsync(dev_mem.get() + goff, host_ptr, bytes, cudaMemcpyHostToDevice,
-                                     copy()));
+    OMBRA_CUDA_THROW(
+        cudaMemcpyAsync(dev_mem.get() + goff, host_ptr, bytes, cudaMemcpyHostToDevice, copy()));
     OMBRA_CUDA_THROW(cudaEventRecord(entry.ready.get(), copy()));
     OMBRA_CUDA_THROW(cudaEventRecord(fl.done.get(), copy()));
     entries.emplace(key, std::move(entry));
@@ -307,7 +312,8 @@ GpuClusterCache::Lease GpuClusterCache::next(Stream& compute) {
     lease.ptr_ = reinterpret_cast<const std::uint64_t*>(s.dev_mem.get() + e.offset);
     lease.words_ = e.bytes / kWordBytes;
     lease.stream_ = compute.get();
-    OMBRA_CUDA_THROW(cudaStreamWaitEvent(static_cast<cudaStream_t>(compute.get()), e.ready.get(), 0));
+    OMBRA_CUDA_THROW(
+        cudaStreamWaitEvent(static_cast<cudaStream_t>(compute.get()), e.ready.get(), 0));
   }
   for (std::size_t i = 1; i <= s.cfg.lookahead && pos + i < s.order.size(); ++i) {
     const std::size_t p = pos + i;

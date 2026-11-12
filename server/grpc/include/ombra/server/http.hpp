@@ -24,6 +24,7 @@ enum class HttpParse { Incomplete, Ok, TooLarge, Bad };
 HttpParse parse_http_request(std::string_view buf, HttpRequest* out);
 
 // A complete response with Connection: close.
-std::string http_response(int status, std::string_view body, std::string_view content_type = "application/json");
+std::string http_response(int status, std::string_view body,
+                          std::string_view content_type = "application/json");
 
 }  // namespace ombra::server

@@ -132,8 +132,9 @@ struct EngineCore {
     const std::size_t col_words = 2 * c->nq * c->ring;
     if (sd.column_envelopes.size() * col_words != words) throw SearchError("loader: block shape");
     for (std::size_t j = 0; j < sd.column_envelopes.size(); ++j) {
-      const core::Envelope e = core::read_envelope(sd.column_envelopes[j], core::EnvelopeKind::Ciphertext,
-                                                   c->spec.preset, store.openfhe_version());
+      const core::Envelope e =
+          core::read_envelope(sd.column_envelopes[j], core::EnvelopeKind::Ciphertext,
+                              c->spec.preset, store.openfhe_version());
       std::istringstream in(to_string_bytes(e.payload), std::ios::in | std::ios::binary);
       Ct ct;
       Serial::Deserialize(ct, in, SerType::BINARY);
@@ -141,8 +142,8 @@ struct EngineCore {
       if (ct->GetKeyTag() != c->spec.key_tag)
         throw KeyTagMismatch("stored column was made under another key than the collection's");
       const core::FlatCiphertexts f = core::flatten_ciphertexts({ct});
-      if (f.num_towers != c->nq || f.ring_dim != c->ring || f.moduli != c->moduli ||
-          f.level != 0 || f.noise_scale_deg != 1 || f.scaling_factor != c->column_scale)
+      if (f.num_towers != c->nq || f.ring_dim != c->ring || f.moduli != c->moduli || f.level != 0 ||
+          f.noise_scale_deg != 1 || f.scaling_factor != c->column_scale)
         throw SearchError("loader: stored column has an unexpected level, scale or shape");
       std::copy(f.words.begin(), f.words.end(), dst + j * col_words);
     }
@@ -198,7 +199,9 @@ SearchEngine::SearchEngine(storage::Store& store, const EngineConfig& config)
   e.compute = std::make_unique<cache::Stream>();
   cache::BlockLoader loader;
   loader.size_words = [&e](const cache::BlockKey& k) { return e.block_words(k); };
-  loader.load = [&e](const cache::BlockKey& k, u64* dst, std::size_t w) { e.load_block(k, dst, w); };
+  loader.load = [&e](const cache::BlockKey& k, u64* dst, std::size_t w) {
+    e.load_block(k, dst, w);
+  };
   cache::CacheConfig cc;
   cc.gpu_budget_bytes = config.gpu_budget_bytes;
   cc.host_budget_bytes = config.host_budget_bytes;
@@ -241,7 +244,8 @@ PreparedKeys SearchEngine::prepare_keys(const std::string& name,
     return to_string_bytes(core::read_envelope(b, k, c->spec.preset, ofhe).payload);
   };
   {
-    std::istringstream in(payload(ctx_b, core::EnvelopeKind::Context), std::ios::in | std::ios::binary);
+    std::istringstream in(payload(ctx_b, core::EnvelopeKind::Context),
+                          std::ios::in | std::ios::binary);
     Serial::Deserialize(c->cc, in, SerType::BINARY);
     if (!c->cc) throw SearchError("cannot read the crypto context");
   }
@@ -256,7 +260,8 @@ PreparedKeys SearchEngine::prepare_keys(const std::string& name,
   // so that keys of another tag that this call inserts can be removed again when they are refused.
   std::set<std::string> mult_before;
   std::set<std::string> auto_before;
-  for (const auto& kv : CryptoContextImpl<DCRTPoly>::GetAllEvalMultKeys()) mult_before.insert(kv.first);
+  for (const auto& kv : CryptoContextImpl<DCRTPoly>::GetAllEvalMultKeys())
+    mult_before.insert(kv.first);
   for (const auto& kv : CryptoContextImpl<DCRTPoly>::GetAllEvalAutomorphismKeys())
     auto_before.insert(kv.first);
   const auto drop_foreign = [&] {
@@ -333,7 +338,8 @@ std::unique_ptr<SearchSession> SearchEngine::open_session(
     if (!e.store.get_collection(collection, &s)) throw CollectionNotFound("unknown collection");
     throw KeysMissing("collection not loaded: upload the keys first");
   }
-  if (key_tag != c->spec.key_tag) throw KeyTagMismatch("request key tag differs from the collection's");
+  if (key_tag != c->spec.key_tag)
+    throw KeyTagMismatch("request key tag differs from the collection's");
   if (filter_leaves != c->layout.filter_leaves())
     throw InvalidQuery("filter_leaves differs from sum(cardinality) of the collection");
 
@@ -349,7 +355,8 @@ std::unique_ptr<SearchSession> SearchEngine::open_session(
   if (!query) throw InvalidQuery("bad query ciphertext");
   if (query->GetKeyTag() != c->spec.key_tag)
     throw KeyTagMismatch("query ciphertext was made under another key than the collection's");
-  if (query->GetElements().size() != 2 || query->GetLevel() != 0 || query->GetNoiseScaleDeg() != 1 ||
+  if (query->GetElements().size() != 2 || query->GetLevel() != 0 ||
+      query->GetNoiseScaleDeg() != 1 ||
       std::abs(query->GetScalingFactor() / c->column_scale - 1.0) > 1e-9 ||
       query->GetElements()[0].GetRingDimension() != c->ring)
     throw InvalidQuery("query ciphertext has an unexpected shape, level or scale");

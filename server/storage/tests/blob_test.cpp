@@ -84,8 +84,16 @@ void refusals() {
                         std::size_t{300000}})
     CHECK_THROWS(s.put_blob("docs", kRec, "a", blob(1, n)));
   bool size_err = false, kind_err = false;
-  try { s.put_blob("docs", kRec, "a", blob(1, 100)); } catch (const BlobSizeError&) { size_err = true; }
-  try { s.put_blob("docs", 0, "a", blob(1)); } catch (const BlobKindError&) { kind_err = true; }
+  try {
+    s.put_blob("docs", kRec, "a", blob(1, 100));
+  } catch (const BlobSizeError&) {
+    size_err = true;
+  }
+  try {
+    s.put_blob("docs", 0, "a", blob(1));
+  } catch (const BlobKindError&) {
+    kind_err = true;
+  }
   CHECK(size_err && kind_err);
   CHECK_THROWS(s.put_blob("docs", 3, "a", blob(1)));
   CHECK_THROWS(s.put_blob("nope", kRec, "a", blob(1)));
@@ -143,8 +151,10 @@ void check_state(const std::string& root, const std::string& id, std::uint32_t k
   Store s(root, kOfhe);
   std::vector<std::uint8_t> out;
   const bool have = s.get_blob("docs", kind, id, &out);
-  if (expect) CHECK(have && out == *expect);
-  else CHECK(!have);
+  if (expect)
+    CHECK(have && out == *expect);
+  else
+    CHECK(!have);
   const auto cf = s.catalog().all_blob_files();
   const std::set<std::string> cat(cf.begin(), cf.end());
   CHECK(files_in(root + "/blobs") == cat);  // no orphan, no .tmp, no missing file
@@ -153,25 +163,29 @@ void check_state(const std::string& root, const std::string& id, std::uint32_t k
 void crashes() {
   const auto old_b = blob(1), new_b = blob(2);
   // Replace of an existing blob.
-  for (auto p : {CrashPoint::BlobBeforeRename, CrashPoint::BlobAfterRename, CrashPoint::BlobAfterCatalog}) {
+  for (auto p :
+       {CrashPoint::BlobBeforeRename, CrashPoint::BlobAfterRename, CrashPoint::BlobAfterCatalog}) {
     TempDir d;
     {
       Store s(d.path, kOfhe);
       s.create_collection(spec());
       s.put_blob("docs", kRec, "k", old_b);
     }
-    CHECK(run_child(d.path, p, [&](Store& s) { s.put_blob("docs", kRec, "k", new_b); }) == kCrashExitCode);
+    CHECK(run_child(d.path, p, [&](Store& s) { s.put_blob("docs", kRec, "k", new_b); }) ==
+          kCrashExitCode);
     // Before the catalog commit the old blob stays, after it the new one is there.
     check_state(d.path, "k", kRec, p == CrashPoint::BlobAfterCatalog ? &new_b : &old_b);
   }
   // First put of a new blob: absent before the commit, present after.
-  for (auto p : {CrashPoint::BlobBeforeRename, CrashPoint::BlobAfterRename, CrashPoint::BlobAfterCatalog}) {
+  for (auto p :
+       {CrashPoint::BlobBeforeRename, CrashPoint::BlobAfterRename, CrashPoint::BlobAfterCatalog}) {
     TempDir d;
     {
       Store s(d.path, kOfhe);
       s.create_collection(spec());
     }
-    CHECK(run_child(d.path, p, [&](Store& s) { s.put_blob("docs", kRec, "k", new_b); }) == kCrashExitCode);
+    CHECK(run_child(d.path, p, [&](Store& s) { s.put_blob("docs", kRec, "k", new_b); }) ==
+          kCrashExitCode);
     check_state(d.path, "k", kRec, p == CrashPoint::BlobAfterCatalog ? &new_b : nullptr);
   }
   // Delete: the catalog commit decides; the file is swept.
@@ -193,7 +207,8 @@ void crashes() {
       Store s(d.path, kOfhe);
       s.create_collection(spec());
     }
-    CHECK(run_child(d.path, CrashPoint::None, [&](Store& s) { s.put_blob("docs", kRec, "k", new_b); }) == 0);
+    CHECK(run_child(d.path, CrashPoint::None,
+                    [&](Store& s) { s.put_blob("docs", kRec, "k", new_b); }) == 0);
     check_state(d.path, "k", kRec, &new_b);
   }
 }

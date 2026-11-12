@@ -15,7 +15,8 @@
 //      integer coefficients equal OpenFHE's words EXACTLY; (c) the GPU evaluation form equals
 //      OpenFHE's NTT of the GPU's own coefficients EXACTLY, always; (d) the GPU's coefficient
 //      words are one integer reduced into every tower, EXACTLY. An optional last argument
-//      (none|reduction|ntt|tower|meta_level|meta_degree|meta_scale) injects a fault, for tests of the oracle only.
+//      (none|reduction|ntt|tower|meta_level|meta_degree|meta_scale) injects a fault, for tests of
+//      the oracle only.
 //   2. Search with OpenFHE-encoded plaintexts: the GPU result equals OpenFHE
 //      sum_j EvalMult(query_j, plaintext_j) (EvalAdd accumulation) EXACTLY (every RNS word and the
 //      metadata, derived by gpu_eval_plain_search from the query and plaintexts, not copied
@@ -38,8 +39,8 @@
 #include "ciphertext-ser.h"
 #include "cryptocontext-ser.h"
 #include "ombra/core/ciphertext_ops.hpp"
-#include "ombra/core/oracle_compare.hpp"
 #include "ombra/core/expansion_gpu.hpp"
+#include "ombra/core/oracle_compare.hpp"
 #include "ombra/core/plain_search.hpp"
 #include "ombra/core/security_floor_context.hpp"
 #include "openfhe.h"

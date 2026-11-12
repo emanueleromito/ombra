@@ -190,12 +190,12 @@ struct RescaleDims {
   u64 num_q;     // towers of the input ciphertext (the last one is dropped)
 };
 // Step 2 of the rescale. last: [z][N] coefficient-form words of the last tower (z = node * 2 +
-// component); tmp: [z][num_q - 1][N] = last switched to modulus q_i with the centered representative
-// (NativeVector(v, q_i) in DCRTPoly::DropLastElementAndScale). nodes2 = 2 * nodes.
+// component); tmp: [z][num_q - 1][N] = last switched to modulus q_i with the centered
+// representative (NativeVector(v, q_i) in DCRTPoly::DropLastElementAndScale). nodes2 = 2 * nodes.
 cudaError_t launch_rescale_switch(const u64* last, u64* tmp, const TowerConst* tc,
                                   const RescaleDims& dims, u32 nodes2, cudaStream_t stream);
-// Step 4: out[node][r][i][k] = (in[node][r][i][k] - tmp[z][i][k]) * ql_inv[i] mod q_i, i < num_q - 1;
-// `in` is [2][num_q][N] and `out` is [2][num_q - 1][N] per node. tmp holds the forward NTT of
+// Step 4: out[node][r][i][k] = (in[node][r][i][k] - tmp[z][i][k]) * ql_inv[i] mod q_i, i < num_q -
+// 1; `in` is [2][num_q][N] and `out` is [2][num_q - 1][N] per node. tmp holds the forward NTT of
 // the output of launch_rescale_switch.
 cudaError_t launch_rescale_combine(const u64* const* in, const u64* tmp, u64* const* out,
                                    const u64* ql_inv, const TowerConst* tc, const RescaleDims& dims,

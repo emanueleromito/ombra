@@ -88,14 +88,15 @@ void write_all(int fd, const std::uint8_t* d, std::size_t n, const std::string& 
 Wal::Wal(std::string path) : path_(std::move(path)) {
   fd_ = ::open(path_.c_str(), O_RDWR | O_CREAT, 0644);
   if (fd_ < 0) fail("open", path_);
-  struct stat st{};
+  struct stat st {};
   if (::fstat(fd_, &st) != 0) fail("stat", path_);
   if (static_cast<std::size_t>(st.st_size) < kHeader) {
     // New file, or a header torn during creation (no records can exist yet).
     if (::ftruncate(fd_, 0) != 0) fail("truncate", path_);
     std::vector<std::uint8_t> h{'O', 'W', 'A', 'L'};
     put_le(h, kWalVersion, 2);
-    if (::pwrite(fd_, h.data(), h.size(), 0) != static_cast<ssize_t>(h.size())) fail("write", path_);
+    if (::pwrite(fd_, h.data(), h.size(), 0) != static_cast<ssize_t>(h.size()))
+      fail("write", path_);
     if (::fsync(fd_) != 0) fail("fsync", path_);
     fsync_path(parent_dir(path_));
     return;

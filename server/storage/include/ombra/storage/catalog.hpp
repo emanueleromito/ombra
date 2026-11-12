@@ -1,6 +1,6 @@
 // SQLite catalog (schema_version 2, api_version 1; schema 1 catalogs are migrated, version 2 adds
-// the blob table). journal_mode=WAL, synchronous=FULL, foreign_keys=ON. Opening a catalog with another stored api_version or
-// schema_version is refused.
+// the blob table). journal_mode=WAL, synchronous=FULL, foreign_keys=ON. Opening a catalog with
+// another stored api_version or schema_version is refused.
 #pragma once
 
 #include <cstdint>

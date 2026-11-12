@@ -10,7 +10,8 @@ namespace {
 bool iequals(std::string_view a, std::string_view b) {
   if (a.size() != b.size()) return false;
   for (std::size_t i = 0; i < a.size(); ++i)
-    if (std::tolower(static_cast<unsigned char>(a[i])) != std::tolower(static_cast<unsigned char>(b[i])))
+    if (std::tolower(static_cast<unsigned char>(a[i])) !=
+        std::tolower(static_cast<unsigned char>(b[i])))
       return false;
   return true;
 }
@@ -23,15 +24,24 @@ std::string_view trim(std::string_view s) {
 
 const char* reason(int status) {
   switch (status) {
-    case 200: return "OK";
-    case 400: return "Bad Request";
-    case 401: return "Unauthorized";
-    case 403: return "Forbidden";
-    case 404: return "Not Found";
-    case 405: return "Method Not Allowed";
-    case 408: return "Request Timeout";
-    case 431: return "Request Header Fields Too Large";
-    default: return "Error";
+    case 200:
+      return "OK";
+    case 400:
+      return "Bad Request";
+    case 401:
+      return "Unauthorized";
+    case 403:
+      return "Forbidden";
+    case 404:
+      return "Not Found";
+    case 405:
+      return "Method Not Allowed";
+    case 408:
+      return "Request Timeout";
+    case 431:
+      return "Request Header Fields Too Large";
+    default:
+      return "Error";
   }
 }
 
@@ -66,9 +76,12 @@ HttpParse parse_http_request(std::string_view buf, HttpRequest* out) {
     if (colon == std::string_view::npos || colon == 0) return HttpParse::Bad;
     const std::string_view name = h.substr(0, colon);
     const std::string_view value = trim(h.substr(colon + 1));
-    if (iequals(name, "authorization")) req.authorization = std::string(value);
-    else if (iequals(name, "transfer-encoding")) return HttpParse::Bad;
-    else if (iequals(name, "content-length") && value != "0") return HttpParse::Bad;
+    if (iequals(name, "authorization"))
+      req.authorization = std::string(value);
+    else if (iequals(name, "transfer-encoding"))
+      return HttpParse::Bad;
+    else if (iequals(name, "content-length") && value != "0")
+      return HttpParse::Bad;
   }
   *out = std::move(req);
   return HttpParse::Ok;

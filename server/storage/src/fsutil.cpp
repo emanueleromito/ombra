@@ -91,7 +91,7 @@ void write_file_durable(const std::string& path, const std::vector<std::uint8_t>
 std::vector<std::uint8_t> read_file(const std::string& path) {
   Fd f{::open(path.c_str(), O_RDONLY)};
   if (f.fd < 0) throw std::runtime_error(err("open", path));
-  struct stat st{};
+  struct stat st {};
   if (::fstat(f.fd, &st) != 0) throw std::runtime_error(err("stat", path));
   std::vector<std::uint8_t> b(static_cast<std::size_t>(st.st_size));
   std::size_t off = 0;

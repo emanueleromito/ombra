@@ -1,7 +1,7 @@
 // The 128-bit security floor, enforced on the C++ side (review finding F7).
 //
-// `check_security_floor` is a pure function on plain numbers (no OpenFHE), so the negative tests can
-// run without ever building an insecure CryptoContext. `require_security_floor` (in
+// `check_security_floor` is a pure function on plain numbers (no OpenFHE), so the negative tests
+// can run without ever building an insecure CryptoContext. `require_security_floor` (in
 // security_floor_context.hpp) reads the same three numbers from a CryptoContext and is called by
 // every core entry point that takes one.
 //

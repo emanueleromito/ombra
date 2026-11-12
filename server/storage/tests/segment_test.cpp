@@ -1,7 +1,8 @@
+#include "ombra/storage/segment.hpp"
+
 #include <fstream>
 
 #include "ombra/storage/fsutil.hpp"
-#include "ombra/storage/segment.hpp"
 #include "test_util.hpp"
 
 using namespace ombra::storage;

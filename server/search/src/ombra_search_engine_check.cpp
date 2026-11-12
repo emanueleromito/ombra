@@ -7,7 +7,7 @@
 //                  count K, one "block <cluster> <idx> <n_ids>" line per stored block (cluster K =
 //                  the center blocks), "delete <id>" lines, and the query names
 //   context.bin, evalmult.bin, autokeys.bin           OpenFHE BINARY serializations
-//   col_<cluster>_<idx>_<j>.bin                       column j of a block (d + sum(V) columns, centers d)
+//   col_<cluster>_<idx>_<j>.bin                       block column j (d + sum(V), centers d)
 //   query_<name>.bin, query_wrongkey.bin              packed queries of D entries
 // Vector ids are "<cluster>.<idx>.<slot>".
 //
@@ -23,7 +23,6 @@
 // which alone holds the secret key. Prints PASS/FAIL lines, counts and timings, never data.
 // Exit code: 0 all exact, 1 mismatch, 2 error.
 
-#include <typeinfo>
 #include <cstdio>
 #include <exception>
 #include <filesystem>
@@ -32,6 +31,7 @@
 #include <set>
 #include <sstream>
 #include <string>
+#include <typeinfo>
 #include <vector>
 
 #include "ciphertext-ser.h"
@@ -76,13 +76,20 @@ Manifest read_manifest(const std::string& path) {
     std::istringstream in(line);
     std::string k;
     in >> k;
-    if (k == "preset") in >> m.preset;
-    else if (k == "version") in >> m.version;
-    else if (k == "collection") in >> m.collection;
-    else if (k == "key_tag") in >> m.key_tag;
-    else if (k == "d") in >> m.d;
-    else if (k == "clusters") in >> m.clusters;
-    else if (k == "card") for (std::uint32_t c; in >> c;) m.cards.push_back(c);
+    if (k == "preset")
+      in >> m.preset;
+    else if (k == "version")
+      in >> m.version;
+    else if (k == "collection")
+      in >> m.collection;
+    else if (k == "key_tag")
+      in >> m.key_tag;
+    else if (k == "d")
+      in >> m.d;
+    else if (k == "clusters")
+      in >> m.clusters;
+    else if (k == "card")
+      for (std::uint32_t c; in >> c;) m.cards.push_back(c);
     else if (k == "block") {
       Manifest::Block b{};
       in >> b.cluster >> b.idx >> b.n_ids;
@@ -152,9 +159,10 @@ void check(const std::string& stage, const Ct& gpu, const Ct& cpu) {
     std::size_t bad = 0, first = 0;
     for (std::size_t i = 0; i < a.words.size(); ++i)
       if (a.words[i] != b.words[i] && bad++ == 0) first = i;
-    std::printf("%s: FAIL (%zu of %zu words differ; first at component %zu, tower %zu, index %zu)\n",
-                stage.c_str(), bad, a.words.size(), first / (a.num_towers * a.ring_dim),
-                (first / a.ring_dim) % a.num_towers, first % a.ring_dim);
+    std::printf(
+        "%s: FAIL (%zu of %zu words differ; first at component %zu, tower %zu, index %zu)\n",
+        stage.c_str(), bad, a.words.size(), first / (a.num_towers * a.ring_dim),
+        (first / a.ring_dim) % a.num_towers, first % a.ring_dim);
     ok = false;
   }
   if (ok)
@@ -191,7 +199,8 @@ bool throws_as(F&& f) {
 
 int main(int argc, char** argv) {
   if (argc != 5) {
-    std::fprintf(stderr, "usage: ombra_search_engine_check <in_dir> <out_dir> <gpu_blocks> <host_blocks>\n");
+    std::fprintf(
+        stderr, "usage: ombra_search_engine_check <in_dir> <out_dir> <gpu_blocks> <host_blocks>\n");
     return 2;
   }
   try {
@@ -223,7 +232,8 @@ int main(int argc, char** argv) {
     spec.preset = m.preset;
     spec.dimension = static_cast<std::uint32_t>(m.d);
     spec.security_level = 1;
-    for (std::uint32_t i = 0; i < m.cards.size(); ++i) spec.filter_fields.push_back({i, m.cards[i]});
+    for (std::uint32_t i = 0; i < m.cards.size(); ++i)
+      spec.filter_fields.push_back({i, m.cards[i]});
     spec.key_tag = m.key_tag;
     spec.cluster_count = static_cast<std::uint32_t>(m.clusters);
     store.create_collection(spec);
@@ -264,7 +274,8 @@ int main(int argc, char** argv) {
     cfg.blocks_per_batch = 3;  // ragged chunks: 4 blocks of a query give batches of 3 and 1
     ombra::search::SearchEngine engine(store, cfg);
     {
-      const auto q = wrap(core::EnvelopeKind::Ciphertext, m, file_bytes("query_" + m.queries[0] + ".bin"));
+      const auto q =
+          wrap(core::EnvelopeKind::Ciphertext, m, file_bytes("query_" + m.queries[0] + ".bin"));
       expect("search before key upload is refused (keys missing)",
              throws_as<ombra::search::KeysMissing>(
                  [&] { engine.open_session(m.collection, m.key_tag, q, sum_v); }));
@@ -299,9 +310,9 @@ int main(int argc, char** argv) {
              throws_as<ombra::search::KeyTagMismatch>([&] {
                engine.open_session(m.collection, m.key_tag, envelope_of_query("wrongkey"), sum_v);
              }));
-      expect("wrong filter_leaves is refused",
-             throws_as<ombra::search::InvalidQuery>(
-                 [&] { engine.open_session(m.collection, m.key_tag, q, sum_v + 1); }));
+      expect("wrong filter_leaves is refused", throws_as<ombra::search::InvalidQuery>([&] {
+               engine.open_session(m.collection, m.key_tag, q, sum_v + 1);
+             }));
       auto bad = q;
       bad[4] = 9;  // unknown envelope version
       expect("query envelope with an unknown version is refused",
@@ -317,8 +328,10 @@ int main(int argc, char** argv) {
         const Ct col = load_ct(in_dir + "/col_" + std::to_string(b.cluster) + "_" +
                                std::to_string(b.idx) + "_" + std::to_string(j) + ".bin");
         Ct prod = cc->EvalMultNoRelin(col, leaves[j]);
-        if (j == 0) sum = prod;
-        else cc->EvalAddInPlace(sum, prod);
+        if (j == 0)
+          sum = prod;
+        else
+          cc->EvalAddInPlace(sum, prod);
       }
       Ct out = cc->Rescale(cc->Relinearize(sum));
       if (b.cluster != m.clusters) {  // data blocks: plaintext penalty at deleted slots
@@ -366,7 +379,8 @@ int main(int argc, char** argv) {
           std::ofstream o(out_dir + "/" + f + ".bin", std::ios::binary);
           o.write(reinterpret_cast<const char*>(r.envelope.data()),
                   static_cast<std::streamsize>(r.envelope.size()));
-          index << f << " " << b.cluster << " " << b.idx << " " << r.tombstone_penalty_applied << "\n";
+          index << f << " " << b.cluster << " " << b.idx << " " << r.tombstone_penalty_applied
+                << "\n";
         }
       };
 
@@ -386,7 +400,8 @@ int main(int argc, char** argv) {
       std::size_t k = 0;
       for (std::uint32_t want : {1u, 0u})
         for (const auto* p : first_of)
-          if (p->cluster == want) same = same && k < again.size() && again[k++].envelope == p->envelope;
+          if (p->cluster == want)
+            same = same && k < again.size() && again[k++].envelope == p->envelope;
       expect(qname + " repeated round on the same session gives identical ciphertexts",
              same && k == again.size());
       expect(qname + " out-of-range cluster is refused",
@@ -395,12 +410,13 @@ int main(int argc, char** argv) {
     }
 
     const auto cm = engine.cache_metrics();
-    std::printf("cache metrics: hits=%llu misses=%llu evictions=%llu hit_rate=%.4f bytes_paged=%llu\n",
-                static_cast<unsigned long long>(cm.hits), static_cast<unsigned long long>(cm.misses),
-                static_cast<unsigned long long>(cm.evictions), cm.hit_rate(),
-                static_cast<unsigned long long>(cm.bytes_paged));
-    std::printf("cache collection_bytes=%zu gpu_budget_bytes=%zu block_bytes=%zu\n", collection_bytes,
-                cfg.gpu_budget_bytes, block_bytes);
+    std::printf(
+        "cache metrics: hits=%llu misses=%llu evictions=%llu hit_rate=%.4f bytes_paged=%llu\n",
+        static_cast<unsigned long long>(cm.hits), static_cast<unsigned long long>(cm.misses),
+        static_cast<unsigned long long>(cm.evictions), cm.hit_rate(),
+        static_cast<unsigned long long>(cm.bytes_paged));
+    std::printf("cache collection_bytes=%zu gpu_budget_bytes=%zu block_bytes=%zu\n",
+                collection_bytes, cfg.gpu_budget_bytes, block_bytes);
     expect("collection is larger than the GPU budget and blocks were evicted",
            collection_bytes > cfg.gpu_budget_bytes && cm.evictions > 0);
 

@@ -46,11 +46,11 @@ __host__ __device__ inline u64 mul_mod(u64 a, u64 b, const TowerConst& c) {
 // Montgomery product with R = 2^64: returns a * b * R^-1 mod q, for a * b < q * 2^64 (so for any
 // a < q, b < 2^64, and in particular a, b < q), q odd, q < 2^63, c.qinv = q^-1 mod 2^64.
 // Proof of exactness: t = a * b < q * R. m = (t mod R) * qinv mod R gives m * q == t (mod R), hence
-// t - m * q is divisible by R and equals R * (hi(t) - hi(m * q)) where hi(x) = floor(x / R) (the low
-// halves are equal). hi(t) < q because t < q * R, and hi(m * q) < q because m < R, so the difference
-// lies in (-q, q) and one conditional add of q gives the unique residue in [0, q) of t * R^-1.
-// Cost: 2 full 64x64 products (a*b: lo and hi; m*q: hi only) and one low product, against 5 products
-// plus two conditional subtractions for Barrett.
+// t - m * q is divisible by R and equals R * (hi(t) - hi(m * q)) where hi(x) = floor(x / R) (the
+// low halves are equal). hi(t) < q because t < q * R, and hi(m * q) < q because m < R, so the
+// difference lies in (-q, q) and one conditional add of q gives the unique residue in [0, q) of t *
+// R^-1. Cost: 2 full 64x64 products (a*b: lo and hi; m*q: hi only) and one low product, against 5
+// products plus two conditional subtractions for Barrett.
 __host__ __device__ inline u64 mont_mul(u64 a, u64 b, const TowerConst& c) {
   const u128 t = (u128)a * b;
   const u64 m = (u64)t * c.qinv;

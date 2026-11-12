@@ -92,8 +92,8 @@ inline Envelope read_envelope(const std::uint8_t* data, std::size_t size,
   if (e.preset != expected_preset)
     throw std::runtime_error("envelope: preset mismatch (file has '" + e.preset + "')");
   if (e.openfhe_version != expected_openfhe_version)
-    throw std::runtime_error("envelope: OpenFHE version mismatch (file has '" +
-                             e.openfhe_version + "')");
+    throw std::runtime_error("envelope: OpenFHE version mismatch (file has '" + e.openfhe_version +
+                             "')");
   need(8);
   std::uint64_t len = detail::get(data + pos, 8);
   pos += 8;

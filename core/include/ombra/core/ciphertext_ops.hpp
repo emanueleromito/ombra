@@ -23,36 +23,37 @@ namespace ombra::core {
 // A list of ciphertexts with identical shape, moduli and metadata, flattened to RNS words laid out
 // [ciphertext][component][tower][coeff] (the layout the search kernel reads).
 struct FlatCiphertexts {
-    std::size_t count = 0;
-    std::size_t num_towers = 0;
-    std::size_t ring_dim = 0;
-    std::vector<std::uint64_t> words;
-    std::vector<std::uint64_t> moduli;  // one per tower, from the ciphertexts
-    std::size_t level = 0;
-    std::size_t noise_scale_deg = 0;
-    double scaling_factor = 0;
-    std::string key_tag;  // the key the ciphertexts were encrypted under (all equal)
-    lbcrypto::PlaintextEncodings encoding = lbcrypto::INVALID_ENCODING;
+  std::size_t count = 0;
+  std::size_t num_towers = 0;
+  std::size_t ring_dim = 0;
+  std::vector<std::uint64_t> words;
+  std::vector<std::uint64_t> moduli;  // one per tower, from the ciphertexts
+  std::size_t level = 0;
+  std::size_t noise_scale_deg = 0;
+  double scaling_factor = 0;
+  std::string key_tag;  // the key the ciphertexts were encrypted under (all equal)
+  lbcrypto::PlaintextEncodings encoding = lbcrypto::INVALID_ENCODING;
 };
 
 // Flattens 2-component, evaluation-form CKKS FIXEDMANUAL ciphertexts. Throws
 // std::invalid_argument if they differ in level, noise degree, scale, shape, moduli, key tag or
 // encoding type (the checks OpenFHE's TypeCheck makes, which the GPU paths would otherwise skip).
-FlatCiphertexts flatten_ciphertexts(const std::vector<lbcrypto::Ciphertext<lbcrypto::DCRTPoly>>& cts);
+FlatCiphertexts flatten_ciphertexts(
+    const std::vector<lbcrypto::Ciphertext<lbcrypto::DCRTPoly>>& cts);
 
 // One ciphertext of any number of components (3-component products, rescaled ciphertexts),
 // words [component][tower][coeff] and its metadata.
 struct FlatOne {
-    std::size_t components = 0;
-    std::size_t num_towers = 0;
-    std::size_t ring_dim = 0;
-    std::vector<std::uint64_t> words;
-    std::vector<std::uint64_t> moduli;
-    std::size_t level = 0;
-    std::size_t noise_scale_deg = 0;
-    double scaling_factor = 0;
-    std::string key_tag;  // the key the ciphertexts were encrypted under (all equal)
-    lbcrypto::PlaintextEncodings encoding = lbcrypto::INVALID_ENCODING;
+  std::size_t components = 0;
+  std::size_t num_towers = 0;
+  std::size_t ring_dim = 0;
+  std::vector<std::uint64_t> words;
+  std::vector<std::uint64_t> moduli;
+  std::size_t level = 0;
+  std::size_t noise_scale_deg = 0;
+  double scaling_factor = 0;
+  std::string key_tag;  // the key the ciphertexts were encrypted under (all equal)
+  lbcrypto::PlaintextEncodings encoding = lbcrypto::INVALID_ENCODING;
 };
 FlatOne flatten_one(const lbcrypto::Ciphertext<lbcrypto::DCRTPoly>& ct);
 

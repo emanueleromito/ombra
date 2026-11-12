@@ -23,7 +23,9 @@ class RangeAllocator {
   std::size_t capacity() const { return capacity_; }
   std::size_t used_bytes() const { return used_bytes_; }
   std::size_t largest_free() const;
-  std::size_t round_up(std::size_t bytes) const { return (bytes + alignment_ - 1) & ~(alignment_ - 1); }
+  std::size_t round_up(std::size_t bytes) const {
+    return (bytes + alignment_ - 1) & ~(alignment_ - 1);
+  }
 
  private:
   std::size_t capacity_;  // rounded down to the alignment

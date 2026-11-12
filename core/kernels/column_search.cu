@@ -29,8 +29,8 @@
 //
 // Arithmetic: products use Montgomery multiplication (modarith.cuh, mont_mul), which takes
 // 42.8 instead of 57.2 instructions per modular multiplication in the loop. The kernel accumulates
-// acc = sum_j mont_mul(x_j, y_j) mod q = R^-1 * sum_j x_j y_j with R = 2^64 and multiplies once by R
-// (mont_finish) at the end, so inputs and outputs stay standard-form residues and the result is
+// acc = sum_j mont_mul(x_j, y_j) mod q = R^-1 * sum_j x_j y_j with R = 2^64 and multiplies once by
+// R (mont_finish) at the end, so inputs and outputs stay standard-form residues and the result is
 // bit-identical to the Barrett version. Every addition is reduced, so acc < q always.
 
 #include <algorithm>
@@ -50,44 +50,45 @@ constexpr int kBlockTile = 4;
 // grid.y = ceil(blocks / kBlockTile) (<= 65535), block = kBlockThreads threads, no shared memory.
 // Each thread keeps 3 * kBlockTile accumulators in registers and loops over the d dimensions.
 // Per dimension and block it does 4 modular multiplications (Montgomery) and 3 modular additions.
-__global__ void __launch_bounds__(kBlockThreads, 4) column_search_kernel(const u64* __restrict__ stored, const u64* __restrict__ query,
-                                     u64* __restrict__ out, const TowerConst* __restrict__ tc,
-                                     u64 dims, u64 blocks, u64 ring_dim, u64 poly_words) {
-    const u64 e = blockIdx.x * (u64)blockDim.x + threadIdx.x;
-    if (e >= poly_words) return;
-    const TowerConst c = tc[e / ring_dim];
-    const u64 b0 = (u64)blockIdx.y * kBlockTile;
-    const u64 nb = min((u64)kBlockTile, blocks - b0);
+__global__ void __launch_bounds__(kBlockThreads, 4)
+    column_search_kernel(const u64* __restrict__ stored, const u64* __restrict__ query,
+                         u64* __restrict__ out, const TowerConst* __restrict__ tc, u64 dims,
+                         u64 blocks, u64 ring_dim, u64 poly_words) {
+  const u64 e = blockIdx.x * (u64)blockDim.x + threadIdx.x;
+  if (e >= poly_words) return;
+  const TowerConst c = tc[e / ring_dim];
+  const u64 b0 = (u64)blockIdx.y * kBlockTile;
+  const u64 nb = min((u64)kBlockTile, blocks - b0);
 
-    u64 acc0[kBlockTile], acc1[kBlockTile], acc2[kBlockTile];
+  u64 acc0[kBlockTile], acc1[kBlockTile], acc2[kBlockTile];
 #pragma unroll
-    for (int k = 0; k < kBlockTile; ++k) acc0[k] = acc1[k] = acc2[k] = 0;
+  for (int k = 0; k < kBlockTile; ++k) acc0[k] = acc1[k] = acc2[k] = 0;
 
-    for (u64 j = 0; j < dims; ++j) {
-        const u64 q0 = query[(j * 2) * poly_words + e];
-        const u64 q1 = query[(j * 2 + 1) * poly_words + e];
-#pragma unroll
-        for (int k = 0; k < kBlockTile; ++k) {
-            if ((u64)k < nb) {
-                const u64 base = (((b0 + k) * dims + j) * 2) * poly_words + e;
-                const u64 s0 = stored[base];
-                const u64 s1 = stored[base + poly_words];
-                acc0[k] = add_mod(acc0[k], mont_mul(s0, q0, c), c.q);
-                const u64 cross = add_mod(mont_mul(s0, q1, c), mont_mul(s1, q0, c), c.q);
-                acc1[k] = add_mod(acc1[k], cross, c.q);
-                acc2[k] = add_mod(acc2[k], mont_mul(s1, q1, c), c.q);
-            }
-        }
-    }
+  for (u64 j = 0; j < dims; ++j) {
+    const u64 q0 = query[(j * 2) * poly_words + e];
+    const u64 q1 = query[(j * 2 + 1) * poly_words + e];
 #pragma unroll
     for (int k = 0; k < kBlockTile; ++k) {
-        if ((u64)k < nb) {
-            const u64 o = ((b0 + k) * 3) * poly_words + e;
-            out[o] = mont_finish(acc0[k], c);
-            out[o + poly_words] = mont_finish(acc1[k], c);
-            out[o + 2 * poly_words] = mont_finish(acc2[k], c);
-        }
+      if ((u64)k < nb) {
+        const u64 base = (((b0 + k) * dims + j) * 2) * poly_words + e;
+        const u64 s0 = stored[base];
+        const u64 s1 = stored[base + poly_words];
+        acc0[k] = add_mod(acc0[k], mont_mul(s0, q0, c), c.q);
+        const u64 cross = add_mod(mont_mul(s0, q1, c), mont_mul(s1, q0, c), c.q);
+        acc1[k] = add_mod(acc1[k], cross, c.q);
+        acc2[k] = add_mod(acc2[k], mont_mul(s1, q1, c), c.q);
+      }
     }
+  }
+#pragma unroll
+  for (int k = 0; k < kBlockTile; ++k) {
+    if ((u64)k < nb) {
+      const u64 o = ((b0 + k) * 3) * poly_words + e;
+      out[o] = mont_finish(acc0[k], c);
+      out[o + poly_words] = mont_finish(acc1[k], c);
+      out[o + 2 * poly_words] = mont_finish(acc2[k], c);
+    }
+  }
 }
 
 // ---- Batched search: Q queries in one pass over the same stored blocks ----
@@ -110,71 +111,69 @@ __global__ void __launch_bounds__(kBlockThreads, 4) column_search_kernel(const u
 constexpr int kBatchBlockTile = 4;
 constexpr int kBatchQueryTile = 4;
 
-__global__ void __launch_bounds__(kBlockThreads, 2) column_search_batched_kernel(const u64* __restrict__ stored,
-                                             const u64* __restrict__ queries,
-                                             u64* __restrict__ out, const TowerConst* __restrict__ tc,
-                                             u64 dims, u64 blocks, u64 num_queries, u64 ring_dim,
-                                             u64 poly_words) {
-    const u64 e = blockIdx.x * (u64)blockDim.x + threadIdx.x;
-    if (e >= poly_words) return;
-    const TowerConst c = tc[e / ring_dim];
-    const u64 b0 = (u64)blockIdx.y * kBatchBlockTile;
-    const u64 q0i = (u64)blockIdx.z * kBatchQueryTile;
-    const u64 nb = min((u64)kBatchBlockTile, blocks - b0);
-    const u64 nq = min((u64)kBatchQueryTile, num_queries - q0i);
+__global__ void __launch_bounds__(kBlockThreads, 2)
+    column_search_batched_kernel(const u64* __restrict__ stored, const u64* __restrict__ queries,
+                                 u64* __restrict__ out, const TowerConst* __restrict__ tc, u64 dims,
+                                 u64 blocks, u64 num_queries, u64 ring_dim, u64 poly_words) {
+  const u64 e = blockIdx.x * (u64)blockDim.x + threadIdx.x;
+  if (e >= poly_words) return;
+  const TowerConst c = tc[e / ring_dim];
+  const u64 b0 = (u64)blockIdx.y * kBatchBlockTile;
+  const u64 q0i = (u64)blockIdx.z * kBatchQueryTile;
+  const u64 nb = min((u64)kBatchBlockTile, blocks - b0);
+  const u64 nq = min((u64)kBatchQueryTile, num_queries - q0i);
 
-    u64 acc0[kBatchQueryTile][kBatchBlockTile], acc1[kBatchQueryTile][kBatchBlockTile],
-        acc2[kBatchQueryTile][kBatchBlockTile];
+  u64 acc0[kBatchQueryTile][kBatchBlockTile], acc1[kBatchQueryTile][kBatchBlockTile],
+      acc2[kBatchQueryTile][kBatchBlockTile];
+#pragma unroll
+  for (int m = 0; m < kBatchQueryTile; ++m) {
+#pragma unroll
+    for (int k = 0; k < kBatchBlockTile; ++k) acc0[m][k] = acc1[m][k] = acc2[m][k] = 0;
+  }
+
+  const u64 query_words = dims * 2 * poly_words;
+  for (u64 j = 0; j < dims; ++j) {
+    u64 s0[kBatchBlockTile], s1[kBatchBlockTile];
+#pragma unroll
+    for (int k = 0; k < kBatchBlockTile; ++k) {
+      if ((u64)k < nb) {
+        const u64 base = (((b0 + k) * dims + j) * 2) * poly_words + e;
+        s0[k] = stored[base];
+        s1[k] = stored[base + poly_words];
+      }
+    }
 #pragma unroll
     for (int m = 0; m < kBatchQueryTile; ++m) {
-#pragma unroll
-        for (int k = 0; k < kBatchBlockTile; ++k) acc0[m][k] = acc1[m][k] = acc2[m][k] = 0;
-    }
-
-    const u64 query_words = dims * 2 * poly_words;
-    for (u64 j = 0; j < dims; ++j) {
-        u64 s0[kBatchBlockTile], s1[kBatchBlockTile];
+      if ((u64)m < nq) {
+        const u64 qbase = (q0i + m) * query_words + (j * 2) * poly_words + e;
+        const u64 q0 = queries[qbase];
+        const u64 q1 = queries[qbase + poly_words];
 #pragma unroll
         for (int k = 0; k < kBatchBlockTile; ++k) {
-            if ((u64)k < nb) {
-                const u64 base = (((b0 + k) * dims + j) * 2) * poly_words + e;
-                s0[k] = stored[base];
-                s1[k] = stored[base + poly_words];
-            }
+          if ((u64)k < nb) {
+            acc0[m][k] = add_mod(acc0[m][k], mont_mul(s0[k], q0, c), c.q);
+            const u64 cross = add_mod(mont_mul(s0[k], q1, c), mont_mul(s1[k], q0, c), c.q);
+            acc1[m][k] = add_mod(acc1[m][k], cross, c.q);
+            acc2[m][k] = add_mod(acc2[m][k], mont_mul(s1[k], q1, c), c.q);
+          }
         }
-#pragma unroll
-        for (int m = 0; m < kBatchQueryTile; ++m) {
-            if ((u64)m < nq) {
-                const u64 qbase = (q0i + m) * query_words + (j * 2) * poly_words + e;
-                const u64 q0 = queries[qbase];
-                const u64 q1 = queries[qbase + poly_words];
-#pragma unroll
-                for (int k = 0; k < kBatchBlockTile; ++k) {
-                    if ((u64)k < nb) {
-                        acc0[m][k] = add_mod(acc0[m][k], mont_mul(s0[k], q0, c), c.q);
-                        const u64 cross =
-                            add_mod(mont_mul(s0[k], q1, c), mont_mul(s1[k], q0, c), c.q);
-                        acc1[m][k] = add_mod(acc1[m][k], cross, c.q);
-                        acc2[m][k] = add_mod(acc2[m][k], mont_mul(s1[k], q1, c), c.q);
-                    }
-                }
-            }
-        }
+      }
     }
+  }
 #pragma unroll
-    for (int m = 0; m < kBatchQueryTile; ++m) {
-        if ((u64)m < nq) {
+  for (int m = 0; m < kBatchQueryTile; ++m) {
+    if ((u64)m < nq) {
 #pragma unroll
-            for (int k = 0; k < kBatchBlockTile; ++k) {
-                if ((u64)k < nb) {
-                    const u64 o = (((q0i + m) * blocks + b0 + k) * 3) * poly_words + e;
-                    out[o] = mont_finish(acc0[m][k], c);
-                    out[o + poly_words] = mont_finish(acc1[m][k], c);
-                    out[o + 2 * poly_words] = mont_finish(acc2[m][k], c);
-                }
-            }
+      for (int k = 0; k < kBatchBlockTile; ++k) {
+        if ((u64)k < nb) {
+          const u64 o = (((q0i + m) * blocks + b0 + k) * 3) * poly_words + e;
+          out[o] = mont_finish(acc0[m][k], c);
+          out[o + poly_words] = mont_finish(acc1[m][k], c);
+          out[o + 2 * poly_words] = mont_finish(acc2[m][k], c);
         }
+      }
     }
+  }
 }
 
 }  // namespace
@@ -182,32 +181,32 @@ __global__ void __launch_bounds__(kBlockThreads, 2) column_search_batched_kernel
 cudaError_t launch_column_search(const u64* stored, const u64* query, u64* out,
                                  const TowerConst* tc, const ColumnSearchDims& d,
                                  cudaStream_t stream) {
-    const u64 poly_words = d.num_towers * d.ring_dim;
-    const u64 grid_y = (d.blocks + kBlockTile - 1) / kBlockTile;
-    if (poly_words == 0 || d.dims == 0 || d.blocks == 0 || grid_y > 65535) {
-        return cudaErrorInvalidValue;
-    }
-    const dim3 grid((unsigned)((poly_words + kBlockThreads - 1) / kBlockThreads), (unsigned)grid_y);
-    column_search_kernel<<<grid, kBlockThreads, 0, stream>>>(stored, query, out, tc, d.dims,
-                                                             d.blocks, d.ring_dim, poly_words);
-    return cudaGetLastError();
+  const u64 poly_words = d.num_towers * d.ring_dim;
+  const u64 grid_y = (d.blocks + kBlockTile - 1) / kBlockTile;
+  if (poly_words == 0 || d.dims == 0 || d.blocks == 0 || grid_y > 65535) {
+    return cudaErrorInvalidValue;
+  }
+  const dim3 grid((unsigned)((poly_words + kBlockThreads - 1) / kBlockThreads), (unsigned)grid_y);
+  column_search_kernel<<<grid, kBlockThreads, 0, stream>>>(stored, query, out, tc, d.dims, d.blocks,
+                                                           d.ring_dim, poly_words);
+  return cudaGetLastError();
 }
 
 cudaError_t launch_column_search_batched(const u64* stored, const u64* queries, u64* out,
                                          const TowerConst* tc, const ColumnSearchDims& d,
                                          u64 num_queries, cudaStream_t stream) {
-    const u64 poly_words = d.num_towers * d.ring_dim;
-    const u64 grid_y = (d.blocks + kBatchBlockTile - 1) / kBatchBlockTile;
-    const u64 grid_z = (num_queries + kBatchQueryTile - 1) / kBatchQueryTile;
-    if (poly_words == 0 || d.dims == 0 || d.blocks == 0 || num_queries == 0 || grid_y > 65535 ||
-        grid_z > 65535) {
-        return cudaErrorInvalidValue;
-    }
-    const dim3 grid((unsigned)((poly_words + kBlockThreads - 1) / kBlockThreads), (unsigned)grid_y,
-                    (unsigned)grid_z);
-    column_search_batched_kernel<<<grid, kBlockThreads, 0, stream>>>(
-        stored, queries, out, tc, d.dims, d.blocks, num_queries, d.ring_dim, poly_words);
-    return cudaGetLastError();
+  const u64 poly_words = d.num_towers * d.ring_dim;
+  const u64 grid_y = (d.blocks + kBatchBlockTile - 1) / kBatchBlockTile;
+  const u64 grid_z = (num_queries + kBatchQueryTile - 1) / kBatchQueryTile;
+  if (poly_words == 0 || d.dims == 0 || d.blocks == 0 || num_queries == 0 || grid_y > 65535 ||
+      grid_z > 65535) {
+    return cudaErrorInvalidValue;
+  }
+  const dim3 grid((unsigned)((poly_words + kBlockThreads - 1) / kBlockThreads), (unsigned)grid_y,
+                  (unsigned)grid_z);
+  column_search_batched_kernel<<<grid, kBlockThreads, 0, stream>>>(
+      stored, queries, out, tc, d.dims, d.blocks, num_queries, d.ring_dim, poly_words);
+  return cudaGetLastError();
 }
 
 // Global-memory words requested by the threads of one launch, summed from the loops of the kernel
@@ -218,16 +217,16 @@ cudaError_t launch_column_search_batched(const u64* stored, const u64* queries, 
 // (the 24-byte tower constant each thread reads is not counted). Requests, not DRAM traffic: the
 // L1 and L2 caches may serve repeated loads of the same word.
 BatchSearchTraffic column_search_batched_traffic(const ColumnSearchDims& d, u64 num_queries) {
-    const u64 p = d.num_towers * d.ring_dim;
-    const u64 block_tiles = (d.blocks + kBatchBlockTile - 1) / kBatchBlockTile;
-    const u64 query_tiles = (num_queries + kBatchQueryTile - 1) / kBatchQueryTile;
-    BatchSearchTraffic t;
-    t.stored_load_bytes = 8 * p * d.dims * 2 * d.blocks * query_tiles;
-    t.query_load_bytes = 8 * p * d.dims * 2 * num_queries * block_tiles;
-    t.store_bytes = 8 * p * 3 * d.blocks * num_queries;
-    t.compulsory_bytes =
-        8 * p * d.dims * 2 * (d.blocks + num_queries) + t.store_bytes;  // each word once
-    return t;
+  const u64 p = d.num_towers * d.ring_dim;
+  const u64 block_tiles = (d.blocks + kBatchBlockTile - 1) / kBatchBlockTile;
+  const u64 query_tiles = (num_queries + kBatchQueryTile - 1) / kBatchQueryTile;
+  BatchSearchTraffic t;
+  t.stored_load_bytes = 8 * p * d.dims * 2 * d.blocks * query_tiles;
+  t.query_load_bytes = 8 * p * d.dims * 2 * num_queries * block_tiles;
+  t.store_bytes = 8 * p * 3 * d.blocks * num_queries;
+  t.compulsory_bytes =
+      8 * p * d.dims * 2 * (d.blocks + num_queries) + t.store_bytes;  // each word once
+  return t;
 }
 
 }  // namespace ombra::core

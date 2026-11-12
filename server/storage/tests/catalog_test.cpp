@@ -1,6 +1,7 @@
+#include "ombra/storage/catalog.hpp"
+
 #include <sqlite3.h>
 
-#include "ombra/storage/catalog.hpp"
 #include "test_util.hpp"
 
 using namespace ombra::storage;

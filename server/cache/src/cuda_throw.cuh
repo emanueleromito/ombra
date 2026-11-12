@@ -3,11 +3,11 @@
 
 #include "ombra/core/cuda_check.hpp"
 
-#define OMBRA_CUDA_THROW(call)                          \
-  do {                                                  \
+#define OMBRA_CUDA_THROW(call)                                        \
+  do {                                                                \
     const ::ombra::core::Status s_ = [&]() -> ::ombra::core::Status { \
-      OMBRA_CUDA_CHECK(call);                           \
-      return {};                                        \
-    }();                                                \
-    s_.throw_if_error();                                \
+      OMBRA_CUDA_CHECK(call);                                         \
+      return {};                                                      \
+    }();                                                              \
+    s_.throw_if_error();                                              \
   } while (0)

@@ -18,8 +18,8 @@ namespace ombra::cache {
 // overlap (benchmark baseline). Returns after all kernels have finished.
 inline void run_through_cache(GpuClusterCache& cache, const core::ColumnSearchLauncher& launcher,
                               const core::ColumnSearchShape& shape, const DeviceArray& query,
-                              const std::vector<BlockKey>& order, Stream& compute,
-                              DeviceArray& out, bool serial = false) {
+                              const std::vector<BlockKey>& order, Stream& compute, DeviceArray& out,
+                              bool serial = false) {
   const std::size_t out_words = 3 * shape.poly_words();
   cache.plan(order);
   for (std::size_t i = 0; i < order.size(); ++i) {

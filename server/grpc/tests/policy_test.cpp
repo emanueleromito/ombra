@@ -1,8 +1,8 @@
 // CPU unit test of the request policy: limits, preset headroom derived from the preset JSON.
+#include "ombra/server/policy.hpp"
+
 #include <cstdio>
 #include <cstdlib>
-
-#include "ombra/server/policy.hpp"
 
 #define CHECK(c)                                                                \
   do {                                                                          \
