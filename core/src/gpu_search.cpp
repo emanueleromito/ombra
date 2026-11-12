@@ -309,7 +309,7 @@ GpuSearchTiming GpuSearch::run() {
     field = seconds_since(t0);
     t0 = Clock::now();
   };
-  s.search->run();  // the multiply-and-add kernel (T0.4); waits
+  s.search->run();  // the multiply-and-add kernel; waits
   lap(t.search_s);
 
   const u64* sum = s.search->result_device();

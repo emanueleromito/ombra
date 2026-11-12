@@ -1,4 +1,4 @@
-// Blob file (T3.4): one encrypted blob of the blob store, immutable once written. Little-endian
+// Blob file: one encrypted blob of the blob store, immutable once written. Little-endian
 // container, version 1:
 //   0   4  magic "OBLB"
 //   4   2  container version (u16, 1)

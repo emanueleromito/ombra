@@ -1,4 +1,4 @@
-# T2.5 storage engine: segments, write-ahead log, SQLite catalog, recovery. No OpenFHE, no GPU.
+# Storage engine: segments, write-ahead log, SQLite catalog, recovery. No OpenFHE, no GPU.
 include(FetchContent)
 if(POLICY CMP0135)
   cmake_policy(SET CMP0135 NEW)  # extract time = now (the option below needs CMake 3.24)

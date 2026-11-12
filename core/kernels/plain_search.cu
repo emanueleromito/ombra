@@ -1,4 +1,4 @@
-// Kernel family: ciphertext x plaintext column-packed search (T0.11).
+// Kernel family: ciphertext x plaintext column-packed search.
 //
 // Packing as in column_search.cu: one plaintext per dimension j per block, one vector per slot;
 // the pre-expanded query is d two-component ciphertexts (c0_j, c1_j), the j-th holding q_j in
@@ -16,7 +16,7 @@
 //   out:   [block][component 0..1][tower][coeff] blocks * 2 * P words
 // All input words must be reduced (< their modulus); moduli < 2^60 and odd.
 // Products are Montgomery products accumulated and corrected once at the end (mont_finish), exactly
-// as in column_search.cu (T1.4); the output is the standard-form residue.
+// as in column_search.cu; the output is the standard-form residue.
 
 #include <algorithm>
 

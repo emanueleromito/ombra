@@ -1,4 +1,4 @@
-// Minimal HTTP/1.1 request parsing for the REST admin port (T2.9). Network-facing, so it is small
+// Minimal HTTP/1.1 request parsing for the REST admin port. Network-facing, so it is small
 // and strict: the header block is capped, one request per connection, no request bodies.
 #pragma once
 

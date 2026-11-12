@@ -1,4 +1,4 @@
-// GPU cluster cache (T2.6): pinned host pool + GPU cache + asynchronous paging. See
+// GPU cluster cache: pinned host pool + GPU cache + asynchronous paging. See
 // include/ombra/cache/gpu_cache.hpp for the contract. The eviction policy and the offset bookkeeping
 // are in arena_lru.cpp / range_allocator.cpp (pure C++, unit tested on the CPU).
 //

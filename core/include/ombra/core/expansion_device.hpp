@@ -1,4 +1,4 @@
-// GPU query expansion on raw RNS words (T0.5). No OpenFHE or CUDA types in this header.
+// GPU query expansion on raw RNS words. No OpenFHE or CUDA types in this header.
 //
 // The host glue (expansion_gpu.hpp) extracts every table from OpenFHE objects into
 // ExpansionTables; kernels in core/kernels/{ntt,keyswitch}.cu use them. Public material only:
@@ -39,7 +39,7 @@ struct ExpansionTables {
   std::vector<std::uint64_t> p_hat_inv_mod_p;  // [num_p] (P/p_j)^-1 mod p_j
   std::vector<std::uint64_t> p_hat_mod_q;      // [num_p][num_q] (P/p_j) mod q_i
 
-  // Rescale (T1.2, dropping the last Q tower): q_{num_q-1}^-1 mod q_i for i < num_q - 1
+  // Rescale (dropping the last Q tower): q_{num_q-1}^-1 mod q_i for i < num_q - 1
   // (CryptoParametersCKKSRNS::GetqlInvModq). Empty if num_q == 1 (nothing to drop).
   std::vector<std::uint64_t> ql_inv_mod_q;
 };
@@ -94,7 +94,7 @@ class ExpansionDevice {
 
   CtHandle upload(const std::vector<std::uint64_t>& words);  // [comp][Q tower][N]
   std::vector<std::uint64_t> download(const CtHandle& ct);
-  // T1.3: device pointer to the words of a ciphertext ([component][Q tower][N], 2 * num_q * N
+  // Device pointer to the words of a ciphertext ([component][Q tower][N], 2 * num_q * N
   // words), valid while a handle to it is alive. For device-to-device handoff of expansion leaves.
   const std::uint64_t* device_ptr(const CtHandle& ct) const;
   void synchronize();
@@ -112,7 +112,7 @@ class ExpansionDevice {
                                                          const std::vector<char>& want_odd);
   // Largest chunk of nodes per batch (default from a ~1 GiB scratch budget); tests lower it to
   // exercise chunking. The scratch grows to the largest chunk used and is never shrunk.
-  // Memory planning (T0.7). Bytes of one ciphertext on the device; bytes of scratch for a chunk of
+  // Memory planning. Bytes of one ciphertext on the device; bytes of scratch for a chunk of
   // `nodes` nodes (what the scratch holds once it has grown to that chunk size).
   std::size_t ct_bytes() const;
   std::size_t scratch_bytes(std::size_t nodes) const;
@@ -134,7 +134,7 @@ class ExpansionDevice {
   SplitProfile profile_level(const CtHandle& c, std::uint32_t galois, std::size_t level,
                              std::size_t nodes, int reps);
 
-  // --- T1.2: relinearize, rescale and ciphertext multiply on raw device pointers. A "ciphertext"
+  // --- Relinearize, rescale and ciphertext multiply on raw device pointers. A "ciphertext"
   // here is [component][Q tower][N] words with this device's num_q towers (rescale outputs have
   // num_q - 1). All pointers are device pointers (DeviceWords::data() + offset), asynchronous on
   // the default stream. Outputs must not alias inputs.

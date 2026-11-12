@@ -1,15 +1,11 @@
-"""Client-side cluster statistics and the probe policy for filtered search (T3.11, T3.6).
+"""Client-side cluster statistics and the probe policy for filtered search.
 
-Decision 0019's first probe rule (stop at k matches in the first round) lost recall at about 1%
-selectivity (docs/plan/results/2026-11-11-t3.11-filtered-recall.md). This module holds the fix, as
-pure numpy logic with no OpenFHE and no server, so it is unit tested and also drives the plaintext
-simulation in core/bench/filter_probe_sim.py:
+Stopping at k matches in the first round lost recall at about 1% selectivity, so the client plans
+probes from per-cluster statistics. Pure numpy logic with no OpenFHE and no server.
 
 * `ClusterStats`: per cluster the number of live vectors and the number per value of each filter
-  field. (An earlier version also stored a radius per cluster for a stopping check; the sweep in
-  docs/plan/results/2026-11-11-t3.11-probe-policies.md showed it never pruned, so it was dropped
-  and the blob version bumped.) The client builds it at create, updates it on insert and delete,
-  and rebuilds it on re-clustering. It is persisted only as an encrypted blob (`seal`/`unseal`,
+  field. The client builds it at create, updates it on insert and delete, and rebuilds it on
+  re-clustering. It is persisted only as an encrypted blob (`seal`/`unseal`,
   under the reserved id `STATS_ID`), never in plaintext.
 * `ProbePlanner`: which clusters to search in each round. Every planned query has exactly two
   rounds, so the round count does not depend on the filter. Policies:
@@ -21,7 +17,7 @@ simulation in core/bench/filter_probe_sim.py:
     (the caller splits it into two rounds by cluster id).
   - "plain2" (unfiltered queries at Decoy/Strict, filtered queries without statistics): round 1 =
     the first `first` clusters by center score, round 2 = the next 2 * `first`.
-  - "basic": decision 0019's rule, first round = unfiltered count, widen 2x below `stop_matches`
+  - "basic": the first rule, first round = unfiltered count, widen 2x below `stop_matches`
     (k by default), up to `max_probe_factor` times the first round. Only for unfiltered Fast
     queries, which may use a different round count.
 """

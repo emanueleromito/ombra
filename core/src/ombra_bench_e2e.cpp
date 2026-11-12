@@ -1,4 +1,4 @@
-// ombra_bench_e2e: server side of the end-to-end query latency measurement (T1.3).
+// ombra_bench_e2e: server side of the end-to-end query latency measurement.
 //
 // Usage: ombra_bench_e2e <context.bin> <autokeys.bin> <evalmultkey.bin> <dir> <d>
 //

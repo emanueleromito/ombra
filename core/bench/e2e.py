@@ -1,6 +1,7 @@
-"""T1.3: end-to-end encrypted query latency, step by step (preset m0_depth2).
+"""End-to-end encrypted query latency, step by step (preset m0_depth2).
 
-    python core/bench/run.py --task t1.3 --out <dir>      # writes <dir>/t1.3-a100.json
+    # writes <dir>/e2e-latency-a100.json
+    python core/bench/run.py --task e2e-latency --out <dir>
 
 This process is the CLIENT: it holds the secret key (never written to disk, never sent to the C++
 process), encodes and encrypts queries, decrypts, picks the clusters and ranks. The SERVER is the
@@ -23,14 +24,15 @@ Result serialization on the server is not timed (it stands in for the network en
 steps include deserialization (a real client must parse the bytes).
 
 Data: the cluster-center block and stored block 0 are real encrypted random unit vectors, so stage 1
-selection and the decrypted scores are real and checked against numpy (bound 1e-6, as T0.6). The
-other chosen blocks are device-to-device copies of block 0, because the kernel timing does not
-depend on the values (as in T0.4/T0.7); the client still deserializes and decrypts one result
-ciphertext per chosen block. The chosen clusters are assumed packed contiguously into
-ceil(frac * N / slots) blocks (the last one masked to the valid slots); with clusters straddling
-block boundaries a real layout touches up to one extra block per chosen cluster, so per-block stage
-2 numbers are reported to scale from. Host-to-device time of the chosen blocks is reported apart:
-it is a stand-in for M2 cluster paging and not part of the search latency.
+selection and the decrypted scores are real and checked against numpy (bound 1e-6, as in the
+filter-mask test). The other chosen blocks are device-to-device copies of block 0, because the
+kernel timing does not depend on the values (as in the column-search and batching benchmarks); the
+client still deserializes and decrypts one result ciphertext per chosen block. The chosen clusters
+are assumed packed contiguously into ceil(frac * N / slots) blocks (the last one masked to the valid
+slots); with clusters straddling block boundaries a real layout touches up to one extra block per
+chosen cluster, so per-block stage 2 numbers are reported to scale from. Host-to-device time of the
+chosen blocks is reported apart: it is a stand-in for cluster paging and not part of the search
+latency.
 
 Only aggregates are printed or stored (times, sizes, max errors); data is synthetic.
 """
@@ -51,7 +53,7 @@ import numpy as np
 PRESET = "m0_depth2"
 K = 10
 SEED = 20260301
-ERROR_BOUND = 1e-6  # same agreed score bound as T0.2 to T0.6
+ERROR_BOUND = 1e-6  # same agreed score bound as the CPU baseline and the GPU tests
 FRACTIONS = (0.05, 0.20)
 SIZES = ((100_000, 100), (1_000_000, 1000))  # (N, nlist); a centers block holds up to 8192
 
@@ -394,7 +396,7 @@ def _host_cpu() -> dict[str, Any]:
     }
 
 
-def run_t13(
+def run_e2e_latency(
     out_dir: Path,
     dims: tuple[int, ...],
     queries: int,
@@ -402,7 +404,7 @@ def run_t13(
     find_binary: Callable[[str], Path],
     openfhe_version: str,
     cases_spec: list[tuple[int, float, int]] | None = None,
-    name: str = "t1.3-a100.json",
+    name: str = "e2e-latency-a100.json",
     log: Callable[[str], None] = lambda s: print(s, flush=True),
     preset: str = PRESET,
 ) -> Path:
@@ -419,7 +421,7 @@ def run_t13(
                 f"{r['queries_per_second_single_stream']:.2f} QPS"
             )
     result = {
-        "task": "T1.3",
+        "task": "e2e-latency",
         "preset": preset,
         "host_cpu": _host_cpu(),
         "gpu_name": _gpu_name(),

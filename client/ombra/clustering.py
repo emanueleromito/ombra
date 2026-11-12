@@ -1,4 +1,4 @@
-"""Spherical k-means for the coarse stage of the two-stage search (T3.5).
+"""Spherical k-means for the coarse stage of the two-stage search.
 
 Vectors are unit length, so cosine similarity is a dot product and the centers are unit vectors
 too. faiss does the k-means (it is fast and standard; sklearn would pull a far larger dependency).

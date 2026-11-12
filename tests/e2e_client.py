@@ -1,8 +1,8 @@
-"""Small test client for the Ombra gRPC server (T2.7b): the client side of the protocol.
+"""Small test client for the Ombra gRPC server: the client side of the protocol.
 
 Holds the secret key (it never leaves this process; no message of the API has a field for it),
 creates keys, encrypts vectors and queries with OpenFHE, talks to `ombra_server` over gRPC, and
-decrypts and decodes the answers: the band decode of decision 0019 (slot = score + 4 * c, c =
+decrypts and decodes the answers: the band decode (slot = score + 4 * c, c =
 number of matching filter fields, a deleted slot decodes to c < 0) and the top-k.
 
 The gRPC stubs are generated from proto/ombra/v1/ombra.proto with grpc_tools into a temp directory
@@ -97,8 +97,9 @@ class ServerProcess:
         extra_args: tuple[str, ...] = (),
         secure: bool = False,
     ) -> None:
-        # Tests that do not exercise T2.9 run without TLS and keys; `secure=True` passes none of
-        # the two flags, so extra_args must bring --tls-cert/--tls-key (and keys must exist).
+        # Tests that do not exercise TLS and API keys run without TLS and keys; `secure=True` passes
+        # none of the two flags, so extra_args must bring --tls-cert/--tls-key (and keys must
+        # exist).
         insecure_args = () if secure else ("--insecure", "--no-auth")
         self._log = open(log_path, "w")  # noqa: SIM115
         self.proc = subprocess.Popen(  # noqa: S603
@@ -409,7 +410,7 @@ class OmbraClient:
         self.check(r.error)
         return r.deleted
 
-    # ---- blocks (T2.8) ------------------------------------------------------------------------
+    # ---- blocks ------------------------------------------------------------------------
     def list_blocks(self, collection: str) -> list[Any]:
         r = self.stub.ListBlocks(self.pb.ListBlocksRequest(api_version=1, collection=collection))
         self.check(r.error)

@@ -1,4 +1,4 @@
-"""T3.7: local mode runs the server's C++ expansion in a child process.
+"""Local mode runs the server's C++ expansion in a child process.
 
 Checks that the child never imports openfhe-python and has the compiled extension loaded, that
 the default preset is "fast", that envelopes of another OpenFHE version are refused, that keys of

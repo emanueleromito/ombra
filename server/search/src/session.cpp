@@ -41,7 +41,7 @@ double ms_since(Clock::time_point t0) {
   return std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 }
 
-// Counts and timings only (hard rule 4).
+// Counts and timings only.
 void log_line(const char* what, std::size_t blocks, double ms) {
   std::fprintf(stderr, "[ombra.search] %s blocks=%zu ms=%.2f\n", what, blocks, ms);
 }
@@ -308,7 +308,7 @@ PreparedKeys SearchEngine::prepare_keys(const std::string& name,
   c->batch = c->cc->GetEncodingParams()->GetBatchSize();
   c->column_scale = cp->GetScalingFactorReal(0);
 
-  // F_max from the headroom of this context (decision 0019).
+  // F_max from the headroom of this context.
   const auto first_bits = cp->GetElementParams()->GetParams()[0]->GetModulus().GetMSB();
   const auto scale_bits = static_cast<std::size_t>(std::llround(std::log2(c->column_scale)));
   try {

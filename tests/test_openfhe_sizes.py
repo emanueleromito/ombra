@@ -1,4 +1,4 @@
-"""T0.9: object sizes at preset m0_depth2 for d = 384, 768, 1536 (sizes only, no data printed).
+"""Object sizes at preset m0_depth2 for d = 384, 768, 1536 (sizes only, no data printed).
 
 Measures with real OpenFHE objects (seeded synthetic data):
   * "raw" = RNS words held in memory/GPU: components x towers x 8 B x N (what Ombra stores on the
@@ -8,7 +8,7 @@ Objects: column-packed stored ciphertext (encrypted-DB mode), column-packed plai
 mode), query ciphertext, score download (level 2 after multiply-add, relinearize, rescale, mask,
 rescale; and level 1 before the mask), automorphism keys and the relinearization key. From these
 it derives storage per million vectors, bytes per dimension per vector, the ratio to a float32
-vector DB and how many vectors fit in an A100 40 GB. Writes /data/results/t0.9-sizes.json when
+vector DB and how many vectors fit in an A100 40 GB. Writes /data/results/sizes.json when
 /data/results exists (Modal volume), else a temp file. CPU only.
 """
 
@@ -32,7 +32,7 @@ PRESET = "m0_depth2"
 SEED = 20260109
 DIMS = [384, 768, 1536]
 WORD = 8  # bytes per RNS word (64-bit)
-A100_BYTES = 42_429_251_584  # A100 40 GB as reported by CUDA in T0.7
+A100_BYTES = 42_429_251_584  # A100 40 GB as reported by CUDA
 SCRATCH_BYTES = 1 << 30  # assumed fixed scratch (kernel temporaries, CUDA context): 1 GiB
 VECTORS = 1_000_000
 FLOAT32_BYTES_PER_DIM = 4
@@ -209,6 +209,6 @@ def test_sizes() -> None:
 
     out_dir = Path("/data/results")
     base = out_dir if out_dir.is_dir() else Path(tempfile.gettempdir())
-    out = base / "t0.9-sizes.json"
+    out = base / "sizes.json"
     out.write_text(json.dumps(result, indent=2))
     print(f"wrote {out}")

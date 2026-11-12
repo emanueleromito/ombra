@@ -1,4 +1,4 @@
-"""The Modal upload filter excludes every secret pattern from .gitignore (T1.20, F12)."""
+"""The Modal upload filter excludes every secret pattern from .gitignore (F12)."""
 
 from __future__ import annotations
 
@@ -68,7 +68,7 @@ def test_secret_patterns_excluded(pattern: str, folder: str) -> None:
         ".git/config",
         "core/build/a.o",
         "client/__pycache__/a.pyc",
-        "docs/plan/m1-core.md",
+        "docs/plan/notes.md",
         "core/data/v.npy",
     ],
 )

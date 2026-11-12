@@ -1,4 +1,4 @@
-"""T2.1: parallel decrypt + top-k gives the same result as the serial path.
+"""Parallel decrypt + top-k gives the same result as the serial path.
 
 Synthetic data only. Blocks are real CKKS ciphertexts at level 2 with a few forced ties.
 """

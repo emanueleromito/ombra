@@ -1,11 +1,12 @@
-"""T2.7c: the measurements decision 0019 requires, through the real gRPC server (A100, Modal).
+"""The filter measurements, through the real gRPC server (A100, Modal).
 
-    python core/bench/run.py --task t2.7 --out <dir>     # writes <dir>/t2.7-<preset>-a100.json
+    # writes <dir>/filter-measurements-<preset>-a100.json
+    python core/bench/run.py --task filter-measurements --out <dir>
 
 This process is the CLIENT (it holds the secret key, never written or sent). It starts the C++
 server `ombra_server` on localhost like tests/test_gpu_e2e_grpc.py and drives it with
 tests/e2e_client.py (reused, not copied): create collection, upload public keys, insert encrypted
-column blocks, search, decrypt, band-decode (decision 0019). Synthetic data only; only aggregates
+column blocks, search, decrypt, band-decode. Synthetic data only; only aggregates
 are printed or stored (errors, recalls, counts, times), never vectors, queries or scores.
 
 Three measurements per preset (`m0_depth2`, `m0_compact_n8192`):
@@ -18,19 +19,19 @@ Three measurements per preset (`m0_depth2`, `m0_compact_n8192`):
     matching every field and over all vectors, the smallest distance of a decoded value to the
     decoder's band boundary (4m - 2), the observed gap between the bands, whether every c decoded
     exactly, and the ratio of the F > 0 error to the F = 0 error.
- 2. The decision-0012 rule with the extra columns (F = 2 fields of 8 values): same method as
-    T1.6/T1.7 (recall.py / recall_check.py): recall@10 of the encrypted pipeline without
-    re-ranking against the plaintext recall of the same cluster setting (exact centers, exact
-    scores), gap within 0.005 for the full scan and every nprobe. One encrypted scan of all
-    clusters per query, restricted to the probed clusters afterwards (as recall.py does). Query
-    with the filter matching one value in each field, and with 'no filter' (all-ones).
+ 2. The recall rule with the extra columns (F = 2 fields of 8 values): same method as
+    the recall acceptance checks (recall.py / recall_check.py): recall@10 of the encrypted pipeline
+    without re-ranking against the plaintext recall of the same cluster setting (exact centers,
+    exact scores), gap within 0.005 for the full scan and every nprobe. One encrypted scan of all
+    clusters per query, restricted to the probed clusters afterwards (as recall.py does). Query with
+    the filter matching one value in each field, and with 'no filter' (all-ones).
  3. Filtered top-10 recall against brute-force filtered ground truth at selectivity 1%, 10% and
-    50%, with the client loop of decision 0019 "Selective filters": first round p clusters, each
+    50%, with the selective-filter client loop: first round p clusters, each
     extra round doubles the number of clusters, up to max_probe = mult * p clusters, then a Strict
     fallback (all remaining clusters), else `incomplete`. Gaussian-mixture data, d = 128, 8
     clusters by client k-means, k = 10, p = 2; filter placements `independent` of the clusters and
     `correlated` (the matching vectors are packed into whole clusters, so pruning matters).
-    mult = 8 is the decision's default (it covers all 8 clusters, so Strict is never separate);
+    mult = 8 is the default (it covers all 8 clusters, so Strict is never separate);
     mult = 2 is added so the Strict fallback is exercised.
 """
 
@@ -79,7 +80,7 @@ P3_SELS = (0.01, 0.1, 0.5)
 P3_PLACEMENTS = ("independent", "correlated")
 P3_MULTS = (8, 2)
 # (first-round clusters p, max_probe multiplier): p is what an unfiltered query would probe
-# (decision 0019, note of 2026-11-10); the loop never probes fewer, widening only below k matches.
+# ; the loop never probes fewer, widening only below k matches.
 P3_SETTINGS = ((2, 8), (2, 2), (4, 8))
 P3_WARMUP = 3
 NOISE = 0.7  # mixture noise relative to the unit-length component centers
@@ -352,7 +353,7 @@ def candidates(
 
 
 # -------------------------------------------------------------------------------------------------
-# 2. Decision-0012 rule with the extra columns
+# 2. Recall rule with the extra columns
 
 
 def run_part2(env: Env, data: Data, nq: int) -> dict[str, Any]:
@@ -460,7 +461,7 @@ def selective_search(
     mult: int,
     p: int = P3_NPROBE,
 ) -> dict[str, Any]:
-    """Decision 0019 client loop; returns found {row: score}, rounds, strict flag, incomplete."""
+    """Selective-filter client loop; returns found {row: score}, rounds, strict flag, incomplete."""
     nf = len(cards)
     stream, cscore = env.open(name, q, cards, wants)
     found: dict[int, float] = {}
@@ -584,8 +585,7 @@ def run_preset(out_dir: Path, preset: str, queries: int, scratch: Path | None = 
         finally:
             env.close()
     result = {
-        "task": "T2.7",
-        "decision": "0019",
+        "task": "filter-measurements",
         "preset": preset,
         "slots": ombra_params.get_preset(preset)["batch_size"],
         "lambda": LAMBDA,
@@ -594,17 +594,17 @@ def run_preset(out_dir: Path, preset: str, queries: int, scratch: Path | None = 
         "server_budgets_mb": {"gpu": GPU_BUDGET_MB, "host": HOST_BUDGET_MB},
         "synthetic_data_note": "synthetic only; aggregates only",
         "part1_score_error": p1,
-        "part2_rule_0012": p2,
+        "part2_recall_rule": p2,
         "part3_filtered_recall": p3,
         "total_wall_seconds": time.time() - t_start,
     }
-    path = out_dir / f"t2.7-{preset}-a100.json"
+    path = out_dir / f"filter-measurements-{preset}-a100.json"
     path.write_text(json.dumps(result, indent=2) + "\n")
     print(f"wrote {path}", flush=True)
     return path
 
 
-def run_t27(out_dir: Path, presets: tuple[str, ...], queries: int) -> None:
+def run_filter(out_dir: Path, presets: tuple[str, ...], queries: int) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     for preset in presets:
         run_preset(out_dir, preset, queries)

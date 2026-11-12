@@ -40,7 +40,7 @@ struct FlatCiphertexts {
 // encoding type (the checks OpenFHE's TypeCheck makes, which the GPU paths would otherwise skip).
 FlatCiphertexts flatten_ciphertexts(const std::vector<lbcrypto::Ciphertext<lbcrypto::DCRTPoly>>& cts);
 
-// One ciphertext of any number of components (T1.2: 3-component products, rescaled ciphertexts),
+// One ciphertext of any number of components (3-component products, rescaled ciphertexts),
 // words [component][tower][coeff] and its metadata.
 struct FlatOne {
     std::size_t components = 0;
@@ -106,7 +106,7 @@ std::vector<lbcrypto::Ciphertext<lbcrypto::DCRTPoly>> gpu_eval_column_search(
     const std::vector<std::vector<lbcrypto::Ciphertext<lbcrypto::DCRTPoly>>>& stored_blocks,
     const std::vector<lbcrypto::Ciphertext<lbcrypto::DCRTPoly>>& query);
 
-// Batched column search (T0.7): several queries in one pass over the stored blocks. queries[q][j]
+// Batched column search: several queries in one pass over the stored blocks. queries[q][j]
 // is dimension j of query q. Returns results[q][b], each what gpu_eval_column_search gives for
 // query q (same metadata rules).
 std::vector<std::vector<lbcrypto::Ciphertext<lbcrypto::DCRTPoly>>> gpu_eval_column_search_batched(

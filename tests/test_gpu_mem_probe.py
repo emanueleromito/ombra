@@ -1,4 +1,4 @@
-"""T0.7: nominal versus actual device memory of ciphertext-sized allocations.
+"""Nominal versus actual device memory of ciphertext-sized allocations.
 
 Runs `ombra_mem_probe`, which allocates many buffers of one ciphertext's size with separate
 cudaMalloc calls and again as one slab, and reads cudaMemGetInfo around each. The numbers are

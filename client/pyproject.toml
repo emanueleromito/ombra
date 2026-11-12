@@ -6,7 +6,7 @@ build-backend = "scikit_build_core.build"
 name = "ombra"
 version = "0.1.0"
 description = "Client for Ombra, a vector database with fully homomorphic encryption"
-requires-python = ">=3.12,<3.13"  # until T4.1 (wheels): local mode is built for 3.12 only
+requires-python = ">=3.12,<3.13"  # local mode is built for 3.12 only until wheels for other versions ship
 dependencies = ["numpy", "cryptography", "faiss-cpu"]
 
 [project.scripts]

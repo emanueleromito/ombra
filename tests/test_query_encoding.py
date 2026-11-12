@@ -1,4 +1,4 @@
-"""T0.5: client query encoding (client/ombra/query.py).
+"""Client query encoding (client/ombra/query.py).
 
 CPU-only checks of the numpy side (symmetric coefficients, embedding, indices, expansion tree on
 plain polynomials) run under `make test`. The `openfhe` tests check, through OpenFHE, that the real
@@ -88,7 +88,7 @@ def _auto(poly: np.ndarray, t: int) -> np.ndarray:
 
 @pytest.mark.parametrize("d", [1, 2, 13, 16, 31, 32])
 def test_plain_polynomial_tree_gives_constants(d: int) -> None:
-    """The tree of decision 0010 on plain symmetric polynomials: leaf r is the constant 2^L q_r."""
+    """The expansion tree on plain symmetric polynomials: leaf r is the constant 2^L q_r."""
     n = 64
     q = np.random.default_rng(2).standard_normal(d)
     depth = oq.expansion_depth(d)

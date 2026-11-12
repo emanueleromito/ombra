@@ -44,6 +44,7 @@ test-openfhe-local: ## Run tests marked openfhe here, no Modal (needs OpenFHE 1.
 	$(PYTHON) -m pytest -m openfhe -v
 
 bench: ## Run benchmarks on Modal (A100); TASK=t0.4 to pick one
+bench: ## Run benchmarks on Modal (A100); TASK=column-search to pick one
 	modal run modal_app.py::bench --task $(TASK)
 
 gpu-info: ## Check GPU, CUDA and OpenFHE in the Modal image (A10)

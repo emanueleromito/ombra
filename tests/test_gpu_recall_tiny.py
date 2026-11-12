@@ -1,4 +1,4 @@
-"""T0.8: the recall measurement code path end to end on tiny synthetic data.
+"""The recall measurement code path end to end on tiny synthetic data.
 
 Seeded synthetic unit vectors (d = 16, one database block, a few queries), a faiss k-means with
 4 clusters, the real pipeline of core/bench/recall.py (encrypt blocks and centers, encode queries,
@@ -60,7 +60,7 @@ def test_recall_pipeline_tiny(tmp_path: Path) -> None:
     for row in rows.values():
         assert 0.0 <= row["encrypted_no_rerank"] <= 1.0
         assert 0.0 <= row["encrypted_rerank"] <= 1.0
-    # The T1.6 acceptance rule on real encrypted output: this small run must be within tolerance
+    # The recall acceptance rule on real encrypted output: this small run must be within tolerance
     # everywhere, count as eligible only with a lowered query minimum, and a tight tolerance must
     # be able to fail (an impossible negative tolerance flags every setting).
     check = recall.recall_check.check_dataset(result, min_queries=nq)

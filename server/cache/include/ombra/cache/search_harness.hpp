@@ -1,4 +1,4 @@
-// Runs the (unchanged) column search kernel over blocks served by the GPU cluster cache (T2.6).
+// Runs the (unchanged) column search kernel over blocks served by the GPU cluster cache.
 // Header only, no CUDA types, no OpenFHE: shared by the paging test driver and the benchmark.
 #pragma once
 

@@ -1,4 +1,4 @@
-// Ombra file envelope v1 (decision 0016). Header only, no OpenFHE. Little-endian layout:
+// Ombra file envelope v1. Header only, no OpenFHE. Little-endian layout:
 //   0  4  magic "OMBR"
 //   4  2  format version (u16, 1)
 //   6  2  kind (u16: 1 context, 2 ciphertext, 3 public eval key)
@@ -8,7 +8,7 @@
 //   .  V  OpenFHE version string
 //   .  8  payload length L (u64)
 //   .  L  payload (OpenFHE BINARY serialization); the file ends here
-// There is deliberately no kind for a secret key (hard rule 2).
+// There is deliberately no kind for a secret key (the secret key never leaves the client).
 #pragma once
 
 #include <cstdint>

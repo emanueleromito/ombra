@@ -1,5 +1,5 @@
 // ombra_encoding_check: reads the polynomial coefficients OpenFHE produces when it encodes given
-// real slot values (T0.5 encoding test).
+// real slot values (expansion encoding test).
 //
 // Usage: ombra_encoding_check <context.bin> <slots.bin> <q.bin> <d>
 //

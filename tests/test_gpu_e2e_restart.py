@@ -1,6 +1,6 @@
-"""T2.10: end-to-end through the gRPC server, with a RESTART of the server on the same data dir.
+"""End-to-end through the gRPC server, with a RESTART of the server on the same data dir.
 
-tests/test_gpu_e2e_grpc.py (T2.7b) already covers create, key upload, insert, search with and
+tests/test_gpu_e2e_grpc.py already covers create, key upload, insert, search with and
 without a filter, delete and the numpy / CPU OpenFHE oracles, but never restarts the server. This
 file adds what is missing: the same flow, then the server process is killed (SIGKILL, no clean
 shutdown) and started again on the same data directory, and searching again must give
@@ -11,8 +11,8 @@ shutdown) and started again on the same data directory, and searching again must
   * the same answers as the numpy brute force over the live vectors;
   * the same collection info (vector and deleted counts, keys uploaded).
 
-Both presets, d = 16, 300 vectors in 6 clusters (the Deployment of the T2.7b test). The secret key
-stays in the test process; the restarted server gets no key again (it must have kept the public
+Both presets, d = 16, 300 vectors in 6 clusters (the Deployment of the gRPC server test). The secret
+key stays in the test process; the restarted server gets no key again (it must have kept the public
 keys on disk). Synthetic data only.
 """
 

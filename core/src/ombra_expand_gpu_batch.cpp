@@ -1,4 +1,4 @@
-// ombra_expand_gpu_batch: batched GPU query expansion checked exactly against OpenFHE (T0.7).
+// ombra_expand_gpu_batch: batched GPU query expansion checked exactly against OpenFHE.
 //
 // Usage: ombra_expand_gpu_batch <context.bin> <autokeys.bin> <d> <queries> <dir>
 //

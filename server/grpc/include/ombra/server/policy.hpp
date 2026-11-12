@@ -1,8 +1,8 @@
-// Request policy of the gRPC server (T2.7b): limits and collection-spec validation. Pure C++, no
+// Request policy of the gRPC server: limits and collection-spec validation. Pure C++, no
 // gRPC, no OpenFHE and no GPU, so it is unit-tested on the CPU.
 //
 // The preset numbers come from core/params/ckks_presets.json through a header that CMake generates
-// at configure time (preset_table.hpp); nothing is hand-picked here (hard rule 1).
+// at configure time (preset_table.hpp); nothing is hand-picked here.
 #pragma once
 
 #include <cstddef>
@@ -58,7 +58,7 @@ struct PresetInfo {
 
 const PresetInfo* find_preset(const std::string& name);  // nullptr if unknown
 
-// Largest filter field count the preset's headroom allows (decision 0019, includes the tombstone
+// Largest filter field count the preset's headroom allows (includes the tombstone
 // penalty, capped at the proto limit of 16).
 std::size_t max_filter_fields_for(const PresetInfo& p);
 

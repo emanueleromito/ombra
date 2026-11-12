@@ -1,4 +1,4 @@
-# T2.7 search engine library. The pure logic (layout, tombstone penalty vector) is plain C++ and
+# Search engine library. The pure logic (layout, tombstone penalty vector) is plain C++ and
 # tested on the CPU. The engine itself needs OpenFHE and CUDA and is built only with
 # OMBRA_ENABLE_CUDA=ON.
 add_library(ombra_search_logic STATIC src/layout.cpp)

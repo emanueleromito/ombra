@@ -1,4 +1,4 @@
-"""T3.5: block repack planning and clustering (CPU only, no OpenFHE)."""
+"""Block repack planning and clustering (CPU only, no OpenFHE)."""
 
 from __future__ import annotations
 

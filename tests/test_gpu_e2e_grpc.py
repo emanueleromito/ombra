@@ -1,10 +1,10 @@
-"""T2.7b: end-to-end through the gRPC server `ombra_server`, both presets.
+"""End-to-end through the gRPC server `ombra_server`, both presets.
 
 The test starts the server on a free localhost port in a temp directory and drives it with
 tests/e2e_client.py: the client creates the keys (the secret key stays in this process), creates a
 collection (d = 16, two filter fields with 3 and 4 values), uploads the public keys, inserts 6
 clusters of encrypted vectors plus one block of cluster centers, searches, decrypts, decodes the
-bands (decision 0019) and takes the top-k.
+bands and takes the top-k.
 
 Cases: (a) no filter: top-10 equals the CPU OpenFHE oracle (the client evaluates the same sum on its
 own copies of the ciphertexts) and numpy brute force; (b) filter on one field and on both (AND):

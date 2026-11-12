@@ -1,4 +1,4 @@
-"""T0.5: query expansion by automorphisms, OpenFHE CPU reference (decision 0010).
+"""Query expansion by automorphisms, OpenFHE CPU reference.
 
 Python makes keys (preset m0_depth2), encodes a normalized query as the symmetric polynomial
 through OpenFHE, generates automorphism keys for exactly N/2^k + 1, k < ceil(log2(2d)), and writes
@@ -33,7 +33,7 @@ pytestmark = pytest.mark.openfhe
 PRESET = "m0_depth2"
 SEED = 20260108
 
-# Max |decrypted slot - q_j| after expansion. Agreed bound for T0.5; do not loosen.
+# Max |decrypted slot - q_j| after expansion. Agreed bound for expansion; do not loosen.
 EXPANSION_TOLERANCE = 1e-6
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -182,7 +182,7 @@ def test_expansion_end_to_end_score_with_mask(
 
     # Column j of the stored vectors is encrypted at level 0, multiplied with leaf j and summed.
     # Encrypting column by column (instead of holding all d ciphertexts) keeps memory bounded;
-    # the ciphertexts are the same as T0.4's stored_j.
+    # the ciphertexts are the same as the stored_j of the column search test.
     score = None
     for j in range(d):
         col = cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(stored[:, j].tolist()))

@@ -1,6 +1,6 @@
 // Project error handling for CUDA calls. Include only from CUDA translation units (.cu).
 //
-// Convention (core/CLAUDE.md): host code inside the library returns a `Status`; exceptions are
+// Convention: host code inside the library returns a `Status`; exceptions are
 // thrown only at the public boundary, where a public function calls `Status::throw_if_error()`.
 //
 //   Status do_work(...) {                         // internal: status values

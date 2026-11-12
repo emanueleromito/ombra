@@ -1,5 +1,5 @@
 // ombra_security_floor_wiring: shows that each library entry point enforces the security floor by
-// itself (T1.15). It deliberately never calls require_security_floor; the test sets
+// itself. It deliberately never calls require_security_floor; the test sets
 // OMBRA_TEST_LOG2QP_LIMIT=1 so a valid preset context falls below the limit.
 //
 // Usage: ombra_security_floor_wiring <context.bin> <evalmultkey.bin> <ciphertext.bin>

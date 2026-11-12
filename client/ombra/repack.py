@@ -1,4 +1,4 @@
-"""Planning of block repacking (T3.5). Pure logic, no I/O, no crypto.
+"""Planning of block repacking. Pure logic, no I/O, no crypto.
 
 A deleted vector is one slot in every column of its block, so only the client can drop deleted
 slots: decrypt, drop, re-encrypt, ReplaceBlock. ReplaceBlock turns 1..N blocks of one cluster into

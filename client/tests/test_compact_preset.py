@@ -1,4 +1,4 @@
-"""T0.11 step 1: preset m0_compact_n8192 (ring dimension 8192) against the 128-bit limit.
+"""Compact configuration: preset m0_compact_n8192 (ring dimension 8192) against the 128-bit limit.
 
 The real log2(QP) is read from the crypto context's public evaluation key (the only place the
 bindings expose P) and compared with the HomomorphicEncryption.org 128-bit classic limit for

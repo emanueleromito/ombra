@@ -1,4 +1,4 @@
-"""T0.7: batched GPU query expansion (the trees of Q queries together) against OpenFHE.
+"""Batched GPU query expansion (the trees of Q queries together) against OpenFHE.
 
 Python makes keys (preset m0_depth2), Q seeded synthetic queries, the automorphism keys, and
 writes only public material (context, query ciphertexts, automorphism keys). The C++ driver

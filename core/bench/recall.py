@@ -1,4 +1,4 @@
-"""Recall-based acceptance check of a preset (T0.8 measurement, T1.6 rule): recall@10 of the
+"""Recall-based acceptance check of a preset (measurement and acceptance rule): recall@10 of the
 encrypted pipeline against plaintext search.
 
     python core/bench/recall.py [--preset m0_depth2] [--dataset NAME ...|all] [--n 100000]
@@ -20,7 +20,7 @@ then OpenFHE Relinearize, Rescale, an all-ones encrypted mask at level 1, Rescal
 real final level 2); the client decrypts and ranks. Only public material (context, public
 evaluation keys, ciphertexts) is written to disk; the secret key stays in this process and is never
 serialized. Only aggregates are printed or stored: recall, times, counts, max errors. Never
-vectors, queries, documents or scores (hard rule 4).
+vectors, queries, documents or scores.
 
 Settings (recall@10 against the exact plaintext top-10 over the same subset):
   * full scan (one cluster), with and without client re-ranking;
@@ -76,7 +76,7 @@ SEED = 20260108
 KMEANS_ITERS = 20
 DEFAULT_NLISTS = (100, 316, 1000)
 DEFAULT_NPROBES = (1, 2, 5, 10, 20, 50, 100)
-ERROR_BOUND = 1e-6  # same agreed score bound as T0.2 to T0.6
+ERROR_BOUND = 1e-6  # same agreed score bound as the CPU baseline and the GPU tests
 
 DATASET_NAME = "KShivendu/dbpedia-entities-openai-1M"
 HF_BASE = f"https://huggingface.co/datasets/{DATASET_NAME}/resolve/main/data/"
@@ -618,7 +618,7 @@ def measure(
         settings[str(nl)] = per_nl
 
     return {
-        "task": "T1.6",
+        "task": "recall-acceptance",
         "preset": preset,
         "dataset_note": "no query split: db and queries are disjoint seeded subsets of a pool",
         "n_vectors": n,
@@ -703,7 +703,7 @@ def main() -> None:
 
     overall = recall_check.check_overall(checks, args.min_datasets)
     summary = {
-        "task": "T1.6",
+        "task": "recall-acceptance",
         "preset": args.preset,
         "n_vectors": n,
         "tolerance": args.tolerance,

@@ -1,4 +1,4 @@
-// ombra_expand_gpu: GPU query expansion checked exactly against OpenFHE (T0.5, decision 0010).
+// ombra_expand_gpu: GPU query expansion checked exactly against OpenFHE.
 //
 // Usage: ombra_expand_gpu <context.bin> <query.bin> <autokeys.bin> <d> [out_dir]
 //

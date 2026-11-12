@@ -1,4 +1,4 @@
-"""Decrypt stage-2 result blocks and pick the top-k, serially or across processes (T2.1).
+"""Decrypt stage-2 result blocks and pick the top-k, serially or across processes.
 
 Each block is one serialized OpenFHE ciphertext file holding `slots` scores. A block is
 deserialized, decrypted, and reduced to its local top-k with global indices; the per-block lists
@@ -6,11 +6,10 @@ are then merged. Both paths use the same order (score descending, global index a
 results are identical, ties included.
 
 Parallel path: worker processes are started with "spawn", not "fork": a fork after OpenMP or other
-threads have started can deadlock the children (seen in local mode, T3.7). Each worker gets the
-crypto context and the secret key once, serialized in memory and sent through the pool's pipe to
-a child process of this client on the same machine; they are never written to disk, logged, or
-sent anywhere else (hard rule 2). Only block paths go in, and (scores, indices) of at most k
-entries per block come out. Nothing here logs scores.
+threads have started can deadlock the children. Each worker gets the crypto context and the
+secret key once, serialized in memory through the pool's pipe to a child process of this client;
+they are never written to disk, logged or sent anywhere else. Only block paths go in, and at most
+k (score, index) pairs per block come out. Nothing here logs scores.
 """
 
 from __future__ import annotations
