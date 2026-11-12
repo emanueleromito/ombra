@@ -1,0 +1,16 @@
+# gitleaks configuration: the default rules plus an allowlist of confirmed false positives.
+# Each entry is explained in docs/plan/results/gitleaks-report.md.
+title = "Ombra gitleaks config"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Python module names in the proto loader, flagged by generic-api-key"
+paths = ['''client/ombra/_proto\.py''']
+regexes = ['''ombra_api\.v1\.ombra_pb2''']
+
+[[allowlists]]
+description = "Keyword argument passing a variable (master_key=m.master_key), not a literal"
+paths = ['''client/ombra/collection\.py''']
+regexes = ['''master_key=m\.master_key''']
