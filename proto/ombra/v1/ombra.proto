@@ -1,7 +1,7 @@
-// Ombra gRPC API, version 1 (package ombra.v1). Decisions 0003, 0010, 0016, 0019.
+// Ombra gRPC API, version 1 (package ombra.v1).
 //
 // The secret key stays on the client: no message here has a field for a secret key, and none may get one. The server
-// receives ciphertexts (inside the 0016 envelope) and public evaluation keys only. Ids are opaque
+// receives ciphertexts (inside the versioned envelope) and public evaluation keys only. Ids are opaque
 // bytes chosen by the client; documents and metadata values never appear in any message.
 // Version rule: every message that the server stores carries `api_version`; the server refuses a
 // stored-message value other than 1 with ERROR_UNSUPPORTED_VERSION. A new incompatible API gets
@@ -60,7 +60,7 @@ enum SecurityLevel {
   SECURITY_LEVEL_STRICT = 3;
 }
 
-// One filter field (decision 0019). The server sees only the number of fields and their value
+// One filter field. The server sees only the number of fields and their value
 // counts; names stay on the client. A one-hot column per value is stored for every vector.
 message FilterField {
   uint32 field_id = 1;     // 0, 1, ... in order; opaque, not a name
@@ -79,7 +79,7 @@ message CollectionSpec {
   uint32 cluster_count = 8;
 }
 
-// The query ciphertext carries dimension + sum(cardinality) entries (decision 0019).
+// The query ciphertext carries dimension + sum(cardinality) entries.
 message CreateCollectionRequest { CollectionSpec spec = 1; }
 message CreateCollectionResponse { oneof result { CollectionSpec spec = 1; Error error = 2; } }
 
@@ -101,7 +101,7 @@ message ListCollectionsResponse { repeated CollectionInfo collections = 1; }
 message DropCollectionRequest { string name = 1; }
 message DropCollectionResponse { Error error = 1; }  // unset on success
 
-// Evaluation keys (public): multiplication key and automorphism keys, in 0016 envelopes. Sent as
+// Evaluation keys (public): multiplication key and automorphism keys, in versioned envelopes. Sent as
 // a client stream of chunks; `kind` says which file the bytes belong to.
 enum KeyKind {
   KEY_KIND_UNSPECIFIED = 0;
@@ -121,7 +121,7 @@ message UploadKeysChunk {
 message UploadKeysResponse { Error error = 1; }
 
 // Insert: a client stream of blocks. A block is up to batch_size vectors of one cluster:
-// d column ciphertexts + sum(cardinality) one-hot ciphertexts, each in a 0016 envelope.
+// d column ciphertexts + sum(cardinality) one-hot ciphertexts, each in a versioned envelope.
 message InsertBlock {
   uint32 api_version = 1;       // must be 1 (the block is stored)
   string collection = 2;
@@ -140,18 +140,18 @@ message DeleteRequest {
 message DeleteResponse { uint64 deleted = 1; Error error = 2; }
 
 // Search: one bidirectional stream. The query ciphertext is sent once and the server expands it
-// once (decision 0010). Round 1 returns center scores; round 2 is a SearchChosen answered by
+// once. Round 1 returns center scores; round 2 is a SearchChosen answered by
 // SearchScores messages ending with `last`. A client may send further SearchChosen messages on
-// the same stream (decision 0019: a selective filter needs more clusters); each reuses the
+// the same stream (a selective filter needs more clusters); each reuses the
 // expansion. The client half-closes to end the stream.
 message SearchStart {
   string collection = 1;
   string key_tag = 2;                 // checked against the collection's
-  bytes query = 3;                    // one 0016 envelope; dimension + sum(cardinality) entries
+  bytes query = 3;                    // one versioned envelope; dimension + sum(cardinality) entries
   uint32 filter_leaves = 4;           // sum(cardinality); the server checks it against the spec
 }
 message SearchCenterScores {          // round 1 out: stage-1 scores, one ciphertext per block
-  repeated bytes score_blocks = 1;    // 0016 envelopes, each decrypts to one score per slot
+  repeated bytes score_blocks = 1;    // versioned envelopes, each decrypts to one score per slot
   uint32 center_count = 2;
 }
 message SearchChosen {                // round 2 in: chosen clusters (real and decoy, indistinguishable)
@@ -159,7 +159,7 @@ message SearchChosen {                // round 2 in: chosen clusters (real and d
 }
 message SearchScores {                // round 2 out: filtered scores and the ids they belong to
   uint32 cluster_id = 1;
-  repeated bytes score_blocks = 2;    // each: slot i holds score + lambda * c (decision 0019)
+  repeated bytes score_blocks = 2;    // each: slot i holds score + lambda * c
   repeated bytes ids = 3;             // slot order within the cluster, tombstoned slots included
   bool last = 4;                      // last message of the stream
 }
@@ -190,7 +190,7 @@ message BlockHeader {
   repeated bool deleted = 3;    // parallel to ids: tombstoned at this instant
   uint32 n_columns = 4;         // the column messages that follow
 }
-// Stream: one header, then n_columns messages with `column` (0016 envelopes, in column order).
+// Stream: one header, then n_columns messages with `column` (versioned envelopes, in column order).
 message GetBlockResponse {
   uint32 api_version = 1;
   oneof part { BlockHeader header = 2; bytes column = 3; Error error = 4; }

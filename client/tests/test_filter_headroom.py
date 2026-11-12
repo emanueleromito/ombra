@@ -1,4 +1,4 @@
-"""Decision 0019: how large a value a filtered score can hold and still decrypt.
+"""How large a value a filtered score can hold and still decrypt.
 
 With the additive penalty, a decrypted slot is `score + LAMBDA * c`, with |score| <= 1 and
 c <= F (the number of filter fields), so |slot| <= 1 + LAMBDA * F. This test sweeps powers of two

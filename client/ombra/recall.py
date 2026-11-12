@@ -6,7 +6,7 @@
 Builds a local-mode collection (ombra.Client.local, OpenFHE on the CPU) in a temporary directory,
 runs the encrypted search, and for the same clusters the encrypted query chose it scores the
 vectors in the clear. Prints recall@k of both against the exact top-k and the gap, and the verdict
-of the recall rule of decision 0012 (core/bench/recall_check.py). Nothing is written out: the
+of the recall rule in core/bench/recall_check.py. Nothing is written out: the
 temporary directory, key file included, is removed at the end, and only aggregate numbers are
 printed (never vectors, queries, ids or scores). Vectors must be unit length; queries too.
 
@@ -38,7 +38,7 @@ NOT_ELIGIBLE = "NOT ELIGIBLE"
 
 
 def verdict(gap: float, n_queries: int) -> str:
-    """The 0012 rule on one corpus: within tolerance, with enough queries, passes."""
+    """The recall rule on one corpus: within tolerance, with enough queries, passes."""
     if abs(gap) > TOLERANCE + 1e-12:
         return FAIL
     return PASS if n_queries >= MIN_QUERIES else NOT_ELIGIBLE
@@ -135,7 +135,7 @@ def format_report(r: dict[str, Any]) -> str:
             f"plaintext recall@{r['k']} (same clusters): {r['plaintext_recall']:.4f}",
             f"encrypted recall@{r['k']}:                 {r['encrypted_recall']:.4f}",
             f"gap (encrypted - plaintext):              {r['gap']:+.4f}",
-            f"0012 rule (|gap| <= {TOLERANCE}, >= {MIN_QUERIES} queries): {r['verdict']}",
+            f"recall rule (|gap| <= {TOLERANCE}, >= {MIN_QUERIES} queries): {r['verdict']}",
         ]
     )
 

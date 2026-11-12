@@ -1,6 +1,6 @@
 """Client-side cluster statistics and the probe policy for filtered search.
 
-Decision 0019's first probe rule (stop at k matches in the first round) lost recall at about 1%
+The first probe rule (stop at k matches in the first round) lost recall at about 1%
 selectivity (measured in the filtered-recall benchmark). This module holds the fix, as
 pure numpy logic with no OpenFHE and no server, so it is unit tested and also drives the plaintext
 simulation in core/bench/filter_probe_sim.py:
@@ -21,7 +21,7 @@ simulation in core/bench/filter_probe_sim.py:
     (the caller splits it into two rounds by cluster id).
   - "plain2" (unfiltered queries at Decoy/Strict, filtered queries without statistics): round 1 =
     the first `first` clusters by center score, round 2 = the next 2 * `first`.
-  - "basic": decision 0019's rule, first round = unfiltered count, widen 2x below `stop_matches`
+  - "basic": the first rule, first round = unfiltered count, widen 2x below `stop_matches`
     (k by default), up to `max_probe_factor` times the first round. Only for unfiltered Fast
     queries, which may use a different round count.
 """

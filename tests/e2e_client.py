@@ -2,7 +2,7 @@
 
 Holds the secret key (it never leaves this process; no message of the API has a field for it),
 creates keys, encrypts vectors and queries with OpenFHE, talks to `ombra_server` over gRPC, and
-decrypts and decodes the answers: the band decode of decision 0019 (slot = score + 4 * c, c =
+decrypts and decodes the answers: the band decode (slot = score + 4 * c, c =
 number of matching filter fields, a deleted slot decodes to c < 0) and the top-k.
 
 The gRPC stubs are generated from proto/ombra/v1/ombra.proto with grpc_tools into a temp directory

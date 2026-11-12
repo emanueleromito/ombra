@@ -1,5 +1,4 @@
-// Kernel family: hybrid key-switched automorphism and the expansion split (decision
-// 0010).
+// Kernel family: hybrid key-switched automorphism and the expansion split.
 //
 // Mirrors OpenFHE v1.6.1 LeveledSHEBase::EvalAutomorphismCore (base-leveledshe.cpp:400), HYBRID
 // branch, followed by the tree's EvalAdd / EvalSub and the multiplication by X^-k. All arithmetic

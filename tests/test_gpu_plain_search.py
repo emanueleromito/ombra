@@ -4,7 +4,7 @@ Python generates keys and seeded synthetic normalized vectors, stores them as fp
 exact doubles), encrypts the pre-expanded query (query value j in every slot) and writes only
 public material and synthetic data to disk. The C++ driver `ombra_plain_search` (see its header)
 checks, against OpenFHE on the same doubles:
-  * the GPU encoder against MakeCKKSPackedPlaintext (decision 0015): FFT and rounding within
+  * the GPU encoder against MakeCKKSPackedPlaintext: FFT and rounding within
     COEF_TOLERANCE units (1 unit = 1/scale in slot space); tower reduction and NTT of OpenFHE's own
     integer coefficients exactly; the GPU evaluation form exactly against OpenFHE's NTT of the GPU's
     own coefficients (never skipped); the GPU's coefficient words are one integer in every tower.

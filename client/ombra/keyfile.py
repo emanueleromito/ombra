@@ -1,6 +1,6 @@
 """Passphrase-protected key file: OpenFHE secret key blob plus the document master key.
 
-Decision 0016 deliberately has no envelope kind for a secret key, so this file has its own magic
+The file envelope deliberately has no kind for a secret key, so this file has its own magic
 "OMBK" and version, laid out like the envelope (little-endian):
   magic "OMBK" | u16 version (1) | u8 kdf (1 = scrypt) | u32 n | u32 r | u32 p | salt (16) |
   nonce (12) | AES-256-GCM ciphertext+tag

@@ -22,8 +22,8 @@ ombra.probe.ProbePlanner, the same code the client runs:
               searched" for Decoy is min(C, 2f) + min(C - 2f, 4f), decoys included; recall counts
               the real plus the decoy clusters' results, as the client does).
   Strict      all clusters in two rounds: recall is exact by construction (not simulated).
-  B    decision 0019's rule with the stop at 3k matches (first round = floor, widen 2x up to 8x).
-  A0   (reference) decision 0019 as run in stop at k matches. Reproduces the filtered-recall
+  B    the original rule with the stop at 3k matches (first round = floor, widen 2x up to 8x).
+  A0   (reference) the original rule, stop at k matches. Reproduces the filtered-recall
   benchmark's recall.
 Superseded: "E" and "E+A" (the radius check never pruned; see the report).
 For A0 and B (baselines) a query with fewer than k matches falls back to a full scan; E2 has no
@@ -52,8 +52,8 @@ from ombra.probe import ClusterStats, ProbePlanner, decoy_round_sizes  # noqa: E
 
 K = 10
 POLICIES = {
-    "A0 (0019, stop at k)": dict(policy="basic", stop=1),
-    "B (0019, stop at 3k)": dict(policy="basic", stop=3),
+    "A0 (basic, stop at k)": dict(policy="basic", stop=1),
+    "B (basic, stop at 3k)": dict(policy="basic", stop=3),
     "E2 (Fast)": dict(policy="e2"),
     "E2 (Decoy)": dict(policy="e2", decoy=True),
 }
@@ -156,7 +156,7 @@ def simulate_cell(
                     break
                 run(nxt)
                 nrounds += 1
-            if _nmatch(scores) < K and len(searched) < nc:  # the 0019 Strict fallback
+            if _nmatch(scores) < K and len(searched) < nc:  # the Strict fallback
                 run(order)
                 nrounds += 1
                 strict += 1

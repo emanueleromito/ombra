@@ -5,7 +5,7 @@
 
 This process is the CLIENT (secret key held here, never written or sent). It starts `ombra_server`
 on localhost like tests/test_gpu_e2e_grpc.py, drives it with tests/e2e_client.py, and measures
-every step of a query. Synthetic data only (a Gaussian mixture, as in filter_0019.py); only
+every step of a query. Synthetic data only (a Gaussian mixture, as in filter_measurements.py); only
 aggregates are printed or stored: times, byte counts, recalls. Never vectors, queries or scores.
 
 Setup per (preset, N): d = 384, two filter fields (8 values each, so 400 columns per block),
@@ -26,7 +26,7 @@ Per query (timed, after a warm-up) the steps are:
               (server column-packed search over the chosen clusters' blocks + transfer);
               also the arrival of the first message
   decrypt     client: decrypt all score blocks of stage 2 in parallel processes and band-
-              decode (decision 0019)
+              decode
   topk        client: merge the per-block top-10 lists
 A second SearchChosen of the next 2 clusters follows on the same stream (not part of the per-query
 total; it lets recall be computed for nprobe 1, 2 and 4 from one encrypted scan). Both a query
@@ -35,7 +35,7 @@ without a filter and one with a filter (both fields set) are run, Q queries each
 Recall: recall@10 of the encrypted pipeline (no re-ranking) against the exact top-10 (over the
 vectors that match the filter, for the filtered variant), and the plaintext recall of the same
 cluster setting (same centers, exact centers scores, exact scores), per nprobe in (1, 2, 4); the
-gap is encrypted - plaintext (decision 0012 uses 0.005). With 20 to 50 queries this is a sanity
+gap is encrypted - plaintext (the recall rule uses 0.005). With 20 to 50 queries this is a sanity
 check of the pipeline, not the rule's verdict (the rule needs 1,000 queries on 2 datasets).
 """
 
@@ -646,7 +646,7 @@ def _run_case(
                     for p_ in NPROBES
                 },
                 "n_queries": nq,
-                "recall_rule_note": "tolerance 0.005 (decision 0012); few queries, no verdict",
+                "recall_rule_note": "tolerance 0.005; few queries, no verdict",
             }
             lat = result["variants"][vname]["latency_s"]["total"]
             print(

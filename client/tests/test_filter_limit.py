@@ -1,4 +1,4 @@
-"""F_max per preset from decision 0019's formula, and the refusals of a filter schema."""
+"""F_max per preset from the headroom formula, and the refusals of a filter schema."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from ombra.params import ParamsError
 
 
 @pytest.mark.parametrize(("name", "fmax"), [("balanced", 14), ("fast", 16)])
-def test_filter_field_limit_matches_decision_0019(name: str, fmax: int) -> None:
+def test_filter_field_limit_matches_headroom_formula(name: str, fmax: int) -> None:
     d = presets.derive(name, 384)
     assert presets.filter_field_limit(d) == fmax
     presets.check_filter_schema(d, [2] * fmax)

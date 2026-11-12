@@ -9,7 +9,7 @@
 //                   the DECODED values, so the OpenFHE oracle sees what the GPU decodes)
 //   codes.bin       the raw stored codes, [dims][slots], in <format> (f64: same as values.bin)
 // Checks (each prints PASS/FAIL, never values; exit 0 only if all pass):
-//   1. Encoding, in three checks (decision 0015): (a) FFT and rounding: the centered difference of
+//   1. Encoding, in three checks: (a) FFT and rounding: the centered difference of
 //      every GPU coefficient from OpenFHE's MakeCKKSPackedPlaintext is at most <coef_tolerance>
 //      units (1 unit = 1 / scale of the value); (b) tower reduction and NTT of OpenFHE's own
 //      integer coefficients equal OpenFHE's words EXACTLY; (c) the GPU evaluation form equals
@@ -164,7 +164,7 @@ int main(int argc, char** argv) {
     bool ok = true;
     ombra::core::PlainEncoder enc(tables, scaling_factor);
 
-    // 1. Encoding, in separate checks (decision 0015). The FFT and rounding are floating
+    // 1. Encoding, in separate checks. The FFT and rounding are floating
     //    point and get a tolerance; every integer step after them is compared exactly.
     auto gpu_coef = enc.encode_host(fmt, cbytes.data(), dims, code_scale, true);
     auto gpu_eval = enc.encode_host(fmt, cbytes.data(), dims, code_scale, false);

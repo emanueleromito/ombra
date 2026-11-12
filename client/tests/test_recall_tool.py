@@ -39,7 +39,7 @@ def test_recall_at_k() -> None:
     assert recall.recall_at_k([], [], 10) == 1.0
 
 
-def test_thresholds_match_the_0012_check() -> None:
+def test_thresholds_match_the_recall_check() -> None:
     path = Path(__file__).resolve().parents[2] / "core" / "bench" / "recall_check.py"
     if not path.exists():
         pytest.skip("repository checkout only")

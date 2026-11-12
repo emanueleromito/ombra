@@ -18,8 +18,8 @@ from ombra.params import ParamsError
 
 SUPPORTED_DIMENSIONS = (384, 768, 1536)
 
-# Product names (docs/product-requirements.md) -> core preset. "fast" is decision 0013;
-# "balanced" is the default, i.e. the baseline m0_depth2 (decisions 0009, 0013). "precise" has no
+# Product names (docs/product-requirements.md) -> core preset. "fast" is the compact preset;
+# "balanced" is the default, i.e. the baseline m0_depth2. "precise" has no
 # preset yet, so it is refused.
 PRODUCT_PRESETS = {
     "fast": "m0_compact_n8192",
@@ -68,15 +68,15 @@ def derive(preset: str, dimension: int, path: Path | None = None) -> Derived:
     )
 
 
-# Server limits (proto LIMIT_MAX_FILTER_FIELDS, LIMIT_MAX_FILTER_CARDINALITY) and decision 0019.
+# Server limits (proto LIMIT_MAX_FILTER_FIELDS, LIMIT_MAX_FILTER_CARDINALITY) and the filter penalty design.
 MAX_FILTER_FIELDS = 16
 MAX_FILTER_CARDINALITY = 64
-FILTER_LAMBDA = 4  # the penalty weight of one filter entry (decision 0019)
+FILTER_LAMBDA = 4  # the penalty weight of one filter entry
 _HEADROOM_MARGIN_BITS = 3  # allowed value = textbook bound at the lowest level, less 3 bits
 
 
 def filter_field_limit(derived: Derived) -> int:
-    """F_max of a preset by decision 0019, derived from its first modulus and scale bits.
+    """F_max of a preset, derived from its first modulus and scale bits.
 
     A decrypted slot is score + lambda * c. A tombstoned slot reaches 1 + lambda * (F + 1). That
     must stay under the allowed value 2^(first_mod - scale - 1 - 3), the bound at the lowest level

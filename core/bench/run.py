@@ -38,9 +38,9 @@ GPU cluster cache (`ombra_bench_cache`, built from server/cache): paging bandwid
 pageable, serial vs overlapped search over a collection 3x the GPU budget, hit rate for uniform and
 Zipf access. Output `<out>/gpu-cache-a100.json`. Runs only when asked for (`--task gpu-cache`).
 
-Filter measurements: the measurements of decision 0019 through the gRPC server
-(core/bench/filter_0019.py): score
-error with filter columns, the decision-0012 recall rule with the extra columns, filtered recall
+Filter measurements: the filter measurements through the gRPC server
+(core/bench/filter_measurements.py): score
+error with filter columns, the recall rule with the extra columns, filtered recall
 with the selective-filter loop. Output `<out>/filter-measurements-<preset>-a100.json` for each
 preset in
 `--presets-filter`. Runs only when asked for (`--task filter-measurements`).
@@ -588,7 +588,7 @@ def main() -> None:
             args.rerun_grpc,
         )
     if task == "filter-measurements":
-        from filter_0019 import run_filter
+        from filter_measurements import run_filter
 
         run_filter(args.out, tuple(args.presets_filter.split(",")), args.queries_filter)
     if task == "gpu-cache":

@@ -1,4 +1,4 @@
-// Query expansion tree (decision 0010). Independent of OpenFHE and CUDA types so the same
+// Query expansion tree. Independent of OpenFHE and CUDA types so the same
 // tree can run with the CPU reference operations (ombra_expand.cpp) and, later, GPU operations.
 //
 // The input is one ciphertext whose plaintext polynomial is the symmetric

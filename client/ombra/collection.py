@@ -5,7 +5,7 @@ the data blocks and the cluster centers, generates the evaluation keys, uploads 
 collection and creates the collection on the server. Parameters come only from
 `ombra.presets.derive` (the 128-bit security floor).
 
-Layout (docs/architecture.md, decision 0019): a data block holds up to `slots` vectors of one
+Layout (docs/architecture.md): a data block holds up to `slots` vectors of one
 cluster as D column ciphertexts (slot i of column j = component j of vector i) followed by one
 one-hot column per filter value; the center block holds the centers as D columns, under cluster id
 `cluster_count` with `is_center` set.
@@ -174,7 +174,7 @@ class KeyKit:
         )
 
     def encrypt_query(self, ext: np.ndarray) -> bytes:
-        """The symmetric coefficient-packed query (decision 0010), encrypted, as an envelope."""
+        """The symmetric coefficient-packed query, encrypted, as an envelope."""
         import openfhe as ofhe
 
         slots = oq.symmetric_slots(oq.prescale_query(ext), self.cc.GetRingDimension())
@@ -198,7 +198,7 @@ class KeyKit:
             return p.read_bytes()
 
     def key_files(self, pb: Any) -> dict[int, bytes]:
-        """Public key files in 0016 envelopes, by KeyKind. Nothing secret."""
+        """Public key files in versioned envelopes, by KeyKind. Nothing secret."""
         import openfhe as ofhe
 
         d, v = self.derived.preset, self.openfhe_version
@@ -334,7 +334,7 @@ class Collection:
         if not np.allclose(np.linalg.norm(x, axis=1), 1.0, atol=1e-6):
             raise ValueError("vectors must be normalized before they are encrypted")
         cards = tuple(cards)
-        presets.check_filter_schema(derived, cards)  # decision 0019: refuse above F_max
+        presets.check_filter_schema(derived, cards)  # Refuse above F_max
         if security_level not in _LEVELS:
             raise ValueError(f"security level must be one of {sorted(_LEVELS)}")
         f = _fields(fields, len(x), cards)

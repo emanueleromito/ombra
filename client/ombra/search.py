@@ -1,6 +1,6 @@
 """Two-stage search with filters, security levels and exact re-ranking.
 
-Flow on one Search stream (decisions 0004, 0019): the query carries the d query values followed by
+Flow on one Search stream: the query carries the d query values followed by
 lambda * one-hot entries for each filter field (all lambda for a field that is not filtered, so the
 server cannot tell filtered from unfiltered queries). Stage 1 returns encrypted center scores; the
 client decrypts them and picks clusters. Each round's slot value is score + lambda * c, with c the
@@ -170,7 +170,7 @@ def run_search(
       requested-cluster count that depends only on `n_probe` and the cluster count, not on the
       filter: min(C, 2 * first) in round 1, then min(C - round 1, 4 * first) in round 2.
     * Fast: a filtered query does exactly two rounds (when round 2 has no new cluster to ask it is
-      counted but nothing is sent); an unfiltered query keeps the 0019 rule (one round, widened
+      counted but nothing is sent); an unfiltered query keeps the basic rule (one round, widened
       2x only below k matches, up to `max_probe_factor` times the first round).
     A filtered query with statistics uses policy "e2" (ombra.probe); expected selectivity below
     0.5% turns it into a full scan in the level's two rounds (the server sees this). No cluster is

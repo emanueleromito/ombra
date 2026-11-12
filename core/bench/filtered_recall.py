@@ -10,12 +10,12 @@ ships vectors):
   * arxiv-abstracts: gfissore/arxiv-abstracts-2021 (CC0-1.0). Filter fields: primary arXiv
     category (top 63 values plus "other" = 64 values) and submission year (2-year bins, 16 values).
   * banking77: PolyAI/banking77 (CC-BY-4.0), real train/test split (test = queries). Filter field:
-    the intent (77 values hashed to 64 buckets, intent % 64, as decision 0019 advises for more
+    the intent (77 values hashed to 64 buckets, intent % 64, as advised for more
     than 64 values; the ground truth uses the same buckets).
 Embeddings: sentence-transformers/all-MiniLM-L6-v2 (Apache-2.0), 384 dimensions, normalized.
 
 Path under test: ombra.collection.Collection.create + ombra.search.run_search against a real
-ombra_server (GPU), preset "fast" (m0_compact_n8192), the probe rule of decision 0019: the first
+ombra_server (GPU), preset "fast" (m0_compact_n8192), the original probe rule: the first
 round is the unfiltered probe count (ceil(sqrt(clusters))), widen 2x only below k matches, up to
 8x, then the Strict fallback. Re-ranking at 3 x k (the client default).
 

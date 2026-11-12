@@ -11,7 +11,7 @@ option(OMBRA_ENABLE_CUDA "Build CUDA kernels" ON)
 option(OMBRA_ENABLE_SANITIZERS "Build with AddressSanitizer and UBSan (CPU code)" OFF)
 
 if(OMBRA_ENABLE_CUDA)
-  # Ampere only for now: sm_80 (A100), sm_86 (A10). See docs/decisions/0008-ampere-first.md.
+  # Ampere only for now: sm_80 (A100), sm_86 (A10).
   if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
     set(CMAKE_CUDA_ARCHITECTURES 80 86)
   endif()

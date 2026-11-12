@@ -1,4 +1,4 @@
-"""GPU query expansion against OpenFHE (decision 0010).
+"""GPU query expansion against OpenFHE.
 
 Python makes keys (preset m0_depth2), encodes a normalized query as the symmetric polynomial,
 generates automorphism keys for exactly N/2^k + 1, k < ceil(log2(2d)), and writes only public
@@ -33,7 +33,7 @@ SEED = 20260109
 TOLERANCE = 1e-6
 # m0_compact_n8192 has more decryption noise than 1e-6 on some seeds (up to 1.47e-6 here, 1.16e-6 in
 # CI). The exact RNS match with OpenFHE above is the kernel check and still runs for it; this is
-# only a sanity bound. Its acceptance rule is the recall rule of decision 0012.
+# only a sanity bound. Its acceptance rule is the recall rule.
 COMPACT_SANITY_BOUND = 1e-5
 
 REPO_ROOT = Path(__file__).resolve().parents[1]

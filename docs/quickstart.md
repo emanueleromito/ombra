@@ -272,7 +272,7 @@ server.
   everything and hides the most, at the highest cost. Choose with `security_level=` when you
   create the collection, or `level=` per search.
 - In Fast and Decoy modes the server sees which clusters and IDs the client picks, and these
-  choices come from decrypted results. Ombra makes no IND-CPA-D claim (decision 0017): decrypted
+  choices come from decrypted results. Ombra makes no IND-CPA-D claim: decrypted
   values never leave your machine, and the leak through these choices is stated, not analysed.
 - A filter that matches few vectors makes the client run extra rounds, so the server can tell
   that a query was filtered and that the filter was selective. In Fast mode the clusters chosen can

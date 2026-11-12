@@ -1,4 +1,4 @@
-// ombra_expand: CPU reference for query expansion on OpenFHE (decision 0010).
+// ombra_expand: CPU reference for query expansion on OpenFHE.
 //
 // Usage: ombra_expand <context.bin> <query.bin> <autokeys.bin> <out_dir> <d>
 //

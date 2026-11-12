@@ -163,7 +163,7 @@ def test_decoy_round_sizes_do_not_depend_on_filter():
     assert decoy_round_sizes(10, 12) == (12, 0)
 
 
-def test_basic_policy_is_the_0019_rule():
+def test_basic_policy_is_the_original_rule():
     order = list(range(8))
     p = ProbePlanner(order, "basic", 3, 2)
     assert p.first_round() == [0, 1]

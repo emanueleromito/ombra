@@ -58,7 +58,7 @@ struct PresetInfo {
 
 const PresetInfo* find_preset(const std::string& name);  // nullptr if unknown
 
-// Largest filter field count the preset's headroom allows (decision 0019, includes the tombstone
+// Largest filter field count the preset's headroom allows (includes the tombstone
 // penalty, capped at the proto limit of 16).
 std::size_t max_filter_fields_for(const PresetInfo& p);
 

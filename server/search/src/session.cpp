@@ -308,7 +308,7 @@ PreparedKeys SearchEngine::prepare_keys(const std::string& name,
   c->batch = c->cc->GetEncodingParams()->GetBatchSize();
   c->column_scale = cp->GetScalingFactorReal(0);
 
-  // F_max from the headroom of this context (decision 0019).
+  // F_max from the headroom of this context.
   const auto first_bits = cp->GetElementParams()->GetParams()[0]->GetModulus().GetMSB();
   const auto scale_bits = static_cast<std::size_t>(std::llround(std::log2(c->column_scale)));
   try {

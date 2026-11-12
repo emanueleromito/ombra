@@ -26,7 +26,7 @@ PYTHON_VERSION = "3.11"
 OPENFHE_TAG = "v1.6.1"
 OPENFHE_PYTHON_TAG = "v1.6.1.0"
 
-# Ampere only for now (see docs/decisions/0008-ampere-first.md).
+# Ampere only for now.
 CUDA_ARCHS = "80;86"
 
 REPO_DIR = "/root/ombra"
@@ -239,7 +239,7 @@ def bench_topk(blocks: int = 25, runs: int = 5, preset: str = "m0_depth2") -> No
 # memory: the column search benchmark holds one block (about 1.2 GB at d = 1536) as OpenFHE
 # ciphertexts plus
 # its flattened copy on the host at a time, so about 3 to 4 GB peak; 16 GiB leaves headroom.
-# The filter measurements (`--task filter-measurements`, filter measurements of decision 0019) runs
+# The filter measurements (`--task filter-measurements`) runs
 # here too: it starts ombra_server
 # (built with everything else) and drives it over localhost; 16 GiB covers the client's cached
 # ciphertexts (about 1 GB) and the server's pinned pool (2 GiB budget).
@@ -517,7 +517,7 @@ def profile_search(ncu: bool = True, micro: bool = True) -> None:
 # One A10 run for two checks, so the image build and startup are paid once (user-approved budget:
 # under $1; the 40-minute timeout caps it): the local mode parity test (local mode vs the server,
 # same
-# top-k) and the encrypted confirmation of the 0019 amendment on banking77 (all cells, 200 queries).
+# top-k) and the encrypted confirmation on banking77 (all cells, 200 queries).
 #   modal run modal_app.py::confirm_a10
 @app.function(gpu="A10", cpu=4.0, memory=16384, timeout=2400, volumes={DATA_DIR: volume})
 def confirm_a10(queries: int = 200, bench_only: bool = False) -> None:

@@ -10,7 +10,7 @@
 // for the life of the session. Stage 1 multiplies the d first leaves with the center block columns;
 // stage 2 multiplies all D leaves with the d + sum(V) columns of each block of a chosen cluster,
 // then relinearizes and rescales on the GPU (existing pipeline, exact against OpenFHE). A result
-// ciphertext is at level 1; slot i decrypts to score + lambda * c (decision 0019, lambda = 4, c =
+// ciphertext is at level 1; slot i decrypts to score + lambda * c (lambda = 4, c =
 // number of filter fields that vector matches). Tombstoned slots get -lambda * (F + 1) added with
 // an OpenFHE plaintext (no level), so they decrypt below every live slot. No mask multiply.
 //
@@ -74,7 +74,7 @@ struct EngineConfig {
 struct BlockScores {
   std::uint32_t cluster = 0;
   std::string segment;                   // segment file name in the store
-  std::vector<std::uint8_t> envelope;    // decision-0016 envelope, kind ciphertext (level 1)
+  std::vector<std::uint8_t> envelope;    // versioned envelope, kind ciphertext (level 1)
   std::vector<std::string> ids;          // one per occupied slot, in slot order, tombstoned included
   bool tombstone_penalty_applied = false;
 };
@@ -135,7 +135,7 @@ class SearchEngine {
   void install_keys(PreparedKeys&& prepared);
 
   // Opens a session for one search stream. `key_tag` is the request's tag; `query_envelope` is a
-  // 0016 envelope (kind ciphertext) holding the packed query of D = d + sum(V) entries;
+  // versioned envelope (kind ciphertext) holding the packed query of D = d + sum(V) entries;
   // `filter_leaves` is the request's sum(V). Throws KeyTagMismatch if the request tag or the tag
   // inside the ciphertext differs from the collection's, InvalidQuery for a bad envelope, shape,
   // level or filter_leaves, KeysMissing if load_collection was not called.

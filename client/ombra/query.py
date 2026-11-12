@@ -1,4 +1,4 @@
-"""Symmetric real query encoding for server-side expansion (decision 0010).
+"""Symmetric real query encoding for server-side expansion.
 
 The query q (d normalized values) becomes the polynomial p(X) = q_0 + sum_{j>=1} q_j (X^j + X^-j)
 in R = Z[X]/(X^N+1), where X^-j = -X^(N-j): coefficient j is q_j, coefficient N-j is -q_j, all
@@ -15,7 +15,7 @@ symmetric (p(X) = p(X^-1) as a function on roots of unity), its slots are real a
 the sign convention of the root.
 
 Pre-scaling: the server's expansion tree multiplies every value by 2^L, L = expansion_depth(d), and
-does no EvalMult and no scale change to undo it (decision 0010). The client therefore encodes
+does no EvalMult and no scale change to undo it. The client therefore encodes
 q * 2^-L (exact: a power of two only changes the exponent), so each expanded leaf decrypts to q_j.
 The norm check is done on the unscaled q.
 """

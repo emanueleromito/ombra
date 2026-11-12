@@ -1,6 +1,6 @@
 // Kernel family: column-packed encrypted search (ciphertext x ciphertext multiply-accumulate).
 //
-// Packing (docs/architecture.md, decision 0003): stored vectors are column-packed, one ciphertext
+// Packing (docs/architecture.md): stored vectors are column-packed, one ciphertext
 // per dimension j, one vector per slot. The pre-expanded query is d ciphertexts, the j-th holding
 // query value q_j in every slot. Score of vector s = sum_j stored_j[s] * query_j[s]; every slot of
 // the result holds one complete score.

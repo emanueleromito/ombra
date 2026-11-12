@@ -146,7 +146,7 @@ def test_insert_search_delete(tmp_path, backend) -> None:
             assert res.hits[0].metadata == {"i": int(res.hits[0].id[1:])}
         _check(col.search(queries[0], K, n_probe=2, workers=2), _plain(x, fields, live, queries[0]))
 
-        # with a filter (0019 amendment): at least the unfiltered clusters, exactly two rounds
+        # with a filter: at least the unfiltered clusters, exactly two rounds
         for q in queries:
             unf = col.search(q, K, n_probe=2)
             for v in (0, 1):

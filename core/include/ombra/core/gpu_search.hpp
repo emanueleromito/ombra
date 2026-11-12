@@ -10,7 +10,7 @@
 //                 product (EvalMultCore) then relinearization of component 2
 // Level, noise-scale degree and scaling factor are set as OpenFHE sets them (rules in the
 // functions below). Relinearization and rescale happen once per output ciphertext, after the
-// d-term sum (decision 0010). Public material only: ciphertexts and the public EvalMult key.
+// d-term sum. Public material only: ciphertexts and the public EvalMult key.
 #pragma once
 
 #include <cstddef>

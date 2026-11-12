@@ -1,4 +1,4 @@
-"""Ombra file envelope v1 (decision 0016): a small header around an OpenFHE BINARY payload.
+"""Ombra file envelope v1: a small header around an OpenFHE BINARY payload.
 
 Little-endian layout, mirrored by core/include/ombra/core/file_envelope.hpp:
   magic "OMBR" | u16 version (1) | u16 kind | u16 preset length | preset |

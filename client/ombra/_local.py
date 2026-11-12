@@ -5,19 +5,19 @@ local socket. The child runs `LocalServer`, which has the method names and messa
 stub of service ombra.v1.Ombra (streams are Python iterators), so `Collection`, `run_search` and
 `GrpcBlobStore` run on it unchanged, in both modes. It is the CPU twin of the C++ server in
 server/. The child receives only the API messages: ciphertexts, the crypto context and public
-evaluation keys, as bytes in 0016 envelopes (the child never gets the secret key, and its
+evaluation keys, as bytes in versioned envelopes (the child never gets the secret key, and its
 code has no way to ask for one). It deserializes the context and the keys itself.
 
 All OpenFHE work of the child is C++: `ombra._native` (client/native/, built against OpenFHE 1.6.1)
-holds the context and keys of a collection, runs the server's exact expansion tree (decision 0010,
-core/include/ombra/core/expansion_tree.hpp with the CPU operations of
-core/src/openfhe_expand_ops.hpp; decision 0022) and the column dot product, so local mode uses the
+holds the context and keys of a collection, runs the server's exact expansion tree
+(core/include/ombra/core/expansion_tree.hpp with the CPU operations of
+core/src/openfhe_expand_ops.hpp) and the column dot product, so local mode uses the
 same levels as the server. The child never imports openfhe-python: the client process holds one
 OpenFHE copy (the wheel, for keys, encryption and decryption), the child another, never both in one
 process. The child refuses envelopes whose OpenFHE version is not 1.6.1, and checks the key tag
 against the keys it deserialized.
 
-Search, as in the C++ server (decisions 0010 and 0019): expand the query ciphertext into one
+Search, as in the C++ server: expand the query ciphertext into one
 ciphertext per entry (the same constants q_j in every slot), then for each block the dot product
 sum_j leaf_j * column_j (EvalMultNoRelin, one relinearization, one rescale), and for a tombstoned
 slot add the plaintext penalty -lambda * (F + 1).

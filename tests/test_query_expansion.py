@@ -1,4 +1,4 @@
-"""Query expansion by automorphisms, OpenFHE CPU reference (decision 0010).
+"""Query expansion by automorphisms, OpenFHE CPU reference.
 
 Python makes keys (preset m0_depth2), encodes a normalized query as the symmetric polynomial
 through OpenFHE, generates automorphism keys for exactly N/2^k + 1, k < ceil(log2(2d)), and writes

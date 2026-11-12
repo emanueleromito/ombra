@@ -1,4 +1,4 @@
-// ombra._native: the CPU (OpenFHE) work of the local-mode server (decision 0022).
+// ombra._native: the CPU (OpenFHE) work of the local-mode server.
 //
 // Imported ONLY by the child process of local mode, never by the client process: the client
 // process holds the secret key through the openfhe-python wheel, and one process must not hold two
