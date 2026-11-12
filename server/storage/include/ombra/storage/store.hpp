@@ -63,7 +63,9 @@ class Store;
 class SegmentPin {
  public:
   SegmentPin() = default;
-  SegmentPin(SegmentPin&& o) noexcept : store_(o.store_), files_(std::move(o.files_)) { o.store_ = nullptr; }
+  SegmentPin(SegmentPin&& o) noexcept : store_(o.store_), files_(std::move(o.files_)) {
+    o.store_ = nullptr;
+  }
   SegmentPin& operator=(SegmentPin&& o) noexcept {
     if (this != &o) {
       release();
@@ -109,9 +111,9 @@ class Store {
   bool get_collection(const std::string& name, CollectionSpec* out) const;
 
   // Appends one cluster block as a new immutable segment. cluster == spec.cluster_count is the
-  // reserved id of the cluster-center blocks (d columns, no filter columns). Returns the segment name once the
-  // write is acknowledged (durable). Throws on duplicate or tombstoned ids, unknown collection or
-  // cluster, or a column envelope that does not match the collection's preset.
+  // reserved id of the cluster-center blocks (d columns, no filter columns). Returns the segment
+  // name once the write is acknowledged (durable). Throws on duplicate or tombstoned ids, unknown
+  // collection or cluster, or a column envelope that does not match the collection's preset.
   std::string insert(const std::string& collection, std::uint32_t cluster,
                      const std::vector<std::string>& ids,
                      const std::vector<std::vector<std::uint8_t>>& column_envelopes);
@@ -171,7 +173,8 @@ class Store {
   // search pins them). Atomic: after a crash either the old set or the new block is in the
   // catalog, and the other files are swept. Returns the new segment name.
   std::string replace_segments(const std::string& collection,
-                               const std::vector<std::string>& old_segments, const SegmentData& neu);
+                               const std::vector<std::string>& old_segments,
+                               const SegmentData& neu);
 
   // ---- Blobs: opaque encrypted bytes keyed by (collection, kind, id) --------------------
   // put_blob: payload size must be a bucket size (BlobSizeError) and kind a known kind

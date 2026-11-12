@@ -55,38 +55,27 @@ class OmbraService final : public ombra::v1::Ombra::Service {
 
  private:
   // The RPC bodies; the public overrides check the API key and record metrics around them.
-  grpc::Status run_CreateCollection(grpc::ServerContext*,
-      const v1::CreateCollectionRequest*,
-      v1::CreateCollectionResponse*);
-  grpc::Status run_GetCollection(grpc::ServerContext*,
-      const v1::GetCollectionRequest*,
-      v1::GetCollectionResponse*);
-  grpc::Status run_ListCollections(grpc::ServerContext*,
-      const v1::ListCollectionsRequest*,
-      v1::ListCollectionsResponse*);
-  grpc::Status run_DropCollection(grpc::ServerContext*,
-      const v1::DropCollectionRequest*,
-      v1::DropCollectionResponse*);
-  grpc::Status run_UploadKeys(grpc::ServerContext*,
-      grpc::ServerReader<v1::UploadKeysChunk>*,
-      v1::UploadKeysResponse*);
-  grpc::Status run_Insert(grpc::ServerContext*,
-      grpc::ServerReader<v1::InsertBlock>*,
-      v1::InsertResponse*);
-  grpc::Status run_Delete(grpc::ServerContext*,
-      const v1::DeleteRequest*,
-      v1::DeleteResponse*);
+  grpc::Status run_CreateCollection(grpc::ServerContext*, const v1::CreateCollectionRequest*,
+                                    v1::CreateCollectionResponse*);
+  grpc::Status run_GetCollection(grpc::ServerContext*, const v1::GetCollectionRequest*,
+                                 v1::GetCollectionResponse*);
+  grpc::Status run_ListCollections(grpc::ServerContext*, const v1::ListCollectionsRequest*,
+                                   v1::ListCollectionsResponse*);
+  grpc::Status run_DropCollection(grpc::ServerContext*, const v1::DropCollectionRequest*,
+                                  v1::DropCollectionResponse*);
+  grpc::Status run_UploadKeys(grpc::ServerContext*, grpc::ServerReader<v1::UploadKeysChunk>*,
+                              v1::UploadKeysResponse*);
+  grpc::Status run_Insert(grpc::ServerContext*, grpc::ServerReader<v1::InsertBlock>*,
+                          v1::InsertResponse*);
+  grpc::Status run_Delete(grpc::ServerContext*, const v1::DeleteRequest*, v1::DeleteResponse*);
   grpc::Status run_Search(grpc::ServerContext*,
-      grpc::ServerReaderWriter<v1::SearchResponse, v1::SearchRequest>*);
-  grpc::Status run_ListBlocks(grpc::ServerContext*,
-      const v1::ListBlocksRequest*,
-      v1::ListBlocksResponse*);
-  grpc::Status run_GetBlock(grpc::ServerContext*,
-      const v1::GetBlockRequest*,
-      grpc::ServerWriter<v1::GetBlockResponse>*);
-  grpc::Status run_ReplaceBlock(grpc::ServerContext*,
-      grpc::ServerReader<v1::ReplaceBlockRequest>*,
-      v1::ReplaceBlockResponse*);
+                          grpc::ServerReaderWriter<v1::SearchResponse, v1::SearchRequest>*);
+  grpc::Status run_ListBlocks(grpc::ServerContext*, const v1::ListBlocksRequest*,
+                              v1::ListBlocksResponse*);
+  grpc::Status run_GetBlock(grpc::ServerContext*, const v1::GetBlockRequest*,
+                            grpc::ServerWriter<v1::GetBlockResponse>*);
+  grpc::Status run_ReplaceBlock(grpc::ServerContext*, grpc::ServerReader<v1::ReplaceBlockRequest>*,
+                                v1::ReplaceBlockResponse*);
   grpc::Status run_PutBlob(grpc::ServerContext*, grpc::ServerReader<v1::PutBlobRequest>*,
                            v1::PutBlobResponse*);
   grpc::Status run_GetBlob(grpc::ServerContext*, const v1::GetBlobRequest*,

@@ -106,20 +106,34 @@ int main(int argc, char** argv) {
       }
       return argv[++i];
     };
-    if (a == "--data-dir") data_dir = next();
-    else if (a == "--listen") listen = next();
-    else if (a == "--openfhe-version") ofhe = next();
-    else if (a == "--gpu-budget-mb") gpu_mb = std::stoul(next());
-    else if (a == "--host-budget-mb") host_mb = std::stoul(next());
-    else if (a == "--compact-interval-ms") compact_ms = std::stoul(next());
-    else if (a == "--tls-cert") tls_cert = next();
-    else if (a == "--tls-key") tls_key = next();
-    else if (a == "--rest-port") rest_port = std::stoi(next());
-    else if (a == "--rest-host") rest_host = next();
-    else if (a == "--scope") scope_arg = next();
-    else if (a == "--create-api-key") create_key = true;
-    else if (a == "--insecure") insecure = true;
-    else if (a == "--no-auth") no_auth = true;
+    if (a == "--data-dir")
+      data_dir = next();
+    else if (a == "--listen")
+      listen = next();
+    else if (a == "--openfhe-version")
+      ofhe = next();
+    else if (a == "--gpu-budget-mb")
+      gpu_mb = std::stoul(next());
+    else if (a == "--host-budget-mb")
+      host_mb = std::stoul(next());
+    else if (a == "--compact-interval-ms")
+      compact_ms = std::stoul(next());
+    else if (a == "--tls-cert")
+      tls_cert = next();
+    else if (a == "--tls-key")
+      tls_key = next();
+    else if (a == "--rest-port")
+      rest_port = std::stoi(next());
+    else if (a == "--rest-host")
+      rest_host = next();
+    else if (a == "--scope")
+      scope_arg = next();
+    else if (a == "--create-api-key")
+      create_key = true;
+    else if (a == "--insecure")
+      insecure = true;
+    else if (a == "--no-auth")
+      no_auth = true;
     else {
       std::fprintf(stderr, "unknown argument %s\n", a.c_str());
       return 2;
@@ -247,7 +261,8 @@ int main(int argc, char** argv) {
           try {
             std::size_t dropped = 0;
             for (const auto& c : store.list_collections()) dropped += store.drop_dead_blocks(c);
-            if (dropped > 0) std::fprintf(stderr, "[ombra.server] compaction dropped=%zu\n", dropped);
+            if (dropped > 0)
+              std::fprintf(stderr, "[ombra.server] compaction dropped=%zu\n", dropped);
           } catch (const std::exception&) {
             std::fprintf(stderr, "[ombra.server] compaction failed\n");
           }

@@ -1,8 +1,8 @@
 // CPU unit test for check_security_floor on plain numbers. No OpenFHE, no insecure context.
+#include "ombra/core/security_floor.hpp"
+
 #include <cstdio>
 #include <stdexcept>
-
-#include "ombra/core/security_floor.hpp"
 
 using namespace ombra::core;
 

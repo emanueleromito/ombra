@@ -76,7 +76,8 @@ __global__ void ks_inner_product_kernel(const u64* __restrict__ digits, const u6
   const u64* dg = digits + z * d.digits * d.num_qp * n;
   u64 acc_b = 0, acc_a = 0;
   for (u64 p = 0; p < d.digits; ++p) {
-    const u64 dv = p == own ? ct[z][(d.src_comp * d.num_q + i) * n + s] : dg[(p * d.num_qp + i) * n + s];
+    const u64 dv =
+        p == own ? ct[z][(d.src_comp * d.num_q + i) * n + s] : dg[(p * d.num_qp + i) * n + s];
     const u64 kb = key[((p * 2 + 0) * d.num_qp + i) * n + s];
     const u64 ka = key[((p * 2 + 1) * d.num_qp + i) * n + s];
     acc_b = add_mod(acc_b, mul_mod(dv, kb, c), c.q);

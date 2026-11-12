@@ -19,70 +19,69 @@
 #include <vector>
 
 #include "cryptocontext-ser.h"
+#include "ombra/core/security_floor_context.hpp"
 #include "openfhe.h"
 #include "scheme/ckksrns/ckksrns-ser.h"
-
-#include "ombra/core/security_floor_context.hpp"
 
 using namespace lbcrypto;
 
 namespace {
 
 std::vector<double> read_doubles(const std::string& path, std::size_t count) {
-    std::ifstream f(path, std::ios::in | std::ios::binary);
-    std::vector<double> v(count);
-    f.read(reinterpret_cast<char*>(v.data()), static_cast<std::streamsize>(count * sizeof(double)));
-    if (!f || f.gcount() != static_cast<std::streamsize>(count * sizeof(double))) {
-        throw std::runtime_error("cannot read " + path);
-    }
-    return v;
+  std::ifstream f(path, std::ios::in | std::ios::binary);
+  std::vector<double> v(count);
+  f.read(reinterpret_cast<char*>(v.data()), static_cast<std::streamsize>(count * sizeof(double)));
+  if (!f || f.gcount() != static_cast<std::streamsize>(count * sizeof(double))) {
+    throw std::runtime_error("cannot read " + path);
+  }
+  return v;
 }
 
 }  // namespace
 
 int main(int argc, char** argv) {
-    if (argc != 5) {
-        std::fprintf(stderr, "usage: ombra_encoding_check <context> <slots> <q> <d>\n");
-        return 2;
+  if (argc != 5) {
+    std::fprintf(stderr, "usage: ombra_encoding_check <context> <slots> <q> <d>\n");
+    return 2;
+  }
+  try {
+    CryptoContext<DCRTPoly> cc;
+    if (!Serial::DeserializeFromFile(argv[1], cc, SerType::BINARY)) {
+      throw std::runtime_error("cannot read crypto context");
     }
-    try {
-        CryptoContext<DCRTPoly> cc;
-        if (!Serial::DeserializeFromFile(argv[1], cc, SerType::BINARY)) {
-            throw std::runtime_error("cannot read crypto context");
-        }
-        ombra::core::require_security_floor(cc);
-        const std::size_t d = std::stoul(argv[4]);
-        const std::size_t ring = cc->GetRingDimension();
-        if (d == 0 || d > ring / 2) {
-            throw std::runtime_error("d must be in [1, N/2]");
-        }
-        const std::vector<double> values = read_doubles(argv[2], ring / 2);
-        const std::vector<double> q = read_doubles(argv[3], d);
-
-        Plaintext pt = cc->MakeCKKSPackedPlaintext(values);
-        DCRTPoly poly = pt->GetElement<DCRTPoly>();
-        poly.SetFormat(Format::COEFFICIENT);
-        const auto big = poly.CRTInterpolate();
-        const BigInteger modulus = big.GetModulus();
-        const BigInteger half = modulus.DividedBy(BigInteger(2));
-        const double scale = pt->GetScalingFactor();
-
-        double worst = 0.0;
-        for (std::size_t j = 0; j < ring; ++j) {
-            const BigInteger& v = big.GetValues()[j];
-            const double c = (v > half) ? -(modulus - v).ConvertToDouble() : v.ConvertToDouble();
-            double want = 0.0;
-            if (j < d) {
-                want = q[j];
-            } else if (j > ring - d) {  // index N - i holds -q_i for 1 <= i < d
-                want = -q[ring - j];
-            }
-            worst = std::max(worst, std::abs(c / scale - want));
-        }
-        std::printf("encoding check: d=%zu max_coeff_error_in_scale_units=%.3e\n", d, worst);
-        return 0;
-    } catch (const std::exception& e) {
-        std::fprintf(stderr, "error: %s\n", e.what());
-        return 2;
+    ombra::core::require_security_floor(cc);
+    const std::size_t d = std::stoul(argv[4]);
+    const std::size_t ring = cc->GetRingDimension();
+    if (d == 0 || d > ring / 2) {
+      throw std::runtime_error("d must be in [1, N/2]");
     }
+    const std::vector<double> values = read_doubles(argv[2], ring / 2);
+    const std::vector<double> q = read_doubles(argv[3], d);
+
+    Plaintext pt = cc->MakeCKKSPackedPlaintext(values);
+    DCRTPoly poly = pt->GetElement<DCRTPoly>();
+    poly.SetFormat(Format::COEFFICIENT);
+    const auto big = poly.CRTInterpolate();
+    const BigInteger modulus = big.GetModulus();
+    const BigInteger half = modulus.DividedBy(BigInteger(2));
+    const double scale = pt->GetScalingFactor();
+
+    double worst = 0.0;
+    for (std::size_t j = 0; j < ring; ++j) {
+      const BigInteger& v = big.GetValues()[j];
+      const double c = (v > half) ? -(modulus - v).ConvertToDouble() : v.ConvertToDouble();
+      double want = 0.0;
+      if (j < d) {
+        want = q[j];
+      } else if (j > ring - d) {  // index N - i holds -q_i for 1 <= i < d
+        want = -q[ring - j];
+      }
+      worst = std::max(worst, std::abs(c / scale - want));
+    }
+    std::printf("encoding check: d=%zu max_coeff_error_in_scale_units=%.3e\n", d, worst);
+    return 0;
+  } catch (const std::exception& e) {
+    std::fprintf(stderr, "error: %s\n", e.what());
+    return 2;
+  }
 }

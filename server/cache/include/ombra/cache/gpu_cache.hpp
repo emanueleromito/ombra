@@ -3,13 +3,13 @@
 //
 //   storage --loader--> pinned host pool (LRU) --async H2D on a copy stream--> GPU cache (LRU)
 //
-// Search code announces the blocks it will need with plan(), then calls next() once per block. next()
-// returns a pinned Lease for the next block of the plan and, before returning, starts the copy of the
-// following `lookahead` blocks on the copy stream, so that copy and compute overlap (double buffering
-// at lookahead 1). A leased block is never evicted. The compute stream waits on the block's copy
-// event inside next(); the lease's release records an event on the compute stream, and any later
-// copy into that memory waits for it, so a kernel still running on an evicted block is never
-// overwritten.
+// Search code announces the blocks it will need with plan(), then calls next() once per block.
+// next() returns a pinned Lease for the next block of the plan and, before returning, starts the
+// copy of the following `lookahead` blocks on the copy stream, so that copy and compute overlap
+// (double buffering at lookahead 1). A leased block is never evicted. The compute stream waits on
+// the block's copy event inside next(); the lease's release records an event on the compute stream,
+// and any later copy into that memory waits for it, so a kernel still running on an evicted block
+// is never overwritten.
 //
 // Threading: public calls are serialized by an internal mutex; a Lease must be destroyed before the
 // cache. Metrics are counters only (no keys, no data). The header has no CUDA types, so it can be

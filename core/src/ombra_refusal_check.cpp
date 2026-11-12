@@ -155,9 +155,8 @@ int run_keys(const std::string& ctx, const std::string& dir, std::size_t d) {
   const std::vector<Cols> stored_a = {a};
   run_case("column_search_valid", [&] { ombra::core::gpu_eval_column_search(stored_a, a); });
   run_case("column_search_other_key", [&] { ombra::core::gpu_eval_column_search(stored_a, b); });
-  run_case("column_search_mixed_query", [&] {
-    ombra::core::gpu_eval_column_search(stored_a, {a[0], b[1]});
-  });
+  run_case("column_search_mixed_query",
+           [&] { ombra::core::gpu_eval_column_search(stored_a, {a[0], b[1]}); });
   run_case("column_search_batched_valid",
            [&] { ombra::core::gpu_eval_column_search_batched(stored_a, {a, a}); });
   run_case("column_search_batched_other_key",

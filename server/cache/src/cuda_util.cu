@@ -37,15 +37,17 @@ DeviceArray::~DeviceArray() {
 }
 
 void DeviceArray::upload(const std::uint64_t* host, std::size_t words, std::size_t offset_words) {
-  if (offset_words + words > words_) throw std::invalid_argument("device array: upload out of range");
-  OMBRA_CUDA_THROW(cudaMemcpy(ptr_ + offset_words, host, words * sizeof(std::uint64_t),
-                              cudaMemcpyHostToDevice));
+  if (offset_words + words > words_)
+    throw std::invalid_argument("device array: upload out of range");
+  OMBRA_CUDA_THROW(
+      cudaMemcpy(ptr_ + offset_words, host, words * sizeof(std::uint64_t), cudaMemcpyHostToDevice));
 }
 
 void DeviceArray::download(std::uint64_t* host, std::size_t words, std::size_t offset_words) const {
-  if (offset_words + words > words_) throw std::invalid_argument("device array: download out of range");
-  OMBRA_CUDA_THROW(cudaMemcpy(host, ptr_ + offset_words, words * sizeof(std::uint64_t),
-                              cudaMemcpyDeviceToHost));
+  if (offset_words + words > words_)
+    throw std::invalid_argument("device array: download out of range");
+  OMBRA_CUDA_THROW(
+      cudaMemcpy(host, ptr_ + offset_words, words * sizeof(std::uint64_t), cudaMemcpyDeviceToHost));
 }
 
 double measure_h2d_gbps(std::size_t bytes, bool pinned, int reps) {

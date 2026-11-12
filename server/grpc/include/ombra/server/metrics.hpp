@@ -26,7 +26,8 @@ class Metrics {
     r.latency_count.fetch_add(1, std::memory_order_relaxed);
     r.latency_sum_us.fetch_add(us, std::memory_order_relaxed);
     std::uint64_t cur = r.latency_max_us.load(std::memory_order_relaxed);
-    while (us > cur && !r.latency_max_us.compare_exchange_weak(cur, us, std::memory_order_relaxed)) {
+    while (us > cur &&
+           !r.latency_max_us.compare_exchange_weak(cur, us, std::memory_order_relaxed)) {
     }
   }
   void count_unauthenticated() { unauthenticated_.fetch_add(1, std::memory_order_relaxed); }

@@ -51,7 +51,8 @@ void expect_refused(const std::string& name, const std::function<void()>& fn) {
 
 int main(int argc, char** argv) {
   if (argc != 4) {
-    std::fprintf(stderr, "usage: ombra_security_floor_wiring <context> <evalmultkey> <ciphertext>\n");
+    std::fprintf(stderr,
+                 "usage: ombra_security_floor_wiring <context> <evalmultkey> <ciphertext>\n");
     return 2;
   }
   try {
@@ -80,8 +81,7 @@ int main(int argc, char** argv) {
       ombra::core::GpuExpansion e(cc, ct, keys, 2);
     });
     expect_refused("GpuCtOps", [&] { ombra::core::GpuCtOps ops(cc, ct, key_vec[0]); });
-    expect_refused("GpuSearch",
-                   [&] { ombra::core::GpuSearch gs(cc, ct, ct, key_vec[0], 1, 1); });
+    expect_refused("GpuSearch", [&] { ombra::core::GpuSearch gs(cc, ct, ct, key_vec[0], 1, 1); });
     expect_refused("gpu_eval_add (require_fixedmanual)",
                    [&] { (void)ombra::core::gpu_eval_add(ct, ct); });
     return g_failures ? 1 : 0;

@@ -26,7 +26,8 @@ struct BlockKey {
 
 struct BlockKeyHash {
   std::size_t operator()(const BlockKey& k) const {
-    return std::hash<std::string>()(k.collection) * 1000003u ^ std::hash<std::uint32_t>()(k.segment);
+    return std::hash<std::string>()(k.collection) * 1000003u ^
+           std::hash<std::uint32_t>()(k.segment);
   }
 };
 

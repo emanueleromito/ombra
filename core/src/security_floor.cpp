@@ -1,10 +1,10 @@
-#include "ombra/core/security_floor_context.hpp"
+#include "ombra/core/security_floor.hpp"
 
 #include <cstdlib>
 #include <memory>
 #include <stdexcept>
 
-#include "ombra/core/security_floor.hpp"
+#include "ombra/core/security_floor_context.hpp"
 
 namespace ombra::core {
 namespace {
@@ -13,13 +13,20 @@ using namespace lbcrypto;
 
 StdLevel to_level(SecurityLevel l) {
   switch (l) {
-    case HEStd_128_classic: return StdLevel::kClassic128;
-    case HEStd_192_classic: return StdLevel::kClassic192;
-    case HEStd_256_classic: return StdLevel::kClassic256;
-    case HEStd_128_quantum: return StdLevel::kQuantum128;
-    case HEStd_192_quantum: return StdLevel::kQuantum192;
-    case HEStd_256_quantum: return StdLevel::kQuantum256;
-    default: return StdLevel::kNotSet;
+    case HEStd_128_classic:
+      return StdLevel::kClassic128;
+    case HEStd_192_classic:
+      return StdLevel::kClassic192;
+    case HEStd_256_classic:
+      return StdLevel::kClassic256;
+    case HEStd_128_quantum:
+      return StdLevel::kQuantum128;
+    case HEStd_192_quantum:
+      return StdLevel::kQuantum192;
+    case HEStd_256_quantum:
+      return StdLevel::kQuantum256;
+    default:
+      return StdLevel::kNotSet;
   }
 }
 

@@ -116,8 +116,8 @@ class ExpansionDevice {
   // `nodes` nodes (what the scratch holds once it has grown to that chunk size).
   std::size_t ct_bytes() const;
   std::size_t scratch_bytes(std::size_t nodes) const;
-  // Ciphertexts live in slabs of slab_slots() slots (one cudaMalloc each, about 256 MiB). slab_bytes()
-  // is the driver's footprint of one slab (rounded to 2 MiB), so a ciphertext costs
+  // Ciphertexts live in slabs of slab_slots() slots (one cudaMalloc each, about 256 MiB).
+  // slab_bytes() is the driver's footprint of one slab (rounded to 2 MiB), so a ciphertext costs
   // slab_bytes() / slab_slots() bytes plus at most one partly used slab. pool_bytes() is the
   // footprint of the slabs currently allocated.
   std::size_t slab_slots() const;
@@ -149,7 +149,8 @@ class ExpansionDevice {
   void rescale(const std::vector<const std::uint64_t*>& in2,
                const std::vector<std::uint64_t*>& out2);
   // Tensor product of 2-component ciphertexts (EvalMultCore): out3[k] has 3 * num_q * N words.
-  void multiply(const std::vector<const std::uint64_t*>& a, const std::vector<const std::uint64_t*>& b,
+  void multiply(const std::vector<const std::uint64_t*>& a,
+                const std::vector<const std::uint64_t*>& b,
                 const std::vector<std::uint64_t*>& out3);
 
   // Synchronous stage entry points for the oracle tests (copy results to the host).

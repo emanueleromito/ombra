@@ -72,9 +72,10 @@ class PlainEncoder {
   std::vector<std::uint64_t> encode_host(PlainFormat fmt, const void* codes, std::size_t cols,
                                          double code_scale, bool coefficients_only);
 
-  // Test aid (exact oracle): the integer steps only. `coeffs` is [col][N] signed integers (OpenFHE's
-  // rounded coefficients); returns them reduced into every tower, [col][tower][coeff], and, if
-  // `ntt`, then forward-transformed to evaluation form. Both must match OpenFHE word for word.
+  // Test aid (exact oracle): the integer steps only. `coeffs` is [col][N] signed integers
+  // (OpenFHE's rounded coefficients); returns them reduced into every tower, [col][tower][coeff],
+  // and, if `ntt`, then forward-transformed to evaluation form. Both must match OpenFHE word for
+  // word.
   std::vector<std::uint64_t> reduce_ntt_host(const std::int64_t* coeffs, std::size_t cols,
                                              bool ntt);
 

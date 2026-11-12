@@ -142,39 +142,61 @@ bool constant_time_equal(const std::uint8_t* a, const std::uint8_t* b, std::size
 }
 
 bool parse_scope(std::string_view s, Scope* out) {
-  if (s == "read") *out = Scope::Read;
-  else if (s == "write") *out = Scope::Write;
-  else if (s == "admin") *out = Scope::Admin;
-  else return false;
+  if (s == "read")
+    *out = Scope::Read;
+  else if (s == "write")
+    *out = Scope::Write;
+  else if (s == "admin")
+    *out = Scope::Admin;
+  else
+    return false;
   return true;
 }
 
 const char* scope_name(Scope s) {
   switch (s) {
-    case Scope::Read: return "read";
-    case Scope::Write: return "write";
-    case Scope::Admin: return "admin";
+    case Scope::Read:
+      return "read";
+    case Scope::Write:
+      return "write";
+    case Scope::Admin:
+      return "admin";
   }
   return "?";
 }
 
 const char* rpc_name(Rpc r) {
   switch (r) {
-    case Rpc::CreateCollection: return "CreateCollection";
-    case Rpc::GetCollection: return "GetCollection";
-    case Rpc::ListCollections: return "ListCollections";
-    case Rpc::DropCollection: return "DropCollection";
-    case Rpc::UploadKeys: return "UploadKeys";
-    case Rpc::Insert: return "Insert";
-    case Rpc::Delete: return "Delete";
-    case Rpc::Search: return "Search";
-    case Rpc::ListBlocks: return "ListBlocks";
-    case Rpc::GetBlock: return "GetBlock";
-    case Rpc::ReplaceBlock: return "ReplaceBlock";
-    case Rpc::PutBlob: return "PutBlob";
-    case Rpc::GetBlob: return "GetBlob";
-    case Rpc::DeleteBlobs: return "DeleteBlobs";
-    case Rpc::kCount: break;
+    case Rpc::CreateCollection:
+      return "CreateCollection";
+    case Rpc::GetCollection:
+      return "GetCollection";
+    case Rpc::ListCollections:
+      return "ListCollections";
+    case Rpc::DropCollection:
+      return "DropCollection";
+    case Rpc::UploadKeys:
+      return "UploadKeys";
+    case Rpc::Insert:
+      return "Insert";
+    case Rpc::Delete:
+      return "Delete";
+    case Rpc::Search:
+      return "Search";
+    case Rpc::ListBlocks:
+      return "ListBlocks";
+    case Rpc::GetBlock:
+      return "GetBlock";
+    case Rpc::ReplaceBlock:
+      return "ReplaceBlock";
+    case Rpc::PutBlob:
+      return "PutBlob";
+    case Rpc::GetBlob:
+      return "GetBlob";
+    case Rpc::DeleteBlobs:
+      return "DeleteBlobs";
+    case Rpc::kCount:
+      break;
   }
   return "?";
 }
@@ -211,7 +233,8 @@ ApiKeyStore ApiKeyStore::load(const std::string& path) {
   struct stat st {};
   if (::stat(path.c_str(), &st) != 0) throw std::runtime_error("cannot read the API key file");
   if ((st.st_mode & 077) != 0)
-    throw std::runtime_error("the API key file must not be accessible by group or others (chmod 600)");
+    throw std::runtime_error(
+        "the API key file must not be accessible by group or others (chmod 600)");
   std::ifstream in(path);
   std::string line;
   if (!std::getline(in, line) || line != kHeader)

@@ -1,5 +1,4 @@
 #include "device_util.hpp"
-
 #include "ombra/core/cuda_check.hpp"
 
 namespace ombra::search {

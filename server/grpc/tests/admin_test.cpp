@@ -73,11 +73,13 @@ static void test_scopes() {
   CHECK(required_scope(Rpc::DropCollection) == Scope::Admin);
   CHECK(scope_allows(Scope::Admin, Scope::Write) && scope_allows(Scope::Write, Scope::Read));
   CHECK(!scope_allows(Scope::Read, Scope::Write) && !scope_allows(Scope::Write, Scope::Admin));
-  for (std::size_t i = 0; i < kRpcCount; ++i) CHECK(std::string(rpc_name(static_cast<Rpc>(i))) != "?");
+  for (std::size_t i = 0; i < kRpcCount; ++i)
+    CHECK(std::string(rpc_name(static_cast<Rpc>(i))) != "?");
 }
 
 static void test_key_file() {
-  const fs::path dir = fs::temp_directory_path() / ("ombra_admin_test_" + std::to_string(::getpid()));
+  const fs::path dir =
+      fs::temp_directory_path() / ("ombra_admin_test_" + std::to_string(::getpid()));
   fs::remove_all(dir);
   const std::string d = (dir / "data").string();  // does not exist yet: created
 
@@ -120,9 +122,7 @@ static void test_key_file() {
 
   // Refused files: wrong version, group-readable, malformed line.
   const std::string bad = (dir / "bad").string();
-  {
-    std::ofstream(bad) << "OMBRA-API-KEYS v2\n";
-  }
+  { std::ofstream(bad) << "OMBRA-API-KEYS v2\n"; }
   ::chmod(bad.c_str(), 0600);
   bool threw = false;
   try {
@@ -140,9 +140,7 @@ static void test_key_file() {
   }
   CHECK(threw);
   ::chmod(path.c_str(), 0600);
-  {
-    std::ofstream(bad) << "OMBRA-API-KEYS v1\nzz zz admin\n";
-  }
+  { std::ofstream(bad) << "OMBRA-API-KEYS v1\nzz zz admin\n"; }
   threw = false;
   try {
     ApiKeyStore::load(bad);
@@ -169,13 +167,15 @@ static void test_http() {
   CHECK(parse_http_request("GET x HTTP/1.1\r\n\r\n", &r) == HttpParse::Bad);
   CHECK(parse_http_request("GET\r\n\r\n", &r) == HttpParse::Bad);
   CHECK(parse_http_request("GET /x HTTP/1.1\r\nnocolon\r\n\r\n", &r) == HttpParse::Bad);
-  CHECK(parse_http_request("POST /x HTTP/1.1\r\nContent-Length: 5\r\n\r\nhello", &r) == HttpParse::Bad);
+  CHECK(parse_http_request("POST /x HTTP/1.1\r\nContent-Length: 5\r\n\r\nhello", &r) ==
+        HttpParse::Bad);
   CHECK(parse_http_request("POST /x HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n", &r) ==
         HttpParse::Bad);
   // Header cap: no terminator within 8 KiB is refused without waiting; a block over 8 KiB too.
   CHECK(parse_http_request(std::string(kMaxHttpHeaderBytes, 'a'), &r) == HttpParse::TooLarge);
   CHECK(parse_http_request(std::string(kMaxHttpHeaderBytes - 1, 'a'), &r) == HttpParse::Incomplete);
-  const std::string big = "GET / HTTP/1.1\r\nX: " + std::string(kMaxHttpHeaderBytes, 'a') + "\r\n\r\n";
+  const std::string big =
+      "GET / HTTP/1.1\r\nX: " + std::string(kMaxHttpHeaderBytes, 'a') + "\r\n\r\n";
   CHECK(parse_http_request(big, &r) == HttpParse::TooLarge);
 
   const std::string resp = http_response(401, "{}");

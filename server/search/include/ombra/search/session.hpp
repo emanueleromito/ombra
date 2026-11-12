@@ -1,18 +1,18 @@
 // Search engine API, what the gRPC service calls. Needs OpenFHE and CUDA.
 //
 //   SearchEngine engine(store, config);        // GPU cluster cache, one compute stream
-//   engine.load_collection("docs");            // context + EvalMult + automorphism keys from the store
+//   engine.load_collection("docs");            // context, EvalMult and automorphism keys
 //   auto s = engine.open_session("docs", key_tag, query_envelope, filter_leaves);
-//   auto centers = s->score_centers();         // round 1: stage 1, first d leaves, per center block
-//   auto scores  = s->score_clusters({3, 7});  // round 2 (callable again: more rounds, same stream)
+//   auto centers = s->score_centers();         // round 1: stage 1, first d leaves
+//   auto scores  = s->score_clusters({3, 7});  // round 2; call again for more rounds
 //
-// The query is expanded ONCE on the GPU into D = d + sum(cardinality) leaves that stay on the device
-// for the life of the session. Stage 1 multiplies the d first leaves with the center block columns;
-// stage 2 multiplies all D leaves with the d + sum(V) columns of each block of a chosen cluster,
-// then relinearizes and rescales on the GPU (existing pipeline, exact against OpenFHE). A result
-// ciphertext is at level 1; slot i decrypts to score + lambda * c (lambda = 4, c =
-// number of filter fields that vector matches). Tombstoned slots get -lambda * (F + 1) added with
-// an OpenFHE plaintext (no level), so they decrypt below every live slot. No mask multiply.
+// The query is expanded ONCE on the GPU into D = d + sum(cardinality) leaves that stay on the
+// device for the life of the session. Stage 1 multiplies the d first leaves with the center block
+// columns; stage 2 multiplies all D leaves with the d + sum(V) columns of each block of a chosen
+// cluster, then relinearizes and rescales on the GPU (existing pipeline, exact against OpenFHE). A
+// result ciphertext is at level 1; slot i decrypts to score + lambda * c (lambda = 4, c = number of
+// filter fields that vector matches). Tombstoned slots get -lambda * (F + 1) added with an OpenFHE
+// plaintext (no level), so they decrypt below every live slot. No mask multiply.
 //
 // Key handling: the engine reads the public context and the public EvalMult and automorphism
 // keys. It never accepts or derives a secret key. Every request carries a key tag that
@@ -38,7 +38,7 @@ namespace ombra::search {
 namespace detail {
 struct EngineCore;  // defined in session.cpp
 struct Coll;
-}
+}  // namespace detail
 
 // Error classes the service maps to proto ErrorCode.
 class SearchError : public std::runtime_error {  // ERROR_INTERNAL unless a subclass says otherwise
@@ -72,9 +72,9 @@ struct EngineConfig {
 // The result for one stored block (one segment).
 struct BlockScores {
   std::uint32_t cluster = 0;
-  std::string segment;                   // segment file name in the store
-  std::vector<std::uint8_t> envelope;    // versioned envelope, kind ciphertext (level 1)
-  std::vector<std::string> ids;          // one per occupied slot, in slot order, tombstoned included
+  std::string segment;                 // segment file name in the store
+  std::vector<std::uint8_t> envelope;  // versioned envelope, kind ciphertext (level 1)
+  std::vector<std::string> ids;        // one per occupied slot, in slot order, tombstoned included
   bool tombstone_penalty_applied = false;
 };
 

@@ -44,9 +44,12 @@ enum class Rpc : int {
 inline constexpr std::size_t kRpcCount = static_cast<std::size_t>(Rpc::kCount);
 const char* rpc_name(Rpc r);
 // read: Get/List collections, ListBlocks, GetBlock, Search. write: read + Insert, Delete,
-// UploadKeys, ReplaceBlock, PutBlob, DeleteBlobs, CreateCollection (GetBlob is read). admin: everything (DropCollection, REST /metrics).
+// UploadKeys, ReplaceBlock, PutBlob, DeleteBlobs, CreateCollection (GetBlob is read). admin:
+// everything (DropCollection, REST /metrics).
 Scope required_scope(Rpc r);
-inline bool scope_allows(Scope have, Scope need) { return static_cast<int>(have) >= static_cast<int>(need); }
+inline bool scope_allows(Scope have, Scope need) {
+  return static_cast<int>(have) >= static_cast<int>(need);
+}
 
 enum class AuthResult { Ok, Unauthenticated, PermissionDenied };
 

@@ -49,8 +49,8 @@ std::vector<u64> shoup_of(const std::vector<u64>& w, const std::vector<u64>& q_o
 // allocation granularity, so one allocation per ciphertext wastes most of the memory; a slab pays
 // that rounding once. A slot returns to the free list when its last handle goes away.
 struct Slab {
-  DeviceBuffer<u64> buf;     // empty once released
-  std::size_t in_use = 0;    // slots handed out and not yet returned
+  DeviceBuffer<u64> buf;   // empty once released
+  std::size_t in_use = 0;  // slots handed out and not yet returned
 };
 struct Slot {
   u64* ptr = nullptr;
@@ -406,9 +406,9 @@ struct ExpansionDevice::Impl {
     OMBRA_CUDA_CHECK(cudaMemcpyAsync(rs_ptrs.get(), last.data(), last.size() * sizeof(u64*),
                                      cudaMemcpyHostToDevice, nullptr));
     const u32 z = (u32)(2 * b);
-    OMBRA_CUDA_CHECK(launch_ntt_inverse(
-        rs_last.get(), rows_inv_last.get(), 1, ntt(), nullptr, {z, n},
-        NttSource{reinterpret_cast<const u64* const*>(rs_ptrs.get()), 0}));
+    OMBRA_CUDA_CHECK(
+        launch_ntt_inverse(rs_last.get(), rows_inv_last.get(), 1, ntt(), nullptr, {z, n},
+                           NttSource{reinterpret_cast<const u64* const*>(rs_ptrs.get()), 0}));
     const RescaleDims rd{n, nq};
     OMBRA_CUDA_CHECK(launch_rescale_switch(rs_last.get(), rs_tmp.get(), tc.get(), rd, z, nullptr));
     OMBRA_CUDA_CHECK(launch_ntt_forward(rs_tmp.get(), rows_fwd_rs.get(), (u32)(nq - 1), ntt(),
@@ -589,8 +589,8 @@ std::size_t DeviceWords::size() const { return impl_->count; }
 void DeviceWords::upload(const std::vector<std::uint64_t>& words, std::size_t offset) {
   require(offset + words.size() <= impl_->count, "DeviceWords upload out of range");
   const auto go = [&]() -> Status {
-    OMBRA_CUDA_CHECK(cudaMemcpy(impl_->buf.get() + offset, words.data(),
-                                words.size() * sizeof(u64), cudaMemcpyHostToDevice));
+    OMBRA_CUDA_CHECK(cudaMemcpy(impl_->buf.get() + offset, words.data(), words.size() * sizeof(u64),
+                                cudaMemcpyHostToDevice));
     return {};
   };
   go().throw_if_error();

@@ -25,7 +25,8 @@ class Stmt {
   Stmt& operator=(const Stmt&) = delete;
 
   Stmt& text(int i, const std::string& v) {
-    if (sqlite3_bind_text(s_, i, v.data(), static_cast<int>(v.size()), SQLITE_TRANSIENT) != SQLITE_OK)
+    if (sqlite3_bind_text(s_, i, v.data(), static_cast<int>(v.size()), SQLITE_TRANSIENT) !=
+        SQLITE_OK)
       fail(db_, "bind");
     return *this;
   }
@@ -46,10 +47,14 @@ class Stmt {
     fail(db_, "step");
   }
   void run() { step(); }
-  void reset() { sqlite3_reset(s_); sqlite3_clear_bindings(s_); }
+  void reset() {
+    sqlite3_reset(s_);
+    sqlite3_clear_bindings(s_);
+  }
   std::string col_text(int i) const {
     auto p = sqlite3_column_blob(s_, i);
-    return std::string(static_cast<const char*>(p), static_cast<std::size_t>(sqlite3_column_bytes(s_, i)));
+    return std::string(static_cast<const char*>(p),
+                       static_cast<std::size_t>(sqlite3_column_bytes(s_, i)));
   }
   std::int64_t col_num(int i) const { return sqlite3_column_int64(s_, i); }
 
@@ -200,9 +205,15 @@ void Catalog::create_collection(const CollectionSpec& s) {
     throw std::runtime_error("catalog: collection api_version must be 1");
   Tx tx(db_);
   Stmt(db_, "INSERT INTO collections VALUES(?,?,?,?,?,?,?,?)")
-      .text(1, s.name).num(2, s.api_version).text(3, s.preset).num(4, s.dimension)
-      .num(5, s.security_level).text(6, s.key_tag).num(7, s.cluster_count)
-      .text(8, encode_filters(s.filter_fields)).run();
+      .text(1, s.name)
+      .num(2, s.api_version)
+      .text(3, s.preset)
+      .num(4, s.dimension)
+      .num(5, s.security_level)
+      .text(6, s.key_tag)
+      .num(7, s.cluster_count)
+      .text(8, encode_filters(s.filter_fields))
+      .run();
   Stmt c(db_, "INSERT INTO clusters VALUES(?,?)");
   // Cluster ids 0 .. cluster_count - 1 are data clusters; the id cluster_count itself is reserved
   // for the block(s) of cluster centers (stage 1 of the search).
@@ -259,13 +270,11 @@ bool Catalog::drop_collection(const std::string& name, std::vector<std::string>*
     while (q.step()) blob_files->push_back(q.col_text(0));
   }
   // Children first (foreign keys are on).
-  for (const char* sql : {"DELETE FROM tombstones WHERE collection=?",
-                          "DELETE FROM vectors WHERE collection=?",
-                          "DELETE FROM segments WHERE collection=?",
-                          "DELETE FROM clusters WHERE collection=?",
-                          "DELETE FROM key_files WHERE collection=?",
-                          "DELETE FROM blobs WHERE collection=?",
-                          "DELETE FROM collections WHERE name=?"})
+  for (const char* sql :
+       {"DELETE FROM tombstones WHERE collection=?", "DELETE FROM vectors WHERE collection=?",
+        "DELETE FROM segments WHERE collection=?", "DELETE FROM clusters WHERE collection=?",
+        "DELETE FROM key_files WHERE collection=?", "DELETE FROM blobs WHERE collection=?",
+        "DELETE FROM collections WHERE name=?"})
     Stmt(db_, sql).text(1, name).run();
   tx.commit();
   return true;
@@ -279,7 +288,9 @@ std::uint64_t Catalog::next_segment_id() {
     q.step();
     id = static_cast<std::uint64_t>(q.col_num(0));
   }
-  Stmt(db_, "UPDATE meta SET value=? WHERE key='next_segment'").num(1, static_cast<std::int64_t>(id + 1)).run();
+  Stmt(db_, "UPDATE meta SET value=? WHERE key='next_segment'")
+      .num(1, static_cast<std::int64_t>(id + 1))
+      .run();
   tx.commit();
   return id;
 }
@@ -291,8 +302,9 @@ bool Catalog::has_segment(const std::string& file) const {
 }
 
 std::vector<SegmentRow> Catalog::segments(const std::string& collection) const {
-  Stmt q(db_,
-         "SELECT cluster,file,n_vectors,n_columns,crc FROM segments WHERE collection=? ORDER BY file");
+  Stmt q(
+      db_,
+      "SELECT cluster,file,n_vectors,n_columns,crc FROM segments WHERE collection=? ORDER BY file");
   q.text(1, collection);
   std::vector<SegmentRow> v;
   while (q.step())
@@ -317,8 +329,13 @@ void Catalog::add_segment(const std::string& collection, const SegmentRow& seg,
     return;
   }
   Stmt(db_, "INSERT INTO segments VALUES(?,?,?,?,?,?)")
-      .text(1, seg.file).text(2, collection).num(3, seg.cluster).num(4, seg.n_vectors)
-      .num(5, seg.n_columns).num(6, seg.crc).run();
+      .text(1, seg.file)
+      .text(2, collection)
+      .num(3, seg.cluster)
+      .num(4, seg.n_vectors)
+      .num(5, seg.n_columns)
+      .num(6, seg.crc)
+      .run();
   Stmt v(db_, "INSERT INTO vectors VALUES(?,?,?)");
   for (const auto& id : ids) {
     v.reset();
@@ -427,9 +444,17 @@ void Catalog::drop_segments(const std::string& collection, const std::vector<std
     Stmt(db_,
          "DELETE FROM tombstones WHERE collection=?1 AND id IN "
          "(SELECT id FROM vectors WHERE collection=?1 AND segment=?2)")
-        .text(1, collection).text(2, f).run();
-    Stmt(db_, "DELETE FROM vectors WHERE collection=? AND segment=?").text(1, collection).text(2, f).run();
-    Stmt(db_, "DELETE FROM segments WHERE collection=? AND file=?").text(1, collection).text(2, f).run();
+        .text(1, collection)
+        .text(2, f)
+        .run();
+    Stmt(db_, "DELETE FROM vectors WHERE collection=? AND segment=?")
+        .text(1, collection)
+        .text(2, f)
+        .run();
+    Stmt(db_, "DELETE FROM segments WHERE collection=? AND file=?")
+        .text(1, collection)
+        .text(2, f)
+        .run();
   }
   tx.commit();
 }
@@ -449,15 +474,22 @@ void Catalog::replace_segments(const std::string& collection,
       have.size() != live_ids_in.size())
     throw std::runtime_error("catalog: live ids of the blocks changed");
   Stmt(db_, "INSERT INTO segments VALUES(?,?,?,?,?,?)")
-      .text(1, neu.file).text(2, collection).num(3, neu.cluster).num(4, neu.n_vectors)
-      .num(5, neu.n_columns).num(6, neu.crc).run();
+      .text(1, neu.file)
+      .text(2, collection)
+      .num(3, neu.cluster)
+      .num(4, neu.n_vectors)
+      .num(5, neu.n_columns)
+      .num(6, neu.crc)
+      .run();
   // Repoint the live vectors to the new segment, then delete what is left of the old ones (the
   // dead ids, after their tombstones).
   for (const auto& f : old_files) {
     Stmt(db_,
          "DELETE FROM tombstones WHERE collection=?1 AND id IN "
          "(SELECT id FROM vectors WHERE collection=?1 AND segment=?2)")
-        .text(1, collection).text(2, f).run();
+        .text(1, collection)
+        .text(2, f)
+        .run();
   }
   Stmt move(db_, "UPDATE vectors SET segment=?3 WHERE collection=?1 AND id=?2");
   for (const auto& id : live_ids_in) {
@@ -465,8 +497,14 @@ void Catalog::replace_segments(const std::string& collection,
     move.text(1, collection).blob(2, id).text(3, neu.file).run();
   }
   for (const auto& f : old_files) {
-    Stmt(db_, "DELETE FROM vectors WHERE collection=? AND segment=?").text(1, collection).text(2, f).run();
-    Stmt(db_, "DELETE FROM segments WHERE collection=? AND file=?").text(1, collection).text(2, f).run();
+    Stmt(db_, "DELETE FROM vectors WHERE collection=? AND segment=?")
+        .text(1, collection)
+        .text(2, f)
+        .run();
+    Stmt(db_, "DELETE FROM segments WHERE collection=? AND file=?")
+        .text(1, collection)
+        .text(2, f)
+        .run();
   }
   tx.commit();
 }
@@ -481,7 +519,10 @@ void Catalog::put_key_files(const std::string& collection,
 void Catalog::put_key_file(const std::string& collection, const std::string& kind,
                            const std::string& file) {
   Stmt(db_, "INSERT OR REPLACE INTO key_files VALUES(?,?,?)")
-      .text(1, collection).text(2, kind).text(3, file).run();
+      .text(1, collection)
+      .text(2, kind)
+      .text(3, file)
+      .run();
 }
 
 std::vector<std::pair<std::string, std::string>> Catalog::key_files(
@@ -501,7 +542,7 @@ std::vector<std::string> Catalog::all_key_files() const {
 }
 
 bool Catalog::put_blob(const std::string& collection, std::uint32_t kind, const std::string& id,
-                      const std::string& file, std::uint64_t size, std::string* old_file) {
+                       const std::string& file, std::uint64_t size, std::string* old_file) {
   Tx tx(db_);
   bool had = false;
   {
@@ -513,8 +554,12 @@ bool Catalog::put_blob(const std::string& collection, std::uint32_t kind, const 
     }
   }
   Stmt(db_, "INSERT OR REPLACE INTO blobs VALUES(?,?,?,?,?)")
-      .text(1, collection).num(2, kind).blob(3, id).text(4, file)
-      .num(5, static_cast<std::int64_t>(size)).run();
+      .text(1, collection)
+      .num(2, kind)
+      .blob(3, id)
+      .text(4, file)
+      .num(5, static_cast<std::int64_t>(size))
+      .run();
   tx.commit();
   return had;
 }
@@ -541,7 +586,10 @@ std::vector<std::string> Catalog::delete_blobs(const std::string& collection, st
       files.push_back(q.col_text(0));
     }
     Stmt(db_, "DELETE FROM blobs WHERE collection=? AND kind=? AND id=?")
-        .text(1, collection).num(2, kind).blob(3, id).run();
+        .text(1, collection)
+        .num(2, kind)
+        .blob(3, id)
+        .run();
   }
   tx.commit();
   return files;

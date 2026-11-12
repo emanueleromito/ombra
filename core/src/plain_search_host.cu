@@ -236,8 +236,8 @@ std::vector<std::uint64_t> PlainEncoder::reduce_ntt_host(const std::int64_t* coe
   const auto run = [&]() -> Status {
     OMBRA_TRY(d_in.allocate(cols * n));
     OMBRA_TRY(d_out.allocate(out.size()));
-    OMBRA_CUDA_CHECK(cudaMemcpy(d_in.get(), coeffs, cols * n * sizeof(long long),
-                                cudaMemcpyHostToDevice));
+    OMBRA_CUDA_CHECK(
+        cudaMemcpy(d_in.get(), coeffs, cols * n * sizeof(long long), cudaMemcpyHostToDevice));
     OMBRA_CUDA_CHECK(
         launch_reduce_ints(d_in.get(), cols, n, impl_->tc.get(), impl_->nt, d_out.get(), nullptr));
     if (ntt) {

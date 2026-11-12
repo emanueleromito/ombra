@@ -226,8 +226,8 @@ int main(int argc, char** argv) {
       std::vector<Ct> bmask(nb);
       for (std::size_t b = 0; b < nb; ++b) {
         for (std::size_t j = 0; j < d; ++j) {
-          blk[b].push_back(load_ct(in_dir + "/stored_" + std::to_string(b) + "_" +
-                                   std::to_string(j) + ".bin"));
+          blk[b].push_back(
+              load_ct(in_dir + "/stored_" + std::to_string(b) + "_" + std::to_string(j) + ".bin"));
         }
         bmask[b] = load_ct(in_dir + "/mask_blk_" + std::to_string(b) + ".bin");
       }

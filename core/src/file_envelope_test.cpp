@@ -1,10 +1,10 @@
 // Unit test of the file envelope. No OpenFHE, no GPU. Synthetic bytes only.
 // argv[1] = path of tests/fixtures/envelope_v1_ciphertext.bin, written by the Python writer.
+#include "ombra/core/file_envelope.hpp"
+
 #include <fstream>
 #include <iostream>
 #include <iterator>
-
-#include "ombra/core/file_envelope.hpp"
 
 using namespace ombra::core;
 
@@ -58,17 +58,20 @@ int main(int argc, char** argv) {
   for (int i = 0; i < 8; ++i) bad[bad.size() - 6 - 8 + i] = 0xFF;
   CHECK(refuses([&] { rd(bad); }));
   CHECK(refuses([&] { rd({}); }));
-  for (std::size_t n = 0; n < b.size(); ++n) CHECK(refuses([&] { rd(Bytes(b.begin(), b.begin() + n)); }));
+  for (std::size_t n = 0; n < b.size(); ++n)
+    CHECK(refuses([&] { rd(Bytes(b.begin(), b.begin() + n)); }));
 
   if (argc > 1) {  // cross-language: identical bytes
     std::ifstream f(argv[1], std::ios::binary);
     Bytes fx((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-    Envelope x{EnvelopeKind::Ciphertext, "fixture_preset", "0.0.0-fixture",
+    Envelope x{EnvelopeKind::Ciphertext,
+               "fixture_preset",
+               "0.0.0-fixture",
                {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}};
     CHECK(!fx.empty());
     CHECK(fx == write_envelope(x));
-    CHECK(read_envelope(fx, EnvelopeKind::Ciphertext, "fixture_preset", "0.0.0-fixture")
-              .payload == x.payload);
+    CHECK(read_envelope(fx, EnvelopeKind::Ciphertext, "fixture_preset", "0.0.0-fixture").payload ==
+          x.payload);
   }
   std::cout << (fails ? "FAILED" : "file_envelope ok") << "\n";
   return fails ? 1 : 0;

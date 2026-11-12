@@ -14,12 +14,12 @@
 namespace ombra::core {
 
 struct RnsShape {
-    std::size_t num_polys;
-    std::size_t num_towers;
-    std::size_t ring_dim;
+  std::size_t num_polys;
+  std::size_t num_towers;
+  std::size_t ring_dim;
 
-    std::size_t poly_words() const { return num_towers * ring_dim; }
-    std::size_t total_words() const { return num_polys * poly_words(); }
+  std::size_t poly_words() const { return num_towers * ring_dim; }
+  std::size_t total_words() const { return num_polys * poly_words(); }
 };
 
 // out[i] = (a[i] + b[i]) mod q(i) for all i; a, b, out are host arrays of shape.total_words().

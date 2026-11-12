@@ -1,8 +1,9 @@
+#include "ombra/storage/wal.hpp"
+
 #include <fcntl.h>
 #include <unistd.h>
 
 #include "ombra/storage/fsutil.hpp"
-#include "ombra/storage/wal.hpp"
 #include "test_util.hpp"
 
 using namespace ombra::storage;
