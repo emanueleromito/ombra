@@ -78,7 +78,7 @@ T3.2 and T3.3 can run in parallel after T3.1. T3.6 needs the server API from M2 
 **Depends on:** T3.6
 **Steps:** package `langchain-ombra` with a `VectorStore` implementation (add texts, delete, similarity search with and without scores, `from_texts`); an example that runs end to end.
 **Done when:** the example runs against the local mode, and the package passes LangChain's own vector store tests that apply.
-**Status:** todo
+**Status:** done
 
 ### T3.9 Recall tool on the user's own data
 
