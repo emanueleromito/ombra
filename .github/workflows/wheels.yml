@@ -40,7 +40,7 @@ jobs:
           # Native runners for every architecture; no QEMU.
           - {name: "Linux x86_64", os: ubuntu-24.04, archs: x86_64}
           - {name: "Linux aarch64", os: ubuntu-24.04-arm, archs: aarch64}
-          - {name: "macOS arm64", os: macos-14, archs: arm64}
+          - {name: "macOS arm64", os: macos-15, archs: arm64}
           # macos-13 is retired by GitHub; macos-15-intel is its Intel replacement.
           - {name: "macOS x86_64", os: macos-15-intel, archs: x86_64}
     steps:
@@ -68,7 +68,7 @@ jobs:
         include:
           - {name: "Linux x86_64", os: ubuntu-24.04, archs: x86_64}
           - {name: "Linux aarch64", os: ubuntu-24.04-arm, archs: aarch64}
-          - {name: "macOS arm64", os: macos-14, archs: arm64}
+          - {name: "macOS arm64", os: macos-15, archs: arm64}
           - {name: "macOS x86_64", os: macos-15-intel, archs: x86_64}
     steps:
       - uses: actions/checkout@v7
