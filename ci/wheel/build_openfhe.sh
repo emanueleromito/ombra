@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 # Builds and installs OpenFHE (C++) for the client wheels. Run once per platform by cibuildwheel
 # (before-all). Same tag and flags as ci/Dockerfile and modal_app.py; change the version in all.
 #

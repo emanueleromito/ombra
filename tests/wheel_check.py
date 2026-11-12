@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Check of an INSTALLED ombra wheel, run by cibuildwheel as test-command (client/pyproject.toml).
 
 It proves, with synthetic data only, that:

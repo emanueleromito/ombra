@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 # Downloads the sources of the pinned openfhe-python tag into DIR (for ombra-openfhe).
 #   fetch_openfhe_python.sh DIR
 set -euo pipefail

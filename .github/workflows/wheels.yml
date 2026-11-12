@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 # Builds the wheels of two packages with cibuildwheel and tests each one after installing it:
 #   ombra-openfhe  (packaging/ombra-openfhe/): openfhe-python 1.6.1.0 with OpenFHE 1.6.1 inside
 #   ombra          (client/): the client with ombra._native, the C++ OpenFHE expansion of core/
