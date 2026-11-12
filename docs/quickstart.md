@@ -184,8 +184,8 @@ python server_search.py localhost:50051 server.crt
 ```
 
 Against a server the default preset is "balanced" (local mode uses "fast"), so keys and
-ciphertexts are larger and everything is slower. This script needs a running server, so CI checks that it compiles but
-does not run it.
+ciphertexts are larger and everything is slower. This script needs a running server, so CI
+checks that it compiles but does not run it.
 
 ## 4. LangChain
 
@@ -271,9 +271,9 @@ server.
   the topic of a query. Decoy hides which clusters are real by adding random ones; Strict scans
   everything and hides the most, at the highest cost. Choose with `security_level=` when you
   create the collection, or `level=` per search.
-- In Fast and Decoy modes the choices come from decrypted results. Ombra makes no formal claim
-  about this leak (decision 0017): decrypted values never leave your machine, but what the server
-  sees of your choices has not been analysed externally.
+- In Fast and Decoy modes the server sees which clusters and IDs the client picks, and these
+  choices come from decrypted results. Ombra makes no IND-CPA-D claim (decision 0017): decrypted
+  values never leave your machine, and the leak through these choices is stated, not analysed.
 - A filter that matches few vectors makes the client run extra rounds, so the server can tell
   that a query was filtered and that the filter was selective. In Fast mode the clusters chosen can
   hint at the filter value. Decoy and Strict hide whether a filter was used.
