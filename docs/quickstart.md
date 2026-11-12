@@ -121,7 +121,7 @@ NVIDIA container toolkit. From a checkout of this repository:
 
 ```bash
 docker compose up -d
-docker compose logs ombra                                   # shows the admin API key, once
+docker compose exec ombra cat /data/admin_api_key          # the admin API key
 docker compose cp ombra:/data/tls/server.crt ./server.crt   # the certificate, for the client
 ```
 

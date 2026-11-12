@@ -3,7 +3,7 @@
 # NVIDIA container toolkit.
 #
 #   docker compose up -d
-#   docker compose logs ombra            # the admin API key is printed once, on the first start
+#   docker compose exec ombra cat /data/admin_api_key    # the admin API key, made on the first start
 #   docker compose cp ombra:/data/tls/server.crt ./server.crt    # the certificate, for clients
 #
 # Collections, the API key file and the certificate live in the named volume "ombra-data", so they

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 # Starts ombra_server in the container. On the first start it makes what the server needs in /data:
-# a self-signed TLS certificate (data/tls/) and one admin API key, printed once to the log. Both
+# a self-signed TLS certificate (data/tls/) and one admin API key in /data/admin_api_key (mode 0600, never logged). Both
 # stay in the volume, so a restart reuses them. The API key is an access token; the client's secret
 # key never reaches the server.
 #
@@ -29,8 +29,8 @@ if [ ! -f "$TLS/server.crt" ] || [ ! -f "$TLS/server.key" ]; then
 fi
 
 if [ ! -f "$DATA/api_keys.v1" ]; then
-  echo "ombra: first start, creating one admin API key (shown once):" >&2
-  ombra_server --create-api-key --scope admin --data-dir "$DATA"
+  (umask 077 && ombra_server --create-api-key --scope admin --data-dir "$DATA" > "$DATA/admin_api_key")
+  echo "ombra: first start, wrote an admin API key to $DATA/admin_api_key" >&2
 fi
 
 args=(--data-dir "$DATA" --listen "$LISTEN" --tls-cert "$TLS/server.crt" --tls-key "$TLS/server.key")
