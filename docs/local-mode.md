@@ -15,18 +15,16 @@ server refuses (key tag, preset, sizes, F_max, block layouts, blob buckets).
   on other platforms install openfhe-python 1.6.1 yourself (CMake, against OpenFHE 1.6.1).
 - No GPU.
 
-## Speed limits (measured on Modal, 4 vCPU, "fast" preset, d = 384)
+## Speed limits (d = 768, "fast" preset, 10,000 vectors, 4 logical CPUs of a Ryzen 5 5600H)
 
 | What | Time |
 | --- | --- |
-| create a collection of 12 vectors (keys, encryption, upload) | 5.4 s |
-| one search, 1 cluster | 19.7 s |
-| the end-to-end search test (about 40 searches, 150 vectors, 6 clusters) | 351 s |
+| create the collection (keys, encryption, upload) | 35 s |
+| one search, 2 clusters | 2.8 s |
 
-A search costs about 10 key switches per query entry (d + filter values = 387 entries), plus
-one ciphertext product per entry and block. The GPU server needs about two key switches per
-entry. Local mode is for trying Ombra, tests and small collections (some thousands of vectors),
-not for production. The "balanced" preset (ring 16384) is about 4 times slower.
+Details and the command are in `docs/plan/results/2026-11-12-t4.1-local-mode-wheel.md`. Local mode
+is for trying Ombra, tests and small collections, not for production. The "balanced" preset
+(ring 16384) is about 4 times slower.
 
 ## The expansion
 
