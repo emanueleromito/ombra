@@ -1,7 +1,7 @@
 Ombra
 Copyright 2026 Erai Labs
 
-Ombra itself is source-available under the PolyForm Noncommercial License 1.0.0 (see LICENSE and COMMERCIAL.md). It uses the third-party software below, each under its own license. The license texts are in each project's repository and in the packages that carry them.
+Ombra itself is source-available under the PolyForm Noncommercial License 1.0.0 (see LICENSE and LICENSING.md). It uses the third-party software below, each under its own license. The license texts are in each project's repository and in the packages that carry them.
 
 Compiled into or linked by the C++ and CUDA code (core/, server/):
 
