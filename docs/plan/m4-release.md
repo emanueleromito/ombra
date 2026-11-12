@@ -41,7 +41,7 @@ T4.3, T4.5 and T4.7 can start at once. T4.1 and T4.4 both edit the workflows fro
 **Depends on:** none
 **Steps:** create `dev` from `main`; make `dev` the default branch for PRs and protect both (PR required, CI required once T4.2 lands); `main` takes only release merges from `dev`; delete merged remote branches; enable automatic deletion of head branches; update the PR target in `CLAUDE.md`.
 **Done when:** `dev` exists and is the default branch, both branches are protected, no merged branch remains on the remote, auto-delete is on, and `CLAUDE.md` says PRs target `dev`.
-**Status:** todo
+**Status:** in progress (`dev` created and default, both branches protected, auto-delete on, `CLAUDE.md` updated; deleting the merged remote branches is left to the user; CI as a required check comes with T4.2)
 
 ### T4.4 Docker images, compose and release workflow
 
