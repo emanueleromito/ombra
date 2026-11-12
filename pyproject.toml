@@ -14,9 +14,10 @@ ignore = ["S101"]  # assert is fine in tests
 "tests/test_gpu_*.py" = ["S603", "S607"]  # tests run built drivers and openssl with fixed arguments
 "integrations/*/tests/*.py" = ["S106"]  # synthetic passphrases in tests
 "integrations/*/examples/*.py" = ["S106"]  # the example uses a placeholder passphrase
+"docs/quickstart/*.py" = ["S106"]  # the sample uses a placeholder passphrase
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "client", "core", "integrations"]
+testpaths = ["tests", "client", "core", "integrations", "docs"]
 pythonpath = ["client", "integrations/langchain-ombra"]
 markers = [
     "openfhe: needs openfhe-python; runs in the pinned image on Modal via `make test-openfhe`",

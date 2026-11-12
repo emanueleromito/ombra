@@ -102,7 +102,7 @@ T3.2 and T3.3 can run in parallel after T3.1. T3.6 needs the server API from M2 
 **Depends on:** T3.7, T3.8
 **Steps:** a page that goes from install to first search (local mode first, then a server), using a 384-dimension embedding model, with copy-and-paste code; a short key-handling note (back up the key file); the limits stated in the threat model.
 **Done when:** someone who has not seen the project follows the page and runs a first search in 10 minutes, and the code samples run in CI.
-**Status:** todo
+**Status:** done (`docs/quickstart.md` with samples in `docs/quickstart/`; the CPU test that keeps page and samples identical runs in CI; running `local_search.py` in local mode is an `openfhe` test that CI does not run today, 22 s including the model load)
 
 ---
 
