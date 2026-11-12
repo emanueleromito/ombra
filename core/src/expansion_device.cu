@@ -81,7 +81,7 @@ struct Marks {
     return {};
   }
   void clear() {
-    for (cudaEvent_t e : events) cudaEventDestroy(e);
+    for (cudaEvent_t e : events) (void)cudaEventDestroy(e);
     events.clear();
   }
   ~Marks() { clear(); }

@@ -145,6 +145,17 @@ def test_encode_rejects_unnormalized() -> None:
         oq.encode_query(Ctx(), None, np.array([2.0, 0.0]))
 
 
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+def test_encode_rejects_non_finite(bad: float) -> None:
+    class Ctx:
+        @staticmethod
+        def GetRingDimension() -> int:  # noqa: N802
+            return 16
+
+    with pytest.raises(ValueError, match="finite"):
+        oq.encode_query(Ctx(), None, np.array([1.0, bad]))
+
+
 def _binary(name: str) -> Path:
     candidates = [
         os.environ.get(f"OMBRA_{name.upper()}_BIN", ""),
