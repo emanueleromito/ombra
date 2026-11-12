@@ -347,35 +347,6 @@ def test_local_install() -> None:
     _run(["python", "/work/local_install_check.py"], cwd="/tmp")  # noqa: S108
 
 
-@app.function(gpu="A10", memory=16384, timeout=3600, volumes={DATA_DIR: volume})
-def profile_expand(dims: str = "1536") -> None:
-    """Release build; time the stages of one expansion split on an A10 (expansion profiling)."""
-    _build("Release")
-    out_dir = Path(DATA_DIR) / "results-profile"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    bench_script = Path(REPO_DIR) / "core" / "bench" / "run.py"
-    _run(
-        [
-            "python",
-            str(bench_script),
-            "--task",
-            "expansion",
-            "--profile",
-            "--dims",
-            dims,
-            "--warmup",
-            "2",
-            "--iters",
-            "5",
-            "--name-expansion",
-            "expansion-profile-a10.json",
-            "--out",
-            str(out_dir),
-        ]
-    )
-    volume.commit()
-
-
 # Recall acceptance check. At N = 100,000 and d = 1536 the run encrypts 13 database
 # blocks plus 3 centers blocks (about 19 GB of ciphertexts on the container's local disk, kept on
 # the GPU as well: about 20 GB of the A100's 40 GB). The host holds one block at a time (3 to 4 GB)
@@ -430,58 +401,6 @@ def recall(
 # the data is downloaded to the volume's dataset cache and never committed. The server holds the
 # encrypted collection (about 20 blocks of about 180 MB), so host memory is large.
 #   modal run modal_app.py::filtered_recall --dry-run     (tiny sizes, 5 queries)
-# One A10 run for two checks, so the image build and startup are paid once (user-approved budget:
-# under $1; the 40-minute timeout caps it): the local mode parity test (local mode vs the server,
-# same top-k) and the encrypted confirmation on banking77 (all cells, 200 queries).
-#   modal run modal_app.py::confirm_a10
-@app.function(gpu="A10", cpu=4.0, memory=16384, timeout=2400, volumes={DATA_DIR: volume})
-def confirm_a10(queries: int = 200, bench_only: bool = False) -> None:
-    """Release build; local/server parity, the e2e test, then filtered recall on banking77."""
-    _build("Release")
-    _build_native()
-    import os
-
-    os.environ.setdefault("OMBRA_GPU_BUDGET_MB", "16000")  # A10: 24 GB
-    os.environ.setdefault("OMBRA_HOST_BUDGET_MB", "8000")  # container: 16 GiB
-    if not bench_only:
-        _run(
-            [
-                "python",
-                "-m",
-                "pytest",
-                "-m",
-                "gpu or openfhe",
-                "-v",
-                "-s",
-                "tests/test_gpu_local_parity.py",
-                "tests/test_gpu_search_e2e.py",
-            ],
-            ok_codes=(0,),
-        )
-    _run(["pip", "install", "--quiet", "sentence-transformers"])
-    out_dir = Path(DATA_DIR) / "results"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    bench = str(Path(REPO_DIR) / "core" / "bench" / "filtered_recall.py")
-    data = str(Path(DATA_DIR) / "datasets" / "filtered-recall")
-    try:
-        _run(
-            [
-                "python",
-                bench,
-                "--out",
-                str(out_dir),
-                "--datasets",
-                data,
-                "--queries",
-                str(queries),
-                "--dataset",
-                "banking77",
-            ]
-        )
-    finally:
-        volume.commit()
-
-
 @app.function(gpu="A100-40GB", cpu=8.0, memory=65536, timeout=43200, volumes={DATA_DIR: volume})
 def filtered_recall(dry_run: bool = False, queries: int = 1000, dataset: str = "") -> None:
     """Release build; filtered recall@10 on two real datasets, preset fast."""

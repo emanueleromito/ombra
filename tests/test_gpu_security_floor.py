@@ -38,7 +38,6 @@ DRIVERS: dict[str, list[str]] = {
     "ombra_bench_batch": ["pk", "k", "1", "1", "1", "1", "1", "1", "1"],
     "ombra_bench_column_search": ["pk", "1", "1", "1", "1", "1"],
     "ombra_bench_expand": ["pk", "k", "1", "1", "1", "1"],
-    "ombra_bench_plain_search": ["pk", "1", "1", "1", "1", "1"],
     "ombra_bench_e2e": ["k", "m", "dir", "1"],
 }
 

@@ -1,4 +1,4 @@
-"""CKKS parameter security, CPU round trip and CPU timings.
+"""CKKS parameter security, and CPU round trip.
 
 All data is synthetic, seeded and normalized. Nothing prints plaintext values or keys; assertions
 compare scalar errors only.
@@ -8,10 +8,6 @@ from __future__ import annotations
 
 import json
 import math
-import os
-import statistics
-import time
-from pathlib import Path
 
 import pytest
 from ombra import params as ombra_params
@@ -32,9 +28,6 @@ ROUND_TRIP_TOLERANCE = 1e-6
 # HomomorphicEncryption.org standard, 128-bit classic security, uniform ternary secret:
 # ring dimension -> maximum log2 of the full modulus (QP, including key-switching primes).
 HE_STD_128_CLASSIC_MAX_LOG_QP = {1024: 27, 2048: 54, 4096: 109, 8192: 218, 16384: 438, 32768: 881}
-
-TIMING_ITERATIONS = 5
-RESULTS_FILE = Path("/data/results/cpu-baseline.json")
 
 
 def _normalized(rng: np.random.Generator, n: int) -> np.ndarray:
@@ -125,57 +118,3 @@ def test_round_trip_matches_numpy(ofhe, setup):
     max_err = float(np.max(np.abs(got - expected)))
     print(f"round trip max abs error: {max_err:.3e}")
     assert max_err <= ROUND_TRIP_TOLERANCE, f"max error {max_err:.3e} > {ROUND_TRIP_TOLERANCE}"
-
-
-def _median_ms(fn, iterations: int = TIMING_ITERATIONS) -> float:
-    samples = []
-    for _ in range(iterations):
-        t0 = time.perf_counter()
-        fn()
-        samples.append((time.perf_counter() - t0) * 1000.0)
-    return statistics.median(samples)
-
-
-def test_cpu_timings(ofhe):
-    preset = ombra_params.get_preset(PRESET)
-    _, cc = ombra_params.make_context(PRESET)
-    rng = np.random.default_rng(SEED + 1)
-    a, b = _normalized(rng, N_VALUES), _normalized(rng, N_VALUES)
-    timings: dict[str, float] = {}
-
-    holder = {}
-
-    def keygen():
-        holder["keys"] = cc.KeyGen()
-        cc.EvalMultKeyGen(holder["keys"].secretKey)
-
-    timings["keygen_with_evalmultkey"] = _median_ms(keygen)
-    keys = holder["keys"]
-    pt_a = cc.MakeCKKSPackedPlaintext(a)
-    pt_b = cc.MakeCKKSPackedPlaintext(b)
-    ct_a = cc.Encrypt(keys.publicKey, pt_a)
-    ct_b = cc.Encrypt(keys.publicKey, pt_b)
-    prod = cc.EvalMult(ct_a, ct_b)
-
-    timings["encrypt"] = _median_ms(lambda: cc.Encrypt(keys.publicKey, pt_a))
-    timings["mult_ct_pt"] = _median_ms(lambda: cc.EvalMult(ct_a, pt_b))
-    timings["add_ct_ct"] = _median_ms(lambda: cc.EvalAdd(ct_a, ct_b))
-    timings["mult_ct_ct"] = _median_ms(lambda: cc.EvalMult(ct_a, ct_b))
-    timings["rescale"] = _median_ms(lambda: cc.Rescale(prod))
-    res = cc.Rescale(prod)
-    timings["decrypt"] = _median_ms(lambda: cc.Decrypt(res, keys.secretKey))
-
-    assert all(t > 0 for t in timings.values())
-    report = {
-        "task": "cpu-baseline",
-        "preset": PRESET,
-        "ring_dim": preset["ring_dim"],
-        "cpu_count": os.cpu_count(),
-        "openfhe_python_version": ofhe.__version__,
-        "iterations": TIMING_ITERATIONS,
-        "median_ms": timings,
-    }
-    print(json.dumps(report))
-    if RESULTS_FILE.parent.parent.exists():
-        RESULTS_FILE.parent.mkdir(parents=True, exist_ok=True)
-        RESULTS_FILE.write_text(json.dumps(report, indent=2))

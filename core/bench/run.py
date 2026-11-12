@@ -186,7 +186,6 @@ def run_expansion(
     warmup: int,
     iters: int,
     out_name: str,
-    profile: bool = False,
 ) -> Path:
     import openfhe as ofhe
     from ombra import params as ombra_params
@@ -224,15 +223,12 @@ def run_expansion(
                 str(warmup),
                 str(iters),
                 str(part),
-                *(["profile"] if profile else []),
             ]
             print("$", " ".join(cmd), flush=True)
             subprocess.run(cmd, check=True)  # noqa: S603
             entry = json.loads(part.read_text())
             gpu_name = entry.pop("gpu_name")
             results.append(entry)
-            if profile:
-                print("profile", json.dumps(entry.get("profile")), flush=True)
             print(
                 f"d={d} L={entry['L']} automorphisms={entry['automorphisms']} "
                 f"keys={entry['keys']} key_bytes={entry['key_bytes']} "
@@ -501,9 +497,6 @@ def main() -> None:
         help="batching: extra cap on queries per pass (0 = only the memory budget; tests use it)",
     )
     parser.add_argument(
-        "--profile", action="store_true", help="expansion: also time the stages of one split"
-    )
-    parser.add_argument(
         "--name-e2e-latency",
         default="e2e-latency-a100.json",
         help="output file name for e2e-latency",
@@ -557,7 +550,7 @@ def main() -> None:
     if task in ("all", "column-search"):
         run_column_search(args.out, dims, args.blocks, args.warmup, args.iters, args.name)
     if task in ("all", "expansion"):
-        run_expansion(args.out, dims, args.warmup, args.iters, args.name_expansion, args.profile)
+        run_expansion(args.out, dims, args.warmup, args.iters, args.name_expansion)
     if task == "grpc-e2e":
         from grpc_e2e import run_grpc
 

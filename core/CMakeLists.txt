@@ -95,9 +95,6 @@ target_link_libraries(ombra_encoding_check PRIVATE ombra_core)
 add_executable(ombra_plain_search src/ombra_plain_search.cpp)
 target_link_libraries(ombra_plain_search PRIVATE ombra_core)
 
-add_executable(ombra_bench_plain_search src/ombra_bench_plain_search.cpp)
-target_link_libraries(ombra_bench_plain_search PRIVATE ombra_core)
-
 add_executable(ombra_search_gpu src/ombra_search_gpu.cpp)
 target_link_libraries(ombra_search_gpu PRIVATE ombra_core)
 
