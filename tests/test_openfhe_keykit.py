@@ -19,7 +19,9 @@ pytestmark = pytest.mark.openfhe
 SCRYPT = (2**4, 8, 1)  # cheap for tests
 CLIENT = str(Path(__file__).resolve().parents[1] / "client")
 CHILD = """
-import sys from ombra import presets from ombra.collection import KeyKit
+import sys
+from ombra import presets
+from ombra.collection import KeyKit
 d = presets.derive("fast", 384)
 kit = KeyKit.load(sys.argv[1], "pw", d, "test-openfhe", 387)
 env = open(sys.argv[2], "rb").read()
