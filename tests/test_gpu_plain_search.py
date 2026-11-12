@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """GPU CKKS encoding of compact plaintext columns and ciphertext x plaintext search.
 
 Python generates keys and seeded synthetic normalized vectors, stores them as fp16 or int8 (or as

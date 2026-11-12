@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Kernel family: column-packed encrypted search (ciphertext x ciphertext multiply-accumulate).
 //
 // Packing (docs/architecture.md): stored vectors are column-packed, one ciphertext

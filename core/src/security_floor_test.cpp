@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // CPU unit test for check_security_floor on plain numbers. No OpenFHE, no insecure context.
 #include "ombra/core/security_floor.hpp"
 

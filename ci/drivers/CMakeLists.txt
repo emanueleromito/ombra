@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 # The two OpenFHE command-line drivers the `openfhe` tests call, built without CUDA.
 #
 # core/CMakeLists.txt links these drivers against the CUDA library, which a GitHub runner does not

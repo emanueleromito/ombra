@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Local mode runs the server's C++ expansion in a child process.
 
 Checks that the child never imports openfhe-python and has the compiled extension loaded, that

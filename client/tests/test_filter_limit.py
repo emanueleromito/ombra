@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """F_max per preset from the headroom formula, and the refusals of a filter schema."""
 
 from __future__ import annotations

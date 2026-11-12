@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 # gRPC server. The request policy (limits, spec validation, preset headroom) is plain C++ and
 # tested on the CPU. The service and the ombra_server executable need CUDA (the search engine) and
 # gRPC for C++ (Ubuntu 22.04: libgrpc++-dev libprotobuf-dev protobuf-compiler

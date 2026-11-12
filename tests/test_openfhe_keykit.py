@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """A KeyKit saved to a key file can be reopened, in this and in a new process."""
 
 from __future__ import annotations

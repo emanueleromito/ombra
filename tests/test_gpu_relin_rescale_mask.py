@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """GPU relinearize, rescale and ciphertext mask multiply, and the GPU-only search.
 
 Oracle (every kernel is compared with OpenFHE): the driver `ombra_search_gpu` feeds the same OpenFHE

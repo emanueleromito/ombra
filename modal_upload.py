@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """What `modal_app.py` uploads into the image: an allowlist, minus secrets and build output.
 
 Pure Python with no `modal` import, so a CPU test can run it. `modal_app.py` calls it locally at

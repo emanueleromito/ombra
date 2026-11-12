@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // ombra_search_gpu: oracle driver for GPU relinearize, rescale and ciphertext mask multiply, and
 // for the GPU-only search pipeline.
 //

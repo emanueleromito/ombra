@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Query expansion tree. Independent of OpenFHE and CUDA types so the same
 // tree can run with the CPU reference operations (ombra_expand.cpp) and, later, GPU operations.
 //

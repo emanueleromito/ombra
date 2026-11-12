@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // ombra_expand: CPU reference for query expansion on OpenFHE.
 //
 // Usage: ombra_expand <context.bin> <query.bin> <autokeys.bin> <out_dir> <d>

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Two-stage search with filters, security levels and exact re-ranking.
 
 Flow on one Search stream: the query carries the d query values followed by

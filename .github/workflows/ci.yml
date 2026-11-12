@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 # Checks on every pull request to dev or main and on every push to dev, on GitHub runners only: no
 # Modal, no GPU. The jobs run inside the CI image (ci/Dockerfile), which has OpenFHE 1.6.1. The
 # first job finds the image for the current Dockerfile in GHCR, or builds it if it is missing.

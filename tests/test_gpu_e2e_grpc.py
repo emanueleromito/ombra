@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """End-to-end through the gRPC server `ombra_server`, both presets.
 
 The test starts the server on a free localhost port in a temp directory and drives it with

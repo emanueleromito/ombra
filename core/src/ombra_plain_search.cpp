@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // ombra_plain_search: oracle driver for the GPU CKKS encoder and the ciphertext x plaintext search.
 //
 // Usage: ombra_plain_search <context.bin> <dir> <dims> <format: f64|fp16|int8> <code_scale>

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Query expansion by automorphisms, OpenFHE CPU reference.
 
 Python makes keys (preset m0_depth2), encodes a normalized query as the symmetric polynomial

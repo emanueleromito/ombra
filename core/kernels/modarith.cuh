@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Shared modular arithmetic for the RNS kernels (CUDA headers only; no OpenFHE).
 //
 // Representation (OpenFHE v1.6.1, NATIVE_SIZE=64 build): one coefficient = one uint64_t word,

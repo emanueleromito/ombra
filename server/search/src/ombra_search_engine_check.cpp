@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // ombra_search_engine_check: oracle driver for the search engine.
 //
 // Usage: ombra_search_engine_check <in_dir> <out_dir> <gpu_blocks> <host_blocks>

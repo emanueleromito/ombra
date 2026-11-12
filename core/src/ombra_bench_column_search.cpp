@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // ombra_bench_column_search: throughput benchmark of the column-packed search kernel.
 //
 // Usage: ombra_bench_column_search <context.bin> <public_key.bin> <dims> <blocks> <warmup> <iters>

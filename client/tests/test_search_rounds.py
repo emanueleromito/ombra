@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Round counts and cluster requests of run_search per security level (no OpenFHE, fake server)."""
 
 from types import SimpleNamespace

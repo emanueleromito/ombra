@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """The quickstart page and its sample files stay in sync, and the local sample runs.
 
 The CPU tests run in `make test` (and so in CI). The end-to-end test needs OpenFHE and

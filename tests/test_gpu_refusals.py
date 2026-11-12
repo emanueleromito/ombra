@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """GPU entry points refuse inputs that do not belong together.
 
 The C++ driver `ombra_refusal_check` sends mixed keys, wrong metadata and mismatched shapes to

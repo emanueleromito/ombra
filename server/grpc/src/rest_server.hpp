@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // REST admin port: GET /healthz (no auth) and GET /metrics (admin key). HTTP/1.1 over
 // OpenSSL (TLS 1.2+) or, with --insecure, plain TCP. One request per connection, header cap 8 KiB,
 // a total deadline per connection. OpenSSL is already a dependency of gRPC.

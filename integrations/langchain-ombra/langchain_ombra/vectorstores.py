@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """`OmbraVectorStore`: a LangChain `VectorStore` over an Ombra collection.
 
 Vectors, metadata and the text of each document are encrypted on this machine before they leave

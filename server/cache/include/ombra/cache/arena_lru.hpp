@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // LRU policy with pinning over an arena. Pure bookkeeping, no memory is touched: used for
 // the pinned host pool and for the GPU cache. A key is one segment (cluster block) of a collection.
 #pragma once

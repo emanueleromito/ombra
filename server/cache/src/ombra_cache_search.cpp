@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // ombra_cache_search: paging test driver for the GPU cluster cache.
 //
 // Usage: ombra_cache_search <context.bin> <in_dir> <dims> <blocks> <seed>

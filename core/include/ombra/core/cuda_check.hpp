@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Project error handling for CUDA calls. Include only from CUDA translation units (.cu).
 //
 // Convention: host code inside the library returns a `Status`; exceptions are

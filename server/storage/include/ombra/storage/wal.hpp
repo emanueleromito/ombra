@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Write-ahead log. File: "OWAL", u16 version (1), then framed records: u32 body length, u32 CRC32
 // of the body, body. Body: u8 type, then fields (strings are u32 length + bytes).
 //   InsertIntent: collection, u32 cluster, segment name, u32 n, n ids

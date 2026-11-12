@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Core layer shared by the sync and async clients. No network or disk I/O of its own: it drives a
 transport (a gRPC channel, or the in-process local server of `ombra._local`) through the
 `Collection` code of the client library, so both modes run the same client code.

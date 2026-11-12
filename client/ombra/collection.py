@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Collection creation, re-clustering and repacking, client side.
 
 The client holds the secret key (never sent, never printed). It clusters the vectors, encrypts

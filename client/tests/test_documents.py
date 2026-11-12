@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Client side: encrypted record/document blobs. Synthetic data only; no OpenFHE, no server."""
 
 from __future__ import annotations

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Passphrase-protected key file: OpenFHE secret key blob plus the document master key.
 
 The file envelope deliberately has no kind for a secret key, so this file has its own magic

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Symmetric real query encoding for server-side expansion.
 
 The query q (d normalized values) becomes the polynomial p(X) = q_0 + sum_{j>=1} q_j (X^j + X^-j)

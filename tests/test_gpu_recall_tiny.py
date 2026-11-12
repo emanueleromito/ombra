@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """The recall measurement code path end to end on tiny synthetic data.
 
 Seeded synthetic unit vectors (d = 16, one database block, a few queries), a faiss k-means with

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // ombra_security_floor_wiring: shows that each library entry point enforces the security floor by
 // itself. It deliberately never calls require_security_floor; the test sets
 // OMBRA_TEST_LOG2QP_LIMIT=1 so a valid preset context falls below the limit.

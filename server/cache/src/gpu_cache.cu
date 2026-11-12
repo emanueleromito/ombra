@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // GPU cluster cache: pinned host pool + GPU cache + asynchronous paging. See
 // include/ombra/cache/gpu_cache.hpp for the contract. The eviction policy and the offset
 // bookkeeping are in arena_lru.cpp / range_allocator.cpp (pure C++, unit tested on the CPU).

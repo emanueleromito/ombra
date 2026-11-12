@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // CryptoContext wrapper for the security floor check (see security_floor.hpp).
 #pragma once
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """The v1 proto compiles for Python and C++; messages round-trip; unknown versions refused.
 
 Uses grpcio-tools' bundled protoc. The C++ check generates the C++ sources; building them needs

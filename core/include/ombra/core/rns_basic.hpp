@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Pointwise modular arithmetic on RNS towers (OpenFHE evaluation/NTT form), executed on the GPU.
 //
 // This header has no OpenFHE or CUDA dependency. Data layout (matches OpenFHE's DCRTPoly):

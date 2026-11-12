@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // GPU operations for the expansion tree (expansion_tree.hpp) on OpenFHE ciphertexts.
 //
 // Host glue: extracts every table the kernels need from OpenFHE's crypto parameters, key and

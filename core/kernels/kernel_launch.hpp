@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Launchers for the CUDA kernels. Kernels live in one .cu file per family under core/kernels/;
 // host wrappers in core/src/ call them through these plain functions, so no CUDA separable
 // compilation (relocatable device code) is needed. Only cuda_runtime types appear here.

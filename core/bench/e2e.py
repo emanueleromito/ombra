@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """End-to-end encrypted query latency, step by step (preset m0_depth2).
 
     # writes <dir>/e2e-latency-a100.json

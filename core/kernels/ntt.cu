@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Kernel family: batched negacyclic NTT, in OpenFHE v1.6.1's convention.
 //
 // Forward (NumberTheoreticTransformNat::ForwardTransformToBitReverseInPlace, transformnat-impl.h):

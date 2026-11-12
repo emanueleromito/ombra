@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Small durable-file helpers and CRC32 (IEEE). Errors are std::runtime_error.
 #pragma once
 

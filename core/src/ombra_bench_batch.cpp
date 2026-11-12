@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // ombra_bench_batch: query batching benchmark for search and expansion.
 //
 // Usage: ombra_bench_batch <context.bin> <public_key.bin> <autokeys.bin> <d> <blocks> <warmup>

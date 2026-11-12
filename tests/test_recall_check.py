@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Pass/fail logic of the recall acceptance check (core/bench/recall_check.py), CPU only."""
 
 from __future__ import annotations

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Crash points for the recovery tests. A test sets one point; when the writer reaches it the
 // process _exit()s at once (no destructors, no flush), like a kill -9. Off in production: the
 // point is None and the check is one relaxed atomic load.

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """End-to-end latency, recall and storage through the real gRPC server (A100, Modal).
 
     python core/bench/run.py --task grpc-e2e --out <dir> [--presets-grpc ...] [--sizes-grpc ...]
