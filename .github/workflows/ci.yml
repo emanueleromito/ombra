@@ -1,56 +1,87 @@
-# CPU tests run on every PR. The GPU oracles (Modal) run only when triggered by hand
-# (workflow_dispatch, "Run workflow" on the Actions tab, choosing the branch), to limit Modal cost;
-# on PRs the job is skipped, which a required check treats as passing. Secrets MODAL_TOKEN_ID and
-# MODAL_TOKEN_SECRET are repository secrets.
+# Checks on every pull request to dev or main and on every push to dev, on GitHub runners only: no
+# Modal, no GPU. The jobs run inside the CI image (ci/Dockerfile), which has OpenFHE 1.6.1. The
+# first job finds the image for the current Dockerfile in GHCR, or builds it if it is missing.
+# GPU tests are in gpu.yml.
 name: CI
 
 on:
   pull_request:
-    branches: [main]
-  workflow_dispatch:
+    branches: [dev, main]
+  push:
+    branches: [dev]
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  cpu:
-    name: CPU tests
+  image:
+    name: CI image
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/ci-image.yml
+
+  lint:
+    name: Lint
+    needs: image
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ${{ needs.image.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
         with:
-          python-version: "3.11"
-      - run: make venv
-      - run: .venv/bin/python -m pip install --quiet numpy grpcio-tools
-      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends protobuf-compiler
+          persist-credentials: false
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - run: make lint
+
+  cpu:
+    name: CPU build and tests
+    needs: image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ${{ needs.image.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - run: make build-cpu
       - run: make test
 
-  gpu:
-    # Manual only (workflow_dispatch). Run it on a branch before merging any change to core/,
-    # tests/, client/ or the Modal files, since those can weaken an oracle.
-    name: GPU oracles
-    if: github.event_name == 'workflow_dispatch'
+  openfhe:
+    name: OpenFHE tests
+    needs: image
     runs-on: ubuntu-latest
-    timeout-minutes: 90
-    concurrency:
-      group: gpu-${{ github.ref }}
-      cancel-in-progress: true
-    env:
-      MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
-      MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ${{ needs.image.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0
-      - run: |
-          if [ -z "$MODAL_TOKEN_ID" ] || [ -z "$MODAL_TOKEN_SECRET" ]; then
-            echo "::error::MODAL_TOKEN_ID and MODAL_TOKEN_SECRET are not set for this run."
-            exit 1
-          fi
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.11"
-      - run: python -m pip install --quiet modal==1.6.3
-      - run: make test-gpu
+          persist-credentials: false
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - run: make test-openfhe-local

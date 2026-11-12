@@ -1,0 +1,17 @@
+# Python packages in the CI image (see ci/Dockerfile). Same set as the Modal image in
+# modal_app.py, plus the linters and the LangChain test packages.
+pybind11[global]
+numpy
+pytest
+pytest-asyncio
+faiss-cpu
+pyarrow==17.0.0
+grpcio
+grpcio-tools
+protobuf
+cryptography
+langchain-core
+langchain-tests
+ruff
+# Pinned: the version of clang-format changes what `make lint` accepts. Ubuntu 24.04 ships 18.
+clang-format==18.1.8

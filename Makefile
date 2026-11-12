@@ -6,7 +6,7 @@ CUDA_ARCHS  ?= 80;86
 TASK        ?= all
 
 .DEFAULT_GOAL := help
-.PHONY: help venv build build-cpu test test-gpu test-openfhe bench gpu-info results-pull fmt lint clean
+.PHONY: help venv build build-cpu test test-gpu test-openfhe test-openfhe-local bench gpu-info results-pull fmt lint clean
 
 help: ## List commands
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-14s %s\n", $$1, $$2}'
@@ -33,6 +33,17 @@ test-gpu: ## Run GPU tests on Modal (A10)
 test-openfhe: ## Run tests marked openfhe on Modal (CPU only, pinned image)
 	modal run modal_app.py::test_openfhe
 
+test-openfhe-local: ## Run tests marked openfhe here, no Modal (needs OpenFHE 1.6.1; the CI image has it)
+	cmake -S ci/drivers -B $(BUILD_DIR)-openfhe -DCMAKE_BUILD_TYPE=Release -DOMBRA_DRIVER_OUT=$(CURDIR)/$(BUILD_DIR)
+	cmake --build $(BUILD_DIR)-openfhe -j
+	OMBRA_REQUIRE_NATIVE=1 cmake -S client -B $(BUILD_DIR)-native -DCMAKE_BUILD_TYPE=Release \
+		-Dpybind11_DIR=$$($(PYTHON) -m pybind11 --cmakedir) \
+		-DPython_EXECUTABLE=$$($(PYTHON) -c 'import sys; print(sys.executable)')
+	cmake --build $(BUILD_DIR)-native -j
+	cp $(BUILD_DIR)-native/_native*.so client/ombra/
+	$(PYTHON) -m pytest -m openfhe -v
+
+bench: ## Run benchmarks on Modal (A100); TASK=t0.4 to pick one
 bench: ## Run benchmarks on Modal (A100); TASK=column-search to pick one
 	modal run modal_app.py::bench --task $(TASK)
 
@@ -52,4 +63,4 @@ lint: ## Lint Python (ruff) and check C++ formatting
 	@files=$$(git ls-files '*.cpp' '*.hpp' '*.h' '*.cu' '*.cuh'); [ -z "$$files" ] || clang-format --dry-run --Werror $$files
 
 clean: ## Remove local build directories
-	rm -rf $(BUILD_DIR) $(BUILD_DIR)-cpu
+	rm -rf $(BUILD_DIR) $(BUILD_DIR)-cpu $(BUILD_DIR)-openfhe $(BUILD_DIR)-native
