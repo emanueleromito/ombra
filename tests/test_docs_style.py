@@ -57,6 +57,7 @@ def prose_lines(text: str):
         if fence is not None:
             continue
         line = re.sub(r"(`+)(.+?)\1", "``", line)
+        line = re.sub(r"\{\{.*?\}\}|\{%.*?%\}", "{{}}", line)  # macro code, not prose
         yield n, re.sub(r"\$\$.*?\$\$|\$[^$]+\$", "$$", line)  # math: a minus sign is not a dash
 
 
@@ -100,6 +101,7 @@ def test_code_is_skipped():
 
 def test_math_is_skipped():
     assert violations("The sum $a - b$ and $$N - j$$ are fine.\n") == []
+    assert violations("Size {{ B[0] - 94 }} bytes.\n") == []
 
 
 def test_list_items_and_ranges_pass():
