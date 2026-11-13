@@ -3,6 +3,11 @@
 //                [--gpu-budget-mb N] [--host-budget-mb N] [--compact-interval-ms N]
 //                [--tls-cert F --tls-key F] [--rest-port N [--rest-host H]]
 //                [--insecure] [--no-auth]
+//                [--max-message-mb N] [--memory-quota-mb N] [--max-threads N]
+//                [--max-sessions N] [--max-sessions-per-key N] [--session-budget-mb N]
+//                [--search-idle-s N] [--search-total-s N] [--max-rounds N]
+//                [--max-collections N] [--max-cluster-count N] [--max-blobs N]
+//                [--max-blob-mb N] [--max-key-upload-mb N] [--rest-workers N] [--rest-max-conns N]
 // ombra_server --create-api-key --scope admin|read|write --data-dir D
 // ombra_server --version
 //
@@ -14,6 +19,11 @@
 // log a loud warning and are limited to loopback addresses. An API key is an access token; the
 // server never accepts a secret key and never logs a token.
 //
+// Limits (all flags, defaults in ombra/server/limits.hpp and below): a call is authenticated before
+// its body is read (TLS), gRPC memory and threads are bounded by a ResourceQuota, idle connections
+// are closed, Search streams are capped per key and globally and have idle and total deadlines.
+// SIGHUP re-reads the API key file (revoke a key without a restart).
+//
 // Every --compact-interval-ms (default 60000, 0 disables) a background thread drops, in every
 // collection, the blocks whose vectors are all deleted; it logs counts only.
 //
@@ -21,6 +31,7 @@
 // free port), then, with --rest-port, "ombra_server rest listening on HOST:PORT". Shuts down on
 // SIGINT or SIGTERM.
 #include <grpcpp/grpcpp.h>
+#include <sys/stat.h>
 
 #include <atomic>
 #include <chrono>
@@ -37,7 +48,9 @@
 #include "gpu_info.hpp"
 #include "ombra/search/session.hpp"
 #include "ombra/server/auth.hpp"
+#include "ombra/server/limits.hpp"
 #include "ombra/server/metrics.hpp"
+#include "ombra/server/policy.hpp"
 #include "ombra/storage/store.hpp"
 #include "rest_server.hpp"
 #include "service.hpp"
@@ -53,12 +66,11 @@
 namespace {
 
 std::atomic<bool> g_stop{false};
+std::atomic<bool> g_reload{false};
 extern "C" void on_signal(int) { g_stop.store(true); }
+extern "C" void on_hup(int) { g_reload.store(true); }
 
-bool is_loopback(const std::string& addr) {
-  return addr.rfind("127.0.0.1:", 0) == 0 || addr.rfind("localhost:", 0) == 0 ||
-         addr.rfind("[::1]:", 0) == 0;
-}
+using ombra::server::is_loopback_listen;
 
 std::string read_file(const std::string& path) {
   std::ifstream in(path, std::ios::binary);
@@ -91,16 +103,33 @@ ombra::server::Gauges collect_gauges(ombra::storage::Store& store,
   return g;
 }
 
-// Messages carry whole blocks (tens of MB at the larger preset): lift gRPC's 4 MiB default.
-constexpr int kMaxMessageBytes = 1 << 30;
+// gRPC channel arguments by name (the macro names differ between gRPC releases).
+constexpr const char* kArgMaxConcurrentStreams = "grpc.max_concurrent_streams";
+constexpr const char* kArgMaxConnectionIdleMs = "grpc.max_connection_idle_ms";
+constexpr const char* kArgMaxConnectionAgeMs = "grpc.max_connection_age_ms";
+constexpr const char* kArgMaxConnectionAgeGraceMs = "grpc.max_connection_age_grace_ms";
+constexpr const char* kArgKeepaliveTimeMs = "grpc.keepalive_time_ms";
+constexpr const char* kArgKeepaliveTimeoutMs = "grpc.keepalive_timeout_ms";
+constexpr const char* kArgKeepalivePermitWithoutCalls = "grpc.keepalive_permit_without_calls";
+constexpr const char* kArgMinPingIntervalMs = "grpc.http2.min_ping_interval_without_data_ms";
+constexpr const char* kArgMaxPingStrikes = "grpc.http2.max_ping_strikes";
+constexpr const char* kArgHandshakeTimeoutMs = "grpc.server_handshake_timeout_ms";
 
 }  // namespace
 
 int main(int argc, char** argv) {
   std::string data_dir, listen, ofhe = OMBRA_OPENFHE_VERSION;
   std::string tls_cert, tls_key, scope_arg, rest_host;
-  std::size_t gpu_mb = 4096, host_mb = 2048;
-  std::size_t compact_ms = 60000;
+  std::uint64_t gpu_mb = 4096, host_mb = 2048;
+  std::uint64_t compact_ms = 60000;
+  // Messages carry whole blocks (tens of MB at the larger preset). The C++ API has one receive
+  // limit for the whole server, so it is the size of the largest legitimate message; it is applied
+  // after authentication, and the ResourceQuota bounds all buffered messages together.
+  std::uint64_t max_message_mb = 256, memory_quota_mb = 2048, max_threads = 128;
+  std::uint64_t session_budget_mb = 0, rest_workers = 4, rest_max_conns = 32;
+  std::uint64_t max_blob_mb = 16384, max_key_upload_mb = 2048;
+  std::uint64_t search_idle_s = 60, search_total_s = 600;
+  ombra::server::ServiceLimits limits;
   int rest_port = -1;  // -1: no REST port
   bool insecure = false, no_auth = false, create_key = false;
   for (int i = 1; i < argc; ++i) {
@@ -112,6 +141,19 @@ int main(int argc, char** argv) {
       }
       return argv[++i];
     };
+    // Numeric flag: the whole value must be a decimal number in range, else the process exits with
+    // a message (audit A-54). No exception can escape from here.
+    const auto num = [&](std::uint64_t lo, std::uint64_t hi) -> std::uint64_t {
+      const std::string v = next();
+      std::uint64_t out = 0;
+      if (!ombra::server::parse_uint(v, lo, hi, &out)) {
+        std::fprintf(stderr, "invalid value for %s: expected a number from %llu to %llu\n",
+                     a.c_str(), static_cast<unsigned long long>(lo),
+                     static_cast<unsigned long long>(hi));
+        std::exit(2);
+      }
+      return out;
+    };
     if (a == "--version") {
       std::printf("ombra_server %s\n", OMBRA_VERSION);
       return 0;
@@ -122,17 +164,50 @@ int main(int argc, char** argv) {
     else if (a == "--openfhe-version")
       ofhe = next();
     else if (a == "--gpu-budget-mb")
-      gpu_mb = std::stoul(next());
+      gpu_mb = num(1, std::uint64_t{1} << 24);
     else if (a == "--host-budget-mb")
-      host_mb = std::stoul(next());
+      host_mb = num(1, std::uint64_t{1} << 24);
     else if (a == "--compact-interval-ms")
-      compact_ms = std::stoul(next());
+      compact_ms = num(0, std::uint64_t{1} << 40);
+    else if (a == "--max-message-mb")
+      max_message_mb = num(4, 2000);
+    else if (a == "--memory-quota-mb")
+      memory_quota_mb = num(64, std::uint64_t{1} << 24);
+    else if (a == "--max-threads")
+      max_threads = num(8, 100000);
+    else if (a == "--session-budget-mb")
+      session_budget_mb = num(0, std::uint64_t{1} << 24);
+    else if (a == "--max-sessions")
+      limits.max_sessions = num(1, 100000);
+    else if (a == "--max-sessions-per-key")
+      limits.max_sessions_per_key = num(1, 100000);
+    else if (a == "--search-idle-s")
+      search_idle_s = num(0, 86400);
+    else if (a == "--search-total-s")
+      search_total_s = num(0, 7 * 86400);
+    else if (a == "--max-rounds")
+      limits.max_rounds = num(1, 1000000);
+    else if (a == "--max-collections")
+      limits.max_collections = num(1, 10000000);
+    else if (a == "--max-cluster-count")
+      limits.max_cluster_count =
+          static_cast<std::uint32_t>(num(1, ombra::server::kMaxClusterCount));
+    else if (a == "--max-blobs")
+      limits.max_blobs_per_collection = num(0, std::uint64_t{1} << 40);
+    else if (a == "--max-blob-mb")
+      max_blob_mb = num(0, std::uint64_t{1} << 30);
+    else if (a == "--max-key-upload-mb")
+      max_key_upload_mb = num(1, 4096);
+    else if (a == "--rest-workers")
+      rest_workers = num(1, 256);
+    else if (a == "--rest-max-conns")
+      rest_max_conns = num(1, 100000);
     else if (a == "--tls-cert")
       tls_cert = next();
     else if (a == "--tls-key")
       tls_key = next();
     else if (a == "--rest-port")
-      rest_port = std::stoi(next());
+      rest_port = static_cast<int>(num(0, 65535));
     else if (a == "--rest-host")
       rest_host = next();
     else if (a == "--scope")
@@ -205,40 +280,106 @@ int main(int argc, char** argv) {
   }
   if (!tls) std::fprintf(stderr, "WARNING: --insecure: connections are NOT encrypted\n");
   if (no_auth) std::fprintf(stderr, "WARNING: --no-auth: anyone who can connect has full access\n");
-  if ((!tls || no_auth) && !is_loopback(listen)) {
+  // The REST port is checked on the host it really binds (audit A-18), and defaults to loopback.
+  const std::string rhost = rest_host.empty() ? "127.0.0.1" : rest_host;
+  if ((!tls || no_auth) && !is_loopback_listen(listen)) {
     std::fprintf(stderr,
                  "refusing to listen on a non-loopback address with --insecure or --no-auth\n");
     return 2;
   }
+  if ((!tls || no_auth) && rest_port >= 0 && !ombra::server::is_loopback_host(rhost)) {
+    std::fprintf(stderr,
+                 "refusing to serve the REST port on a non-loopback address with --insecure or "
+                 "--no-auth\n");
+    return 2;
+  }
+  std::size_t gpu_bytes = 0, host_bytes = 0, session_bytes = 0, quota_bytes = 0;
+  std::size_t blob_bytes = 0, upload_bytes = 0;
+  if (!ombra::server::mb_to_bytes(gpu_mb, &gpu_bytes) ||
+      !ombra::server::mb_to_bytes(host_mb, &host_bytes) ||
+      !ombra::server::mb_to_bytes(session_budget_mb, &session_bytes) ||
+      !ombra::server::mb_to_bytes(memory_quota_mb, &quota_bytes) ||
+      !ombra::server::mb_to_bytes(max_blob_mb, &blob_bytes) ||
+      !ombra::server::mb_to_bytes(max_key_upload_mb, &upload_bytes)) {
+    std::fprintf(stderr, "a memory size flag is too large\n");
+    return 2;
+  }
+  limits.max_blob_bytes_per_collection = blob_bytes;
+  limits.max_key_upload_bytes = upload_bytes;
+  limits.search_idle_ms = search_idle_s * 1000;
+  limits.search_total_ms = search_total_s * 1000;
   if (ofhe == "unknown") {
     std::fprintf(stderr, "OpenFHE version unknown at build time: pass --openfhe-version\n");
     return 2;
   }
 
+  // A test hook of the security floor is never honoured by the server, whatever the build.
+  ::unsetenv("OMBRA_TEST_LOG2QP_LIMIT");
+  ::umask(077);  // the data directory is private: files 0600, directories 0700 (audit A-22)
   std::signal(SIGINT, on_signal);
   std::signal(SIGTERM, on_signal);
+  std::signal(SIGHUP, on_hup);
   try {
     ombra::storage::Store store(data_dir, ofhe);
     ombra::search::EngineConfig cfg;
-    cfg.gpu_budget_bytes = gpu_mb << 20;
-    cfg.host_budget_bytes = host_mb << 20;
+    cfg.gpu_budget_bytes = gpu_bytes;
+    cfg.host_budget_bytes = host_bytes;
+    cfg.session_budget_bytes = session_bytes;
+    // Presets come from the generated table of core/params; the engine and the store use it to
+    // refuse an uploaded context or stored column that is not the collection's preset (A-16, A-71).
+    cfg.preset_check = [](const std::string& preset, std::size_t ring, std::size_t batch,
+                          std::size_t depth, std::size_t first_bits, std::size_t scale_bits) {
+      const auto* p = ombra::server::find_preset(preset);
+      const auto close = [](std::size_t a, std::size_t b) { return a + 1 >= b && b + 1 >= a; };
+      return p && p->ring_dim == ring && p->batch_size == batch && p->depth == depth &&
+             close(p->first_mod_bits, first_bits) && close(p->scale_bits, scale_bits);
+    };
+    store.set_shape_provider(
+        [](const std::string& preset, std::uint32_t* ring, std::uint32_t* slots) {
+          const auto* p = ombra::server::find_preset(preset);
+          if (!p) return false;
+          *ring = static_cast<std::uint32_t>(p->ring_dim);
+          *slots = static_cast<std::uint32_t>(p->batch_size);
+          return true;
+        });
     ombra::search::SearchEngine engine(store, cfg);
     ombra::server::Metrics metrics;
-    ombra::server::OmbraService service(store, engine, keys.get(), metrics);
+    ombra::server::OmbraService service(store, engine, keys.get(), metrics, limits);
 
     std::shared_ptr<grpc::ServerCredentials> creds;
+    const auto auth_processor =
+        std::make_shared<ombra::server::ApiKeyAuthProcessor>(keys.get(), metrics);
     if (tls) {
       grpc::SslServerCredentialsOptions opts;
       opts.pem_key_cert_pairs.push_back({read_file(tls_key), read_file(tls_cert)});
       creds = grpc::SslServerCredentials(opts);
+      // Authenticate when the headers arrive, before gRPC reads a message body (audit A-03).
+      if (keys) creds->SetAuthMetadataProcessor(auth_processor);
     } else {
       creds = grpc::InsecureServerCredentials();
     }
     grpc::ServerBuilder builder;
     int port = 0;
     builder.AddListeningPort(listen, creds, &port);
-    builder.SetMaxReceiveMessageSize(kMaxMessageBytes);
-    builder.SetMaxSendMessageSize(kMaxMessageBytes);
+    const int max_msg = static_cast<int>(max_message_mb << 20);
+    builder.SetMaxReceiveMessageSize(max_msg);
+    builder.SetMaxSendMessageSize(max_msg);
+    // Memory and threads of the whole gRPC server (buffered messages of all calls count here).
+    builder.SetResourceQuota(grpc::ResourceQuota("ombra")
+                                 .Resize(quota_bytes)
+                                 .SetMaxThreads(static_cast<int>(max_threads)));
+    // Connection limits and keepalive policy. Idle connections are closed, connections are
+    // recycled, and a client that pings too often is disconnected.
+    builder.AddChannelArgument(kArgMaxConcurrentStreams, 32);
+    builder.AddChannelArgument(kArgMaxConnectionIdleMs, 5 * 60 * 1000);
+    builder.AddChannelArgument(kArgMaxConnectionAgeMs, 60 * 60 * 1000);
+    builder.AddChannelArgument(kArgMaxConnectionAgeGraceMs, 5 * 60 * 1000);
+    builder.AddChannelArgument(kArgKeepaliveTimeMs, 2 * 60 * 1000);
+    builder.AddChannelArgument(kArgKeepaliveTimeoutMs, 20 * 1000);
+    builder.AddChannelArgument(kArgKeepalivePermitWithoutCalls, 0);
+    builder.AddChannelArgument(kArgMinPingIntervalMs, 60 * 1000);
+    builder.AddChannelArgument(kArgMaxPingStrikes, 2);
+    builder.AddChannelArgument(kArgHandshakeTimeoutMs, 10 * 1000);
     builder.RegisterService(&service);
     std::unique_ptr<grpc::Server> server = builder.BuildAndStart();
     if (!server || port == 0) {
@@ -251,10 +392,10 @@ int main(int argc, char** argv) {
 
     std::unique_ptr<ombra::server::RestServer> rest;
     if (rest_port >= 0) {
-      const std::string rhost = rest_host.empty() ? host : rest_host;
       rest = std::make_unique<ombra::server::RestServer>(
           rhost, rest_port, tls_cert, tls_key, keys.get(), metrics,
-          [&store, &engine] { return collect_gauges(store, engine); });
+          [&store, &engine] { return collect_gauges(store, engine); },
+          static_cast<std::size_t>(rest_workers), static_cast<std::size_t>(rest_max_conns));
       std::printf("ombra_server rest listening on %s:%d\n", rhost.c_str(), rest->port());
       std::fflush(stdout);
     }
@@ -272,13 +413,26 @@ int main(int argc, char** argv) {
             for (const auto& c : store.list_collections()) dropped += store.drop_dead_blocks(c);
             if (dropped > 0)
               std::fprintf(stderr, "[ombra.server] compaction dropped=%zu\n", dropped);
-          } catch (const std::exception&) {
-            std::fprintf(stderr, "[ombra.server] compaction failed\n");
+          } catch (const std::exception& e) {
+            std::fprintf(stderr, "[ombra.server] compaction failed: %s\n", e.what());
           }
         }
       });
     }
-    while (!g_stop.load()) std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    while (!g_stop.load()) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      if (g_reload.exchange(false) && keys) {
+        // SIGHUP: pick up revoked or new API keys. A broken file keeps the loaded keys.
+        try {
+          keys->reload(ombra::server::ApiKeyStore::path_in(data_dir));
+          std::fprintf(stderr, "[ombra.server] reloaded API keys count=%zu\n", keys->size());
+        } catch (const std::exception& e) {
+          std::fprintf(stderr,
+                       "[ombra.server] API key reload failed, keeping the loaded keys: %s\n",
+                       e.what());
+        }
+      }
+    }
     if (compactor.joinable()) compactor.join();
     if (rest) rest->stop();
     server->Shutdown(std::chrono::system_clock::now() + std::chrono::seconds(2));

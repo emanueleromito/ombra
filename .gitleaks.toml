@@ -1,5 +1,5 @@
 # gitleaks configuration: the default rules plus an allowlist of confirmed false positives.
-# Each entry is explained in docs/plan/results/gitleaks-report.md.
+# Each entry is a confirmed false positive: a name or a keyword argument, not a secret value.
 title = "Ombra gitleaks config"
 
 [extend]

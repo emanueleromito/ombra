@@ -22,7 +22,7 @@ from typing import Any
 
 import numpy as np
 
-from ombra._decrypt import decrypt_values, usable_cpus
+from ombra._decrypt import ExpectedShapes, check_ciphertext, decrypt_values, usable_cpus
 
 # The crypto context and secret key of a worker process (set by _worker_init); empty in the parent.
 _STATE: dict[str, Any] = {}
@@ -53,33 +53,41 @@ def _order(scores: np.ndarray, indices: np.ndarray, k: int) -> tuple[np.ndarray,
     return scores[o], indices[o]
 
 
-def _decrypt_block(path: str, index: int, count: int, slots: int, k: int):
+def _load(path: str, expected: ExpectedShapes | None) -> Any:
+    """Deserialize a block file and, when `expected` is given, refuse a foreign shape."""
     import openfhe as ofhe
 
-    st = _STATE
     ct, ok = ofhe.DeserializeCiphertext(path, ofhe.BINARY)
     if not ok:
-        raise RuntimeError(f"cannot deserialize block {index}")
+        raise RuntimeError("cannot deserialize block")
+    if expected is not None:
+        check_ciphertext(expected, ct, os.path.getsize(path))
+    return ct
+
+
+def _decrypt_block(
+    path: str, index: int, count: int, slots: int, k: int, expected: ExpectedShapes | None = None
+):
+    st = _STATE
+    ct = _load(path, expected)
     vals = decrypt_values(st["cc"], st["sk"], ct, slots)[:count]
     idx = np.arange(count, dtype=np.int64) + index * slots
     return _order(vals, idx, k)
 
 
-def _decrypt_values(path: str, count: int, slots: int) -> np.ndarray:
-    import openfhe as ofhe
-
+def _decrypt_values(
+    path: str, count: int, slots: int, expected: ExpectedShapes | None = None
+) -> np.ndarray:
     st = _STATE
-    ct, ok = ofhe.DeserializeCiphertext(path, ofhe.BINARY)
-    if not ok:
-        raise RuntimeError("cannot deserialize block")
+    ct = _load(path, expected)
     return decrypt_values(st["cc"], st["sk"], ct, slots)[:count]
 
 
-def _values_task(args: tuple[str, int, int]) -> np.ndarray:
+def _values_task(args: tuple) -> np.ndarray:
     return _decrypt_values(*args)
 
 
-def _task(args: tuple[str, int, int, int, int]) -> tuple[np.ndarray, np.ndarray]:
+def _task(args: tuple) -> tuple[np.ndarray, np.ndarray]:
     return _decrypt_block(*args)
 
 
@@ -87,20 +95,35 @@ def _merge(parts: list[tuple[np.ndarray, np.ndarray]], k: int) -> tuple[np.ndarr
     return _order(np.concatenate([p[0] for p in parts]), np.concatenate([p[1] for p in parts]), k)
 
 
-def _tasks(files: list[Path | str], slots: int, valid_last: int, k: int) -> list[tuple]:
+def _tasks(
+    files: list[Path | str],
+    slots: int,
+    valid_last: int,
+    k: int,
+    expected: ExpectedShapes | None = None,
+) -> list[tuple]:
     if not files:
         raise ValueError("no blocks")
     if not 0 < valid_last <= slots:
         raise ValueError("valid_last must be in 1..slots")
     last = len(files) - 1
-    return [(str(f), i, valid_last if i == last else slots, slots, k) for i, f in enumerate(files)]
+    return [
+        (str(f), i, valid_last if i == last else slots, slots, k, expected)
+        for i, f in enumerate(files)
+    ]
 
 
 def serial_topk(
-    files: list[Path | str], cc: Any, sk: Any, slots: int, valid_last: int, k: int
+    files: list[Path | str],
+    cc: Any,
+    sk: Any,
+    slots: int,
+    valid_last: int,
+    k: int,
+    expected: ExpectedShapes | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return (scores, global indices) of the k best entries over all blocks, one process."""
-    tasks = _tasks(files, slots, valid_last, k)
+    tasks = _tasks(files, slots, valid_last, k, expected)
     _STATE.update(cc=cc, sk=sk)
     try:
         return _merge([_task(t) for t in tasks], k)
@@ -126,14 +149,26 @@ class ParallelTopk:
         del init
 
     def run(
-        self, files: list[Path | str], slots: int, valid_last: int, k: int
+        self,
+        files: list[Path | str],
+        slots: int,
+        valid_last: int,
+        k: int,
+        expected: ExpectedShapes | None = None,
     ) -> tuple[np.ndarray, np.ndarray]:
-        tasks = _tasks(files, slots, valid_last, k)
+        tasks = _tasks(files, slots, valid_last, k, expected)
         return _merge(self._pool.map(_task, tasks, chunksize=1), k)
 
-    def decrypt(self, files: list[Path | str], counts: list[int], slots: int) -> list[np.ndarray]:
-        """Decrypt every block in parallel; the first `counts[i]` slot values of block i."""
-        tasks = [(str(f), c, slots) for f, c in zip(files, counts, strict=True)]
+    def decrypt(
+        self,
+        files: list[Path | str],
+        counts: list[int],
+        slots: int,
+        expected: ExpectedShapes | None = None,
+    ) -> list[np.ndarray]:
+        """Decrypt every block in parallel; the first `counts[i]` slot values of block i.
+        With `expected`, a block of another shape is refused (audit A-11)."""
+        tasks = [(str(f), c, slots, expected) for f, c in zip(files, counts, strict=True)]
         return list(self._pool.map(_values_task, tasks, chunksize=1))
 
     def close(self) -> None:
@@ -155,8 +190,9 @@ def parallel_topk(
     valid_last: int,
     k: int,
     workers: int | None = None,
+    expected: ExpectedShapes | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Same result as serial_topk, with blocks decrypted by spawned worker processes."""
     n = max(1, min(workers or usable_cpus(), len(files)))
     with ParallelTopk(cc, sk, n) as pool:
-        return pool.run(files, slots, valid_last, k)
+        return pool.run(files, slots, valid_last, k, expected)

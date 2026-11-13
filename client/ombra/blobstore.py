@@ -17,6 +17,7 @@ KIND_DOCUMENT = 2  # BlobKind.BLOB_KIND_DOCUMENT
 BUCKET_SIZES = (16384, 262144, 2097152, 16777216)  # LIMIT_BLOB_BUCKET_0..3
 API_VERSION = 1
 CHUNK_BYTES = 1 << 20
+MAX_CHUNK_BYTES = 4194304  # LIMIT_MAX_CHUNK_BYTES
 
 
 class BlobStoreError(RuntimeError):
@@ -93,13 +94,20 @@ class GrpcBlobStore:
         )
         size: int | None = None
         parts: list[bytes] = []
+        total = 0
         for msg in self._stub.GetBlob(req):
             which = msg.WhichOneof("part")
             if which == "error":
                 self._check(msg.error)
             elif which == "size":
+                # a blob is one of the bucket sizes; a server cannot make us allocate more
+                if size is not None or msg.size not in BUCKET_SIZES:
+                    raise BlobStoreError("blob stream announces an invalid size")
                 size = msg.size
             elif which == "data":
+                total += len(msg.data)
+                if size is None or total > size or len(msg.data) > MAX_CHUNK_BYTES:
+                    raise BlobStoreError("blob stream is larger than announced")
                 parts.append(msg.data)
         data = b"".join(parts)
         if size is None or len(data) != size:

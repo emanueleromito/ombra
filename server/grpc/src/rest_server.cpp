@@ -2,6 +2,7 @@
 #include "rest_server.hpp"
 
 #include <arpa/inet.h>
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
@@ -10,8 +11,10 @@
 #include <sys/time.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
+#include <exception>
 #include <memory>
 #include <stdexcept>
 
@@ -38,8 +41,12 @@ struct RestServer::Tls {
 
 RestServer::RestServer(const std::string& host, int port, const std::string& tls_cert,
                        const std::string& tls_key, const ApiKeyStore* keys, Metrics& metrics,
-                       std::function<Gauges()> gauges)
-    : keys_(keys), metrics_(metrics), gauges_(std::move(gauges)) {
+                       std::function<Gauges()> gauges, std::size_t workers,
+                       std::size_t max_connections)
+    : keys_(keys),
+      metrics_(metrics),
+      gauges_(std::move(gauges)),
+      max_connections_(std::max<std::size_t>(1, max_connections)) {
   if (!tls_cert.empty() || !tls_key.empty()) {
     tls_ = std::make_unique<Tls>();
     tls_->ctx.reset(SSL_CTX_new(TLS_server_method()));
@@ -70,6 +77,8 @@ RestServer::RestServer(const std::string& host, int port, const std::string& tls
   socklen_t len = sizeof addr;
   ::getsockname(listen_fd_, reinterpret_cast<sockaddr*>(&addr), &len);
   port_ = ntohs(addr.sin_port);
+  for (std::size_t i = 0; i < std::max<std::size_t>(1, workers); ++i)
+    workers_.emplace_back([this] { worker(); });
   thread_ = std::thread([this] { run(); });
 }
 
@@ -77,7 +86,16 @@ RestServer::~RestServer() { stop(); }
 
 void RestServer::stop() {
   stop_.store(true);
+  {
+    std::lock_guard lk(qmu_);  // a worker between its predicate check and wait() cannot miss this
+  }
+  qcv_.notify_all();
   if (thread_.joinable()) thread_.join();
+  for (auto& w : workers_)
+    if (w.joinable()) w.join();
+  workers_.clear();
+  for (int fd : queue_) ::close(fd);
+  queue_.clear();
   if (listen_fd_ >= 0) {
     ::close(listen_fd_);
     listen_fd_ = -1;
@@ -90,11 +108,39 @@ void RestServer::run() {
     if (::poll(&p, 1, 100) <= 0) continue;
     const int fd = ::accept4(listen_fd_, nullptr, nullptr, SOCK_CLOEXEC);
     if (fd < 0) continue;
+    {
+      std::lock_guard lk(qmu_);
+      if (open_ >= max_connections_) {  // connection cap: refuse without reading anything
+        ::close(fd);
+        continue;
+      }
+      ++open_;
+      queue_.push_back(fd);
+    }
+    qcv_.notify_one();
+  }
+}
+
+void RestServer::worker() {
+  for (;;) {
+    int fd = -1;
+    {
+      std::unique_lock lk(qmu_);
+      qcv_.wait(lk, [this] { return stop_.load() || !queue_.empty(); });
+      if (queue_.empty()) return;  // stopping
+      fd = queue_.front();
+      queue_.pop_front();
+    }
     try {
       serve(fd);
+    } catch (const std::exception& e) {
+      std::fprintf(stderr, "[ombra.server] rest request failed: %s\n", e.what());
     } catch (...) {
+      std::fprintf(stderr, "[ombra.server] rest request failed: unknown error\n");
     }
     ::close(fd);
+    std::lock_guard lk(qmu_);
+    --open_;
   }
 }
 
@@ -114,7 +160,21 @@ void RestServer::serve(int fd) {
     ssl.reset(SSL_new(tls_->ctx.get()));
     if (!ssl) return;
     SSL_set_fd(ssl.get(), fd);
-    if (SSL_accept(ssl.get()) != 1) return;  // plain-text or broken client: dropped, no answer
+    // The handshake runs under the same total deadline as the headers (audit A-17): non-blocking
+    // socket, poll between attempts. A plain-text or slow client is dropped without an answer.
+    const int flags = ::fcntl(fd, F_GETFL, 0);
+    if (flags < 0 || ::fcntl(fd, F_SETFL, flags | O_NONBLOCK) != 0) return;
+    for (;;) {
+      const int r = SSL_accept(ssl.get());
+      if (r == 1) break;
+      const int e = SSL_get_error(ssl.get(), r);
+      if (e != SSL_ERROR_WANT_READ && e != SSL_ERROR_WANT_WRITE) return;
+      const int wait = left_ms();
+      if (wait <= 0) return;
+      pollfd pf{fd, static_cast<short>(e == SSL_ERROR_WANT_READ ? POLLIN : POLLOUT), 0};
+      if (::poll(&pf, 1, wait) <= 0) return;
+    }
+    if (::fcntl(fd, F_SETFL, flags) != 0) return;  // blocking again, with the socket timeouts
   }
   const auto read_some = [&](char* buf, std::size_t n) -> long {
     if (ssl) {

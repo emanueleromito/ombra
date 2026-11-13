@@ -32,8 +32,25 @@ _HEADER = struct.Struct("<4sHBIII")
 _HEADER_LEN = _HEADER.size + SALT_LEN + NONCE_LEN
 # OWASP-level scrypt (128 MiB); tests pass smaller values.
 DEFAULT_SCRYPT = (2**17, 8, 1)
-# Upper bounds when reading, so a hostile file cannot make us allocate gigabytes.
+# Bounds on read and write. scrypt needs 128 * n * r bytes: a hostile file must not make us allocate
+# more than 1 GiB (audit A-41). Weak n is refused unless the environment variable below is set,
+# which only tests and throwaway-key tools do (a key file of a real collection is never weak).
 _MAX_N, _MAX_R, _MAX_P = 2**20, 32, 16
+_MAX_SCRYPT_BYTES = 1 << 30
+_MIN_N = 2**14
+ALLOW_WEAK_ENV = "OMBRA_ALLOW_WEAK_SCRYPT"
+
+
+def _check_kdf_params(n: int, r: int, p: int) -> None:
+    if n < 2 or n & (n - 1) or not (n <= _MAX_N and 1 <= r <= _MAX_R and 1 <= p <= _MAX_P):
+        raise KeyFileError("key derivation parameters out of range")
+    if 128 * n * r > _MAX_SCRYPT_BYTES:
+        raise KeyFileError("key derivation parameters out of range (memory above 1 GiB)")
+    if n < _MIN_N and os.environ.get(ALLOW_WEAK_ENV) != "1":
+        raise KeyFileError(f"scrypt n below {_MIN_N} is too weak for a key file")
+
+
+_EXISTS = "key file already exists; pass overwrite=True to replace it"
 
 
 class KeyFileError(ValueError):
@@ -73,7 +90,7 @@ def _derive(passphrase: str, salt: bytes, n: int, r: int, p: int) -> bytes:
         n=n,
         r=r,
         p=p,
-        maxmem=256 * n * r + 2**26,
+        maxmem=129 * n * r + 2**26,
         dklen=32,
     )
 
@@ -82,8 +99,7 @@ def export_key_bytes(
     material: KeyMaterial, passphrase: str, *, scrypt_params: tuple[int, int, int] = DEFAULT_SCRYPT
 ) -> bytes:
     n, r, p = scrypt_params
-    if n < 2 or n & (n - 1) or not (1 <= r <= _MAX_R and 1 <= p <= _MAX_P and n <= _MAX_N):
-        raise KeyFileError("invalid scrypt parameters")
+    _check_kdf_params(n, r, p)
     salt, nonce = os.urandom(SALT_LEN), os.urandom(NONCE_LEN)
     header = _HEADER.pack(MAGIC, KEYFILE_VERSION, KDF_SCRYPT, n, r, p) + salt + nonce
     key = _derive(passphrase, salt, n, r, p)
@@ -101,8 +117,7 @@ def import_key_bytes(data: bytes, passphrase: str) -> KeyMaterial:
         raise KeyFileError(f"unknown key file version {version}")
     if kdf != KDF_SCRYPT:
         raise KeyFileError(f"unknown key derivation {kdf}")
-    if n < 2 or n & (n - 1) or not (n <= _MAX_N and 1 <= r <= _MAX_R and 1 <= p <= _MAX_P):
-        raise KeyFileError("key derivation parameters out of range")
+    _check_kdf_params(n, r, p)
     header = data[:_HEADER_LEN]
     salt = header[_HEADER.size : _HEADER.size + SALT_LEN]
     nonce = header[_HEADER.size + SALT_LEN :]
@@ -125,20 +140,29 @@ def export_key_file(
     """Write atomically (temp file in the same directory, mode 0600, then rename).
 
     Refuses to replace an existing file unless ``overwrite`` is set: it may hold the only copy
-    of a secret key.
+    of a secret key. Without ``overwrite`` the file is put in place with a hard link, which fails
+    if the name exists, so a concurrent writer is never overwritten (audit A-46).
     """
     target = Path(path)
     if target.exists() and not overwrite:
-        raise KeyFileError("key file already exists; pass overwrite=True to replace it")
+        raise KeyFileError(_EXISTS)
     blob = export_key_bytes(material, passphrase, scrypt_params=scrypt_params)
     fd, tmp = tempfile.mkstemp(dir=target.parent, prefix=f".{target.name}.", suffix=".tmp")
     try:
-        os.fchmod(fd, 0o600)
+        if hasattr(os, "fchmod"):  # not on Windows; mkstemp already creates the file 0600
+            os.fchmod(fd, 0o600)
         with os.fdopen(fd, "wb") as f:
             f.write(blob)
             f.flush()
             os.fsync(f.fileno())
-        os.replace(tmp, target)
+        if overwrite:
+            os.replace(tmp, target)
+        else:
+            try:
+                os.link(tmp, target)  # atomic, fails if `target` appeared in the meantime
+            except FileExistsError:
+                raise KeyFileError(_EXISTS) from None
+            os.unlink(tmp)
     except BaseException:
         try:
             os.unlink(tmp)

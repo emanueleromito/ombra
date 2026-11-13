@@ -60,12 +60,14 @@ int main(int argc, char** argv) {
   try {
     const std::string in_dir = argv[2], out_dir = argv[3];
     const std::size_t dims = std::stoul(argv[4]);
+    if (dims == 0) throw std::invalid_argument("dims must be positive");
     CryptoContext<DCRTPoly> cc;
     if (!Serial::DeserializeFromFile(argv[1], cc, SerType::BINARY)) {
       throw std::runtime_error("cannot read crypto context");
     }
     ombra::core::require_security_floor(cc);
     const std::size_t blocks = std::stoul(argv[5]);
+    if (blocks == 0) throw std::invalid_argument("blocks must be positive");
     std::vector<std::vector<Ciphertext<DCRTPoly>>> stored(blocks);
     std::vector<Ciphertext<DCRTPoly>> query;
     for (std::size_t j = 0; j < dims; ++j) {

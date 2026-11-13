@@ -8,8 +8,8 @@ find_package(OpenFHE REQUIRED)
 find_package(OpenMP REQUIRED)
 string(REPLACE "-Werror" "" OFHE_FLAGS "${OpenFHE_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OFHE_FLAGS}")
-add_executable(deser deser.cpp)
-target_include_directories(deser PRIVATE ${OpenFHE_INCLUDE} ${OpenFHE_INCLUDE}/third-party/include
+add_executable(deser deser.cpp ${CMAKE_CURRENT_SOURCE_DIR}/../../../core/src/security_floor.cpp)
+target_include_directories(deser PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../../core/include ${OpenFHE_INCLUDE} ${OpenFHE_INCLUDE}/third-party/include
   ${OpenFHE_INCLUDE}/core ${OpenFHE_INCLUDE}/pke ${OpenFHE_INCLUDE}/binfhe)
 target_link_directories(deser PRIVATE ${OpenFHE_LIBDIR})
 target_link_libraries(deser PRIVATE ${OpenFHE_SHARED_LIBRARIES} OpenMP::OpenMP_CXX)

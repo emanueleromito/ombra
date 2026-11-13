@@ -58,7 +58,7 @@ def test_pyprojects_declare_the_dual_license():
         assert not any(c.startswith("License ::") for c in project.get("classifiers", [])), path
         folder = (ROOT / path).parent
         for name in project.get("license-files", []):
-            assert (folder / name).is_file(), f"{path}: license file {name} missing"
+            assert list(folder.glob(name)), f"{path}: license file {name} missing"
     assert checked >= 2
 
 
@@ -79,7 +79,11 @@ def test_images_carry_the_source_and_license_labels():
     assert len(dockerfiles) >= 3, "ci image and the two release images are expected"
     for path in dockerfiles:
         text = path.read_text(encoding="utf-8")
-        assert f'LABEL org.opencontainers.image.licenses="{EXPRESSION}"' in text, path
+        if path.parent.name == "ci":
+            # The CI image holds OpenFHE and no Ombra code, so it does not carry Ombra's licence.
+            assert 'LABEL org.opencontainers.image.licenses="BSD-2-Clause"' in text, path
+        else:
+            assert f'LABEL org.opencontainers.image.licenses="{EXPRESSION}"' in text, path
         assert (
             'LABEL org.opencontainers.image.source="https://github.com/erailabs/ombra"' in text
         ), path
@@ -89,3 +93,12 @@ def test_license_texts_carry_no_placeholder():
     for name in ("LICENSE", "README.md", "SECURITY.md"):
         text = (ROOT / name).read_text(encoding="utf-8")
         assert "PLACEHOLDER" not in text, f"{name} still has a placeholder"
+
+
+def test_packaged_third_party_licenses_match_the_root_ones():
+    # client/licenses/ is a subset of licenses/ with the same file names; keep the texts equal.
+    root = ROOT / "licenses"
+    copies = sorted((ROOT / "client" / "licenses").glob("*.txt"))
+    assert copies, "client/licenses/ is expected"
+    for copy in copies:
+        assert copy.read_bytes() == (root / copy.name).read_bytes(), copy.name

@@ -25,6 +25,7 @@
 #include <vector>
 
 #include "ombra/core/expansion_tree.hpp"
+#include "ombra/core/security_floor_context.hpp"
 #include "openfhe.h"
 #include "openfhe_expand_ops.hpp"
 
@@ -98,6 +99,7 @@ int main(int argc, char** argv) {
   const std::size_t d = std::stoul(argv[7]);
   const int reps = std::stoi(argv[8]);
   auto cc = GenCryptoContext(p);
+  ombra::core::require_security_floor(cc);  // hard rule 1: never below the 128-bit floor
   cc->Enable(PKE);
   cc->Enable(KEYSWITCH);
   cc->Enable(LEVELEDSHE);

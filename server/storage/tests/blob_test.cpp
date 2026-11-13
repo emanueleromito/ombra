@@ -63,6 +63,14 @@ void basic() {
   CHECK(s.get_blob("docs", kDoc, "id-16384", &out) && out == blob(9));
   CHECK(s.get_blob("docs", kRec, "id-16384", &out) && out == blob(7));
 
+  {
+    std::uint64_t n = 0, bytes = 0;
+    s.blob_totals("docs", &n, &bytes);
+    CHECK(n == 5 && bytes > 16777216);
+    s.blob_totals("nothing", &n, &bytes);
+    CHECK(n == 0 && bytes == 0);
+  }
+
   // Replace: new bytes (and another bucket), old file gone.
   const auto before = files_in(d.path + "/blobs").size();
   s.put_blob("docs", kRec, "id-16384", blob(8, 262144));

@@ -263,12 +263,21 @@ def test_rest_limits(deployment):
     ctx = ssl.create_default_context(cafile=str(deployment["cert"]))
     conn = http.client.HTTPSConnection(host, int(port), context=ctx, timeout=10)
     # The server answers 431 and closes with unread bytes pending, so the client may instead see
-    # the connection reset before it reads the answer; either way the request is refused.
+    # the connection reset before it reads the answer. Either way the request must be refused: a
+    # 200 (or any other status) fails the test.
     try:
         conn.request("GET", "/healthz", headers={"X-Pad": "a" * 20000})
-        assert conn.getresponse().status == 431
+        outcome = conn.getresponse().status
     except (OSError, http.client.HTTPException):
-        pass
+        outcome = "reset"
+    finally:
+        conn.close()
+    assert outcome in (431, "reset"), f"oversized header was not refused: {outcome}"
+    # The refusal must not take the REST port down.
+    conn = http.client.HTTPSConnection(host, int(port), context=ctx, timeout=10)
+    try:
+        conn.request("GET", "/healthz")
+        assert conn.getresponse().status == 200
     finally:
         conn.close()
 

@@ -71,7 +71,10 @@ void write_file_durable(const std::string& path, const std::vector<std::uint8_t>
                         void (*before_rename)()) {
   const std::string tmp = path + ".tmp";
   {
-    Fd f{::open(tmp.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644)};
+    // Exclusive and never through a symlink (audit A-56); a stale temp file of a crashed write is
+    // removed first (recovery sweeps them too). Mode 0600: the data directory is private (A-22).
+    ::unlink(tmp.c_str());
+    Fd f{::open(tmp.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600)};
     if (f.fd < 0) throw std::runtime_error(err("create", tmp));
     std::size_t off = 0;
     while (off < bytes.size()) {

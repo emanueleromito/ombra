@@ -83,9 +83,14 @@ def filter_field_limit(derived: Derived) -> int:
     must stay under the allowed value 2^(first_mod - scale - 1 - 3), the bound at the lowest level
     less a margin. Capped by the server's LIMIT_MAX_FILTER_FIELDS.
     """
-    bits = derived.values["first_mod_size"] - derived.values["scaling_mod_size"] - 1
-    allowed = 2 ** (bits - _HEADROOM_MARGIN_BITS)
-    return min(MAX_FILTER_FIELDS, (allowed - 1) // FILTER_LAMBDA - 1)
+    first, scale = derived.values["first_mod_size"], derived.values["scaling_mod_size"]
+    # the same guards as max_filter_fields in server/search/src/layout.cpp (never negative)
+    if first < scale + 5:
+        return 0
+    allowed = 2 ** (first - scale - 1 - _HEADROOM_MARGIN_BITS)
+    if allowed < 1 + 2 * FILTER_LAMBDA:
+        return 0
+    return max(0, min(MAX_FILTER_FIELDS, (allowed - 1) // FILTER_LAMBDA - 1))
 
 
 def check_filter_schema(derived: Derived, cards: Sequence[int]) -> None:

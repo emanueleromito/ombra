@@ -115,6 +115,8 @@ class Catalog {
   std::vector<std::string> delete_blobs(const std::string& collection, std::uint32_t kind,
                                         const std::vector<std::string>& ids);
   std::vector<std::string> all_blob_files() const;
+  // Number and total payload bytes of the blobs of a collection (for quotas).
+  void blob_totals(const std::string& collection, std::uint64_t* count, std::uint64_t* bytes) const;
 
   sqlite3* raw() const { return db_; }  // for tests that tamper with versions
 

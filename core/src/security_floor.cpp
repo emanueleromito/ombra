@@ -31,6 +31,19 @@ StdLevel to_level(SecurityLevel l) {
   }
 }
 
+SecretDist to_dist(SecretKeyDist d) {
+  switch (d) {
+    case UNIFORM_TERNARY:
+      return SecretDist::kUniformTernary;
+    case GAUSSIAN:
+      return SecretDist::kGaussian;
+    case SPARSE_TERNARY:
+      return SecretDist::kSparseTernary;
+    default:
+      return SecretDist::kOther;
+  }
+}
+
 std::size_t sum_bits(const std::shared_ptr<ILDCRTParams<BigInteger>>& p) {
   std::size_t bits = 0;
   if (!p) return 0;
@@ -51,11 +64,15 @@ void require_security_floor(const CryptoContext<DCRTPoly>& cc) {
   const std::size_t log2_qp = context_log2_qp(cc);
   const auto rns = std::dynamic_pointer_cast<CryptoParametersRNS>(cc->GetCryptoParameters());
   std::size_t extra = 0;
+#ifdef OMBRA_ENABLE_TEST_HOOKS
+  // Test builds only (CMake option OMBRA_ENABLE_TEST_HOOKS): lowers the limit so the wiring tests
+  // can prove that every entry point calls this check. Release builds do not read it.
   if (const char* env = std::getenv("OMBRA_TEST_LOG2QP_LIMIT")) {
     extra = std::strtoull(env, nullptr, 10);
   }
+#endif
   check_security_floor(to_level(rns->GetStdLevel()), rns->GetElementParams()->GetRingDimension(),
-                       log2_qp, extra);
+                       log2_qp, extra, to_dist(rns->GetSecretKeyDist()));
 }
 
 }  // namespace ombra::core

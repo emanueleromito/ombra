@@ -13,7 +13,7 @@ endif()
 # Headers shared with the server's core/ (the tree and the CPU operations), in the repository.
 set(OMBRA_CORE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core" CACHE PATH "core/ of the repository")
 
-find_package(OpenFHE QUIET)
+find_package(OpenFHE 1.6.1 EXACT QUIET)
 find_package(pybind11 CONFIG QUIET)
 if(NOT OpenFHE_FOUND OR NOT pybind11_FOUND OR NOT EXISTS "${OMBRA_CORE_DIR}/include/ombra/core/expansion_tree.hpp")
   if("$ENV{OMBRA_REQUIRE_NATIVE}" STREQUAL "1")
@@ -65,7 +65,7 @@ set_target_properties(ombra_native_exact PROPERTIES INSTALL_RPATH "${OpenFHE_LIB
 
 # Exact test of seeded stored ciphertexts (SEED-1, docs/decisions/0023) against OpenFHE; run by
 # tests/test_openfhe_seeded.py. Not installed.
-add_executable(ombra_seeded_exact native/seeded_test.cpp)
+add_executable(ombra_seeded_exact native/seeded_test.cpp "${OMBRA_CORE_DIR}/src/security_floor.cpp")
 target_include_directories(
   ombra_seeded_exact PRIVATE native "${OMBRA_CORE_DIR}/include" ${OpenFHE_INCLUDE}
                              ${OpenFHE_INCLUDE}/third-party/include ${OpenFHE_INCLUDE}/core

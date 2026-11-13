@@ -24,3 +24,28 @@ updates:
       # Stay on the Ubuntu LTS release; move to the next LTS by hand.
       - dependency-name: ubuntu
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
+  - package-ecosystem: pip
+    directory: /ci
+    target-branch: dev
+    schedule:
+      interval: weekly
+  - package-ecosystem: pip
+    directory: /docs
+    target-branch: dev
+    schedule:
+      interval: weekly
+  - package-ecosystem: pip
+    directory: /packaging/ombra-openfhe
+    target-branch: dev
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /docker
+    target-branch: dev
+    schedule:
+      interval: weekly
+    ignore:
+      # CUDA 12.6.3 on Ubuntu 22.04 and Python 3.12 are chosen on purpose; move them by hand.
+      - dependency-name: nvidia/cuda
+      - dependency-name: python
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]

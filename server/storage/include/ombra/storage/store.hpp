@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -108,6 +109,12 @@ class Store {
   // carry; it is checked when segments are read.
   Store(std::string root, std::string openfhe_version);
 
+  // Optional: resolves a preset name to its ring dimension and slot count, so that insert can
+  // compare a seeded column's header with the collection (audit A-71). Set before serving.
+  using ShapeProvider =
+      std::function<bool(const std::string& preset, std::uint32_t* ring_dim, std::uint32_t* slots)>;
+  void set_shape_provider(ShapeProvider p) { shape_ = std::move(p); }
+
   void create_collection(const CollectionSpec& spec);
   bool get_collection(const std::string& name, CollectionSpec* out) const;
 
@@ -189,6 +196,8 @@ class Store {
   bool get_blob(const std::string& collection, std::uint32_t kind, const std::string& id,
                 std::vector<std::uint8_t>* out) const;
   // Removes the blobs that exist (missing ids are ignored); returns how many were removed.
+  // Number and payload bytes of the collection's blobs (quota checks).
+  void blob_totals(const std::string& collection, std::uint64_t* count, std::uint64_t* bytes) const;
   std::size_t delete_blobs(const std::string& collection, std::uint32_t kind,
                            const std::vector<std::string>& ids);
 
@@ -209,7 +218,9 @@ class Store {
   void unpin(const std::vector<std::string>& files) const;
   std::string blob_dir() const { return root_ + "/blobs"; }
   std::string key_dir() const { return root_ + "/keys"; }
+  ColumnExpect expect_for(const CollectionSpec& spec) const;
   std::string root_, ofhe_;
+  ShapeProvider shape_;
   std::unique_ptr<Catalog> catalog_;
   std::unique_ptr<Wal> wal_;
   mutable std::mutex mu_;

@@ -8,6 +8,7 @@
 #include <map>
 #include <memory>
 #include <set>
+#include <type_traits>
 #include <unordered_set>
 
 #include "ombra/server/policy.hpp"
@@ -52,8 +53,7 @@ static_assert(static_cast<std::uint64_t>(v1::LIMIT_BLOB_BUCKET_3) == storage::kB
 static_assert(static_cast<std::uint32_t>(v1::BLOB_KIND_RECORD) == storage::kBlobKindRecord);
 static_assert(static_cast<std::uint32_t>(v1::BLOB_KIND_DOCUMENT) == storage::kBlobKindDocument);
 
-constexpr std::size_t kMaxKeyFileBytes = std::size_t{1} << 30;  // per key kind
-constexpr std::size_t kClustersPerGroup = 16;                   // clusters scored per write burst
+constexpr std::size_t kClustersPerGroup = 16;  // clusters scored per write burst
 
 double ms_since(Clock::time_point t0) {
   return std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
@@ -83,6 +83,8 @@ Status classify_current() {
     return {Err::InvalidArgument, "unknown blob kind"};
   } catch (const storage::BlockMismatch& e) {
     return {Err::BlockMismatch, e.what()};
+  } catch (const search::ResourceExhausted&) {
+    return {Err::SizeLimit, "too many concurrent searches for the server's GPU memory"};
   } catch (const search::KeyTagMismatch& e) {
     return {Err::KeyTagMismatch, e.what()};
   } catch (const search::KeysMissing& e) {
@@ -103,10 +105,13 @@ Status classify_current() {
       return {Err::PresetMismatch, "envelope preset differs from the collection's"};
     if (has("envelope:")) return {Err::InvalidArgument, "invalid envelope"};
     if (has("duplicate id")) return {Err::InvalidArgument, "duplicate id"};
+    if (has("seeded column") || has("seeded:"))
+      return {Err::InvalidArgument, "stored column does not match the collection"};
     if (has("unknown collection")) return {Err::CollectionNotFound, "unknown collection"};
     std::fprintf(stderr, "[ombra.server] internal error: %s\n", e.what());
     return {Err::Internal, "internal error"};
   } catch (...) {
+    std::fprintf(stderr, "[ombra.server] internal error: unknown exception\n");
     return {Err::Internal, "internal error"};
   }
 }
@@ -180,10 +185,9 @@ void OmbraService::ensure_loaded(const std::string& c) {
 }
 
 void OmbraService::forget(const std::string& c) {
-  // The engine keeps its (stale) entry for a dropped collection, but nothing reaches it again: a
-  // search needs the name in loaded_, and a re-created collection is loaded afresh.
   std::lock_guard lk(load_mu_);
   loaded_.erase(c);
+  engine_.forget_collection(c);  // keys, GPU buffers and id caches (audit A-21)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -198,9 +202,17 @@ grpc::Status OmbraService::run_CreateCollection(grpc::ServerContext*,
     fill(resp->mutable_error(), st);
     return grpc::Status::OK;
   }
+  if (spec.cluster_count > limits_.max_cluster_count) {
+    fill(resp->mutable_error(), err(Err::SizeLimit, "cluster_count is above the server's limit"));
+    return grpc::Status::OK;
+  }
   try {
     if (store_.get_collection(spec.name, nullptr)) {
       fill(resp->mutable_error(), err(Err::CollectionExists, "collection exists"));
+      return grpc::Status::OK;
+    }
+    if (store_.list_collections().size() >= limits_.max_collections) {
+      fill(resp->mutable_error(), err(Err::SizeLimit, "too many collections"));
       return grpc::Status::OK;
     }
     store_.create_collection(spec);
@@ -255,6 +267,7 @@ grpc::Status OmbraService::run_ListCollections(grpc::ServerContext*,
       if (store_.get_collection(n, &spec)) fill_info(store_, spec, resp->add_collections());
     }
   } catch (...) {
+    (void)classify_current();  // logs the reason
     return grpc::Status(grpc::StatusCode::INTERNAL, "internal error");
   }
   return grpc::Status::OK;
@@ -289,6 +302,21 @@ grpc::Status OmbraService::run_UploadKeys(grpc::ServerContext*,
     fill(resp->mutable_error(), err(c, m));
     return grpc::Status::OK;
   };
+  // Key files are staged in memory: bound the uploads in flight and the bytes of each (audit A-20).
+  struct UploadSlot {
+    std::atomic<std::size_t>& n;
+    bool ok;
+    explicit UploadSlot(std::atomic<std::size_t>& c, std::size_t max) : n(c), ok(false) {
+      std::size_t cur = n.load();
+      while (cur < max && !n.compare_exchange_weak(cur, cur + 1)) {
+      }
+      ok = cur < max;
+    }
+    ~UploadSlot() {
+      if (ok) n.fetch_sub(1);
+    }
+  } slot(key_uploads_, limits_.max_concurrent_key_uploads);
+  if (!slot.ok) return fail(Err::SizeLimit, "too many key uploads in progress");
   std::string coll;
   int cur_kind = 0;  // kind of the file being assembled, 0 if none
   std::vector<std::uint8_t> buf;
@@ -325,8 +353,11 @@ grpc::Status OmbraService::run_UploadKeys(grpc::ServerContext*,
         return fail(Err::BadSequence, "chunk offset does not follow the previous chunk");
       if (c.data().size() > kMaxChunkBytes)
         return fail(Err::SizeLimit, "chunk is larger than the limit");
-      if (buf.size() + c.data().size() > kMaxKeyFileBytes)
+      if (buf.size() + c.data().size() >
+          (cur_kind == v1::KEY_KIND_CONTEXT ? kMaxContextBytes : kMaxEvalKeyBytes))
         return fail(Err::SizeLimit, "key file is too large");
+      if (total + c.data().size() > limits_.max_key_upload_bytes)
+        return fail(Err::SizeLimit, "key upload is too large");
       buf.insert(buf.end(), c.data().begin(), c.data().end());
       total += c.data().size();
       if (c.last()) {
@@ -413,6 +444,7 @@ grpc::Status OmbraService::run_Insert(grpc::ServerContext*, grpc::ServerReader<v
       std::vector<std::vector<std::uint8_t>> cols;
       cols.reserve(want_cols);
       for (const auto& c : b.columns()) {
+        if (c.size() > kMaxColumnBytes) return fail(Err::SizeLimit, "column is too large");
         cols.emplace_back(c.begin(), c.end());
         bytes += c.size();
       }
@@ -465,7 +497,9 @@ grpc::Status OmbraService::run_Delete(grpc::ServerContext*, const v1::DeleteRequ
 // Search
 
 grpc::Status OmbraService::run_Search(
-    grpc::ServerContext*, grpc::ServerReaderWriter<v1::SearchResponse, v1::SearchRequest>* stream) {
+    grpc::ServerContext* ctx,
+    grpc::ServerReaderWriter<v1::SearchResponse, v1::SearchRequest>* stream,
+    const std::string& key_id) {
   // Sends an error message and ends the stream (status OK: the error is in the message).
   const auto send_error = [&](const Status& s) {
     v1::SearchResponse out;
@@ -474,10 +508,21 @@ grpc::Status OmbraService::run_Search(
     return grpc::Status::OK;
   };
 
+  // Deadlines (audit A-02): a stream the client leaves idle, or that lives too long, is cancelled
+  // from the watchdog thread; the blocking Read below then fails and the handler returns.
+  const auto guard =
+      watchdog_.watch([ctx] { ctx->TryCancel(); }, limits_.search_idle_ms, limits_.search_total_ms);
+
   v1::SearchRequest req;
   if (!stream->Read(&req)) return grpc::Status::OK;  // client closed without a request
+  guard->touch();
   if (req.step_case() != v1::SearchRequest::kStart)
     return send_error(err(Err::BadSequence, "the first message must be SearchStart"));
+
+  // One slot per open stream, globally and per API key; released when the handler returns, which
+  // also frees the session's device memory.
+  SessionLimiter::Ticket ticket = sessions_.try_acquire(key_id);
+  if (!ticket.valid()) return send_error(err(Err::SizeLimit, "too many concurrent searches"));
 
   std::unique_ptr<search::SearchSession> session;
   storage::CollectionSpec spec;
@@ -494,7 +539,10 @@ grpc::Status OmbraService::run_Search(
       return send_error(
           err(Err::InvalidFilterLayout, "filter_leaves differs from sum(cardinality)"));
     if (st.query().empty()) return send_error(err(Err::InvalidArgument, "query is empty"));
+    if (st.query().size() > kMaxQueryBytes)
+      return send_error(err(Err::SizeLimit, "query is larger than the limit"));
     ensure_loaded(st.collection());
+    guard->busy(true);
     const std::string& q = st.query();
     session =
         engine_.open_session(st.collection(), st.key_tag(),
@@ -502,9 +550,12 @@ grpc::Status OmbraService::run_Search(
   } catch (...) {
     return send_error(classify_current());
   }
+  guard->busy(false);
+  guard->touch();
 
   // Round 1: stage 1 over the center blocks.
   try {
+    guard->busy(true);
     auto centers = session->score_centers();
     v1::SearchResponse out;
     auto* c = out.mutable_centers();
@@ -520,12 +571,23 @@ grpc::Status OmbraService::run_Search(
   } catch (...) {
     return send_error(classify_current());
   }
+  guard->busy(false);
 
   // Rounds 2..n: every SearchChosen is answered by one SearchScores per cluster.
-  while (stream->Read(&req)) {
+  std::size_t rounds = 0;
+  while (!ctx->IsCancelled() && stream->Read(&req)) {
+    guard->touch();
+    if (ctx->IsCancelled() || guard->timed_out()) return grpc::Status::OK;
+    if (++rounds > limits_.max_rounds)
+      return send_error(err(Err::SizeLimit, "too many rounds in one search stream"));
     if (req.step_case() != v1::SearchRequest::kChosen)
       return send_error(err(Err::BadSequence, "expected SearchChosen"));
     const auto t0 = Clock::now();
+    guard->busy(true);
+    struct BusyOff {
+      Watchdog::Guard& g;
+      ~BusyOff() { g.busy(false); }
+    } busy_off{*guard};
     try {
       const auto& ids = req.chosen().cluster_ids();
       if (ids.empty()) return send_error(err(Err::InvalidArgument, "no clusters chosen"));
@@ -544,6 +606,7 @@ grpc::Status OmbraService::run_Search(
             clusters.begin() + static_cast<std::ptrdiff_t>(g),
             clusters.begin() +
                 static_cast<std::ptrdiff_t>(std::min(clusters.size(), g + kClustersPerGroup)));
+        if (ctx->IsCancelled()) return grpc::Status::OK;  // the client is gone: stop the GPU work
         const auto results = session->score_clusters(group);
         for (std::size_t i = 0; i < group.size(); ++i) {
           v1::SearchResponse out;
@@ -655,6 +718,8 @@ grpc::Status OmbraService::run_ReplaceBlock(grpc::ServerContext*,
     std::string coll;
     std::vector<std::string> segments;
     storage::SegmentData nd;
+    storage::CollectionSpec rspec;
+    std::size_t max_columns = 0;
     bool have_header = false;
     std::size_t bytes = 0;
     while (in->Read(&m)) {
@@ -667,6 +732,9 @@ grpc::Status OmbraService::run_ReplaceBlock(grpc::ServerContext*,
         for (const auto& s : m.header().segments()) segments.push_back(s);
         if (segments.empty() || segments.size() > kMaxClustersPerRound)
           return fail(Err::InvalidArgument, "between 1 and 4096 blocks must be listed");
+        if (!store_.get_collection(coll, &rspec))
+          return fail(Err::CollectionNotFound, "collection not found");
+        max_columns = rspec.dimension + sum_cardinality(rspec);  // a data block's column count
         for (const auto& id : m.header().ids()) {
           if (id.empty() || id.size() > kMaxIdBytes)
             return fail(Err::InvalidArgument, "invalid id");
@@ -675,6 +743,9 @@ grpc::Status OmbraService::run_ReplaceBlock(grpc::ServerContext*,
         if (nd.ids.size() > kMaxIdsPerRequest) return fail(Err::SizeLimit, "too many ids");
       } else if (m.part_case() == v1::ReplaceBlockRequest::kColumn) {
         if (!have_header) return fail(Err::BadSequence, "a column before the header");
+        if (nd.column_envelopes.size() >= max_columns)
+          return fail(Err::SizeLimit, "more columns than the collection's layout has");
+        if (m.column().size() > kMaxColumnBytes) return fail(Err::SizeLimit, "column is too large");
         nd.column_envelopes.emplace_back(m.column().begin(), m.column().end());
         bytes += m.column().size();
       } else {
@@ -758,6 +829,13 @@ grpc::Status OmbraService::run_PutBlob(grpc::ServerContext*,
       return fail(Err::InvalidArgument, "less data than the header's size");
     if (!store_.get_collection(coll, nullptr))
       return fail(Err::CollectionNotFound, "collection not found");
+    {
+      std::uint64_t n = 0, total_bytes = 0;
+      store_.blob_totals(coll, &n, &total_bytes);
+      if (n >= limits_.max_blobs_per_collection ||
+          total_bytes + payload.size() > limits_.max_blob_bytes_per_collection)
+        return fail(Err::SizeLimit, "the collection's blob quota is used up");
+    }
     store_.put_blob(coll, kind, id, payload);
     log_line("put_blob", 1, payload.size(), ms_since(t0));
   } catch (...) {
@@ -836,6 +914,25 @@ grpc::Status OmbraService::run_DeleteBlobs(grpc::ServerContext*, const v1::Delet
   return grpc::Status::OK;
 }
 
+grpc::Status ApiKeyAuthProcessor::Process(const InputMetadata& auth_metadata, grpc::AuthContext*,
+                                          OutputMetadata*, OutputMetadata*) {
+  if (keys_ == nullptr) return grpc::Status::OK;  // --no-auth
+  std::string token;
+  const auto it = auth_metadata.find("authorization");
+  if (it != auth_metadata.end()) token.assign(it->second.data(), it->second.size());
+  if (authorize(keys_, token, Scope::Read) == AuthResult::Unauthenticated) {
+    metrics_.count_unauthenticated();
+    std::uint64_t suppressed = 0;
+    if (log_.allow(&suppressed))
+      std::fprintf(
+          stderr,
+          "[ombra.server] refused call before its body reason=unauthenticated (+%llu not logged)\n",
+          static_cast<unsigned long long>(suppressed));
+    return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "missing or invalid API key");
+  }
+  return grpc::Status::OK;  // the header stays visible to the handler, which checks the scope
+}
+
 namespace {
 
 std::string bearer_of(const grpc::ServerContext* ctx) {
@@ -852,7 +949,11 @@ grpc::Status OmbraService::guarded(grpc::ServerContext* ctx, Rpc rpc, Resp* resp
   const AuthResult a = authorize(keys_, bearer_of(ctx), required_scope(rpc), &key_id);
   if (a == AuthResult::Unauthenticated) {
     metrics_.count_unauthenticated();
-    std::fprintf(stderr, "[ombra.server] refused rpc=%s reason=unauthenticated\n", rpc_name(rpc));
+    std::uint64_t suppressed = 0;
+    if (refused_log_.allow(&suppressed))  // one line per interval, not one per attempt
+      std::fprintf(stderr,
+                   "[ombra.server] refused rpc=%s reason=unauthenticated (+%llu not logged)\n",
+                   rpc_name(rpc), static_cast<unsigned long long>(suppressed));
     return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "missing or invalid API key");
   }
   if (a == AuthResult::PermissionDenied) {
@@ -862,7 +963,11 @@ grpc::Status OmbraService::guarded(grpc::ServerContext* ctx, Rpc rpc, Resp* resp
     return grpc::Status(grpc::StatusCode::PERMISSION_DENIED, "the API key's scope is too low");
   }
   const auto t0 = Clock::now();
-  grpc::Status st = fn();
+  grpc::Status st;
+  if constexpr (std::is_invocable_v<Fn, const std::string&>)
+    st = fn(key_id);
+  else
+    st = fn();
   bool failed = !st.ok();
   if constexpr (requires(const Resp* r) { r->has_error(); }) failed = failed || resp->has_error();
   metrics_.record(rpc, failed, ms_since(t0));
@@ -920,7 +1025,7 @@ grpc::Status OmbraService::Search(
     grpc::ServerContext* ctx,
     grpc::ServerReaderWriter<v1::SearchResponse, v1::SearchRequest>* req) {
   return guarded(ctx, Rpc::Search, static_cast<void*>(nullptr),
-                 [&] { return run_Search(ctx, req); });
+                 [&](const std::string& key_id) { return run_Search(ctx, req, key_id); });
 }
 
 grpc::Status OmbraService::ListBlocks(grpc::ServerContext* ctx, const v1::ListBlocksRequest* req,

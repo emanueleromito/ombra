@@ -18,7 +18,7 @@ from typing import Any
 import numpy as np
 
 from ombra import presets
-from ombra.collection import Collection, CollectionError, KeyKit
+from ombra.collection import Collection, CollectionError, KeyKit, check_server_spec
 from ombra.search import Hit
 
 MAX_ID_BYTES = 256  # LIMIT_MAX_ID_BYTES
@@ -165,6 +165,7 @@ class ClientCore:
         if names and len(names) != len(cards):
             raise ValueError(f"the collection has {len(cards)} filter fields, not {len(names)}")
         derived = presets.derive(spec.preset, spec.dimension)
+        check_server_spec(derived, cards, spec.cluster_count)  # before any key is generated
         kit = KeyKit.load(
             key_file, passphrase, derived, self._t.openfhe_version, derived.dimension + sum(cards)
         )

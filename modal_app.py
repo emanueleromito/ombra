@@ -8,7 +8,7 @@ Use the Makefile instead of calling these directly:
     make test-gpu      # build and run GPU tests on an A10
     make test-openfhe  # run tests marked `openfhe` on CPU in the pinned image
     make bench         # build and run benchmarks on an A100
-    make results-pull  # copy benchmark results from the Modal volume to docs/plan/results/raw/
+    make results-pull  # copy benchmark results from the Modal volume to results-raw/
 
 Needs MODAL_TOKEN_ID and MODAL_TOKEN_SECRET in the environment (or `modal token new`).
 """
@@ -22,10 +22,31 @@ from pathlib import Path
 import modal
 
 # Pinned versions. OpenFHE and openfhe-python must be a matching pair; change both together.
-CUDA_IMAGE = "nvidia/cuda:12.6.3-devel-ubuntu22.04"
+CUDA_IMAGE = (
+    "nvidia/cuda:12.6.3-devel-ubuntu22.04"
+    "@sha256:d49bb8a4ff97fb5fe477947a3f02aa8c0a53eae77e11f00ec28618a0bcaa2ad1"
+)
 PYTHON_VERSION = "3.11"
 OPENFHE_TAG = "v1.6.1"
 OPENFHE_PYTHON_TAG = "v1.6.1.0"
+# The tags above, pinned by commit; the SHA-256 is of GitHub's archive of the openfhe-python commit.
+OPENFHE_COMMIT = "b59e1f291965f14fbee5172cd83a20f5b856204f"
+OPENFHE_PYTHON_COMMIT = "a016560c6a03e13f09ba59e07cb131597202039a"
+OPENFHE_PYTHON_SHA256 = "27464e784fe2a69d9d94da21f19a054703165b1a1d0b3b30b8bfb3c3c93d1927"
+_FETCH_OPENFHE = (
+    "git init --quiet /opt/openfhe-src",
+    "git -C /opt/openfhe-src fetch --quiet --depth 1 "
+    f"https://github.com/openfheorg/openfhe-development {OPENFHE_COMMIT}",
+    "git -C /opt/openfhe-src checkout --quiet --detach FETCH_HEAD",
+    f'test "$(git -C /opt/openfhe-src rev-parse HEAD)" = "{OPENFHE_COMMIT}"',
+)
+_FETCH_OPENFHE_PYTHON = (
+    "curl -sSfL -o /tmp/ofp.tgz "
+    f"https://codeload.github.com/openfheorg/openfhe-python/tar.gz/{OPENFHE_PYTHON_COMMIT}",
+    f'echo "{OPENFHE_PYTHON_SHA256}  /tmp/ofp.tgz" | sha256sum -c -',
+    "mkdir /opt/openfhe-python-src",
+    "tar xzf /tmp/ofp.tgz -C /opt/openfhe-python-src --strip-components=1",
+)
 
 # Decision 0024: Turing, Ampere, Ada, Hopper.
 CUDA_ARCHS = "75;80;86;89;90"
@@ -45,20 +66,18 @@ def _upload_ignore(p: Path) -> bool:
 
 image = (
     modal.Image.from_registry(CUDA_IMAGE, add_python=PYTHON_VERSION)
-    .apt_install("git", "build-essential", "cmake", "ninja-build", "libomp-dev")
+    .apt_install("git", "curl", "build-essential", "cmake", "ninja-build", "libomp-dev")
     .pip_install("pybind11[global]", "numpy", "pytest", "faiss-cpu")
     .run_commands(
         # OpenFHE (C++), installed to /usr/local
-        f"git clone --depth 1 --branch {OPENFHE_TAG} "
-        "https://github.com/openfheorg/openfhe-development /opt/openfhe-src",
+        *_FETCH_OPENFHE,
         "cmake -S /opt/openfhe-src -B /opt/openfhe-build -G Ninja "
         "-DCMAKE_BUILD_TYPE=Release -DBUILD_UNITTESTS=OFF -DBUILD_EXAMPLES=OFF "
         "-DBUILD_BENCHMARKS=OFF",
         "cmake --build /opt/openfhe-build -j",
         "cmake --install /opt/openfhe-build",
         # openfhe-python, built against the OpenFHE above
-        f"git clone --depth 1 --branch {OPENFHE_PYTHON_TAG} "
-        "https://github.com/openfheorg/openfhe-python /opt/openfhe-python-src",
+        *_FETCH_OPENFHE_PYTHON,
         "cmake -S /opt/openfhe-python-src -B /opt/openfhe-python-build -G Ninja "
         "-DCMAKE_BUILD_TYPE=Release",
         "cmake --build /opt/openfhe-python-build -j",
@@ -95,6 +114,17 @@ def _run(cmd: list[str], cwd: str = REPO_DIR, ok_codes: tuple[int, ...] = (0,)) 
     print("$", " ".join(cmd), flush=True)
     code = subprocess.run(cmd, cwd=cwd).returncode
     if code not in ok_codes:
+        raise SystemExit(f"command failed with exit code {code}: {' '.join(cmd)}")
+
+
+def _run_no_skips(cmd: list[str]) -> None:
+    """Run pytest so that a skipped test fails the run (conftest.py, OMBRA_FAIL_ON_SKIP)."""
+    import os
+
+    print("$", " ".join(cmd), flush=True)
+    env = {**os.environ, "OMBRA_FAIL_ON_SKIP": "1"}
+    code = subprocess.run(cmd, cwd=REPO_DIR, env=env).returncode
+    if code != 0:
         raise SystemExit(f"command failed with exit code {code}: {' '.join(cmd)}")
 
 
@@ -200,10 +230,7 @@ def test_gpu(pytest_args: str = "") -> None:
     _run(["ctest", "--test-dir", BUILD_DIR, "--output-on-failure", "--no-tests=ignore"])
     # Zero collected tests (pytest exit code 5) is a failure: GPU tests exist now. The
     # driver for tests/test_gpu_ciphertext_roundtrip.py is built into BUILD_DIR above.
-    _run(
-        ["python", "-m", "pytest", "-m", "gpu", "-v", "-s", *pytest_args.split()],
-        ok_codes=(0,),
-    )
+    _run_no_skips(["python", "-m", "pytest", "-m", "gpu", "-v", "-s", *pytest_args.split()])
 
 
 # memory: with --expansion-large the C++ expansion driver holds all d = 1536 expanded ciphertexts
@@ -220,7 +247,7 @@ def test_openfhe(pytest_args: str = "") -> None:
     _build("Release", targets=("ombra_expand", "ombra_encoding_check"))
     _build_native()  # local mode runs the compiled expansion in a child process
     cmd = ["python", "-m", "pytest", "-m", "openfhe", "-v", "-s", *pytest_args.split()]
-    _run(cmd, ok_codes=(0,))
+    _run_no_skips(cmd)
     volume.commit()
 
 
@@ -302,7 +329,13 @@ def prebuild(build_type: str = "Release", archs: str = ALL_CUDA_ARCHS, commit: s
     _build_native()
     os.makedirs(BUILD_CACHE, exist_ok=True)
     natives = [str(p) for p in Path(f"{REPO_DIR}/client/ombra").glob("_native*.so")]
-    _run(["tar", "-cf", _cache_tar(build_type), BUILD_DIR, *natives], cwd="/")
+    # Members are relative: the build directory's content, and the native modules by name.
+    _run(["tar", "-cf", _cache_tar(build_type), "-C", BUILD_DIR, "."], cwd="/")
+    _run(
+        ["tar", "-cf", _cache_tar(build_type) + ".native", "-C", f"{REPO_DIR}/client/ombra"]
+        + [Path(n).name for n in natives],
+        cwd="/",
+    )
     Path(_cache_tar(build_type) + ".json").write_text(
         f'{{"commit": "{commit}", "archs": "{archs}", "build_type": "{build_type}"}}\n'
     )
@@ -322,7 +355,14 @@ def gpu_run(cmd: str, build_type: str = "Release", commit: str = "") -> None:
     meta = json.loads(Path(_cache_tar(build_type) + ".json").read_text())
     if commit and meta["commit"] != commit:
         raise SystemExit(f"cached build is from commit {meta['commit']!r}, asked for {commit!r}")
-    _run(["tar", "-xf", _cache_tar(build_type)], cwd="/")
+    # Unpack into the build directory and the client folder only, never into /.
+    os.makedirs(BUILD_DIR, exist_ok=True)
+    _run(["tar", "-xf", _cache_tar(build_type), "-C", BUILD_DIR, "--no-same-owner"], cwd="/")
+    _run(
+        ["tar", "-xf", _cache_tar(build_type) + ".native", "-C", f"{REPO_DIR}/client/ombra"]
+        + ["--no-same-owner"],
+        cwd="/",
+    )
     _run(["nvidia-smi", "--query-gpu=name,memory.total,driver_version", "--format=csv,noheader"])
     out_dir = Path(DATA_DIR) / "results"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -436,12 +476,25 @@ def _skip_core(p: Path) -> bool:
     return not keep
 
 
+def _client_ignore(p: Path) -> bool:
+    # Paths are relative to client/. Same secret and data patterns as the main image, plus the
+    # folders the install does not need.
+    from modal_upload import is_unsafe
+
+    s = str(p)
+    return is_unsafe(s) or any(
+        x in s for x in ("__pycache__", ".pytest_cache", "tests", ".ruff_cache", "_native.cpython")
+    )
+
+
 local_install_image = (
-    modal.Image.from_registry("ubuntu:24.04", add_python="3.12")  # libstdc++ of GCC 13+
+    modal.Image.from_registry(
+        "ubuntu:24.04@sha256:2198e4c65076e9cb0b3d695219df667c0e3b0072da64ca3c2648aca17dcecaf5",
+        add_python="3.12",
+    )  # libstdc++ of GCC 13+
     .apt_install("git", "build-essential", "cmake", "ninja-build", "libomp-dev")
     .run_commands(
-        f"git clone --depth 1 --branch {OPENFHE_TAG} "
-        "https://github.com/openfheorg/openfhe-development /opt/openfhe-src",
+        *_FETCH_OPENFHE,
         "cmake -S /opt/openfhe-src -B /opt/openfhe-build -G Ninja "
         "-DCMAKE_BUILD_TYPE=Release -DBUILD_UNITTESTS=OFF -DBUILD_EXAMPLES=OFF "
         "-DBUILD_BENCHMARKS=OFF -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++",
@@ -454,14 +507,15 @@ local_install_image = (
         "client",
         remote_path="/work/client",
         copy=True,
-        ignore=lambda p: any(
-            s in str(p)
-            for s in ("__pycache__", ".pytest_cache", "tests", ".ruff_cache", "_native.cpython")
-        ),
+        ignore=_client_ignore,
     )
     .add_local_file("tests/local_install_check.py", "/work/local_install_check.py", copy=True)
     .run_commands(
-        "CC=gcc CXX=g++ OMBRA_REQUIRE_NATIVE=1 pip install '/work/client[local]'",
+        # ombra-openfhe (the [local] extra) is not on PyPI until the first release, so this image
+        # takes openfhe-python from the PyPI `openfhe` wheel (CPython 3.12, x86-64 Linux) and
+        # installs the client without the extra. Same OpenFHE 1.6.1 underneath.
+        "pip install 'openfhe==1.6.1.0.24.4' 'protobuf>=5,<8' 'grpcio-tools>=1.60,<2'",
+        "CC=gcc CXX=g++ OMBRA_REQUIRE_NATIVE=1 pip install /work/client",
     )
 )
 

@@ -31,6 +31,7 @@ Files are kept under the directory given to `Client.local(path)` (format "ombra-
 from __future__ import annotations
 
 import atexit
+import json
 import multiprocessing
 import multiprocessing.connection as mpc
 import os
@@ -192,8 +193,8 @@ class LocalTransport:
     def _control(self, what: str) -> dict[str, Any]:
         ch = self._acquire()
         try:
-            ch.conn.send(("control", what))
-            out: dict[str, Any] = ch.conn.recv()
+            ch.conn.send_bytes(b"K" + what.encode())  # JSON and bytes only (A-48)
+            out: dict[str, Any] = json.loads(ch.conn.recv_bytes())
             return out
         except BaseException:
             ch.ok = False
@@ -210,10 +211,10 @@ class LocalTransport:
         ch = self._acquire()
         try:
             if streams_in:
-                ch.conn.send(("call", method, None))
+                ch.conn.send_bytes(b"C" + method.encode() + b"\0")
                 requests = iter(request)
             else:
-                ch.conn.send(("call", method, request.SerializeToString()))
+                ch.conn.send_bytes(b"C" + method.encode() + b"\0" + request.SerializeToString())
                 requests = iter(())
         except BaseException:
             ch.ok = False
@@ -299,25 +300,28 @@ def _child_main(path: str, sock: str, authkey: bytes, parent_pid: int) -> None:
         try:
             while True:
                 try:
-                    msg = conn.recv()
+                    frame = conn.recv_bytes()
                 except (EOFError, OSError):
                     return
-                if msg[0] == "control":
-                    if msg[1] == "hello":
-                        conn.send({"openfhe_version": server.version})
-                    elif msg[1] == "modules":
-                        conn.send(
-                            {
-                                "openfhe_loaded": "openfhe" in sys.modules,
-                                "native_loaded": "ombra._native" in sys.modules,
-                            }
-                        )
+                if frame[:1] == b"K":
+                    what = frame[1:].decode()
+                    if what == "hello":
+                        reply: dict[str, Any] = {"openfhe_version": server.version}
+                    elif what == "modules":
+                        reply = {
+                            "openfhe_loaded": "openfhe" in sys.modules,
+                            "native_loaded": "ombra._native" in sys.modules,
+                        }
                     else:  # shutdown
-                        conn.send({})
+                        conn.send_bytes(b"{}")
                         stop.set()
                         return
+                    conn.send_bytes(json.dumps(reply).encode())
                     continue
-                _serve_call(server, pb, conn, msg[1], msg[2])
+                if frame[:1] != b"C" or b"\0" not in frame:
+                    return  # not a message of this protocol: drop the connection
+                method, _, body = frame[1:].partition(b"\0")
+                _serve_call(server, pb, conn, method.decode(), body if body else None)
         except (EOFError, OSError):
             return
         finally:
@@ -371,11 +375,29 @@ def _serve_call(server: LocalServer, pb: Any, conn: Any, method: str, body: byte
         conn.send_bytes(b"X" + type(exc).__name__.encode()[:100])
 
 
+def _private_dir(path: Path) -> None:
+    """Create `path` (and parents) readable by this user only; tighten an existing one."""
+    path.mkdir(parents=True, exist_ok=True, mode=0o700)
+    try:
+        path.chmod(0o700)
+    except OSError:  # not ours, or a file system without modes
+        pass
+
+
 def _atomic(path: Path, data: bytes) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".tmp")
-    tmp.write_bytes(data)
-    os.replace(tmp, path)
+    _private_dir(path.parent)
+    # unique name, O_EXCL and mode 0600 (mkstemp); ids in file names are not world readable (A-47)
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 class _Coll:
@@ -393,7 +415,7 @@ class LocalServer:
     def __init__(self, path: str | os.PathLike[str], pb: Any, openfhe_version: str) -> None:
         self.pb, self.version = pb, openfhe_version
         self.root = Path(path)
-        self.root.mkdir(parents=True, exist_ok=True)
+        _private_dir(self.root)
         marker = self.root / "FORMAT"
         if marker.exists():
             if marker.read_bytes() != FORMAT:
