@@ -1,9 +1,9 @@
 preset,n_vectors,filter,total_p50_ms,total_p95_ms,source
-balanced,100k,none,TBD,TBD,pending a new run on the current code
-balanced,100k,2 fields,TBD,TBD,pending a new run on the current code
+balanced,100k,none,143.3,170.4,A100 40 GB grpc-e2e run 2026-11-13 (core/bench/grpc_e2e.py; 30 queries)
+balanced,100k,2 fields,142.6,162.9,A100 40 GB grpc-e2e run 2026-11-13 (core/bench/grpc_e2e.py; 30 queries)
 balanced,1M,none,TBD,TBD,pending a new run on the current code
 balanced,1M,2 fields,TBD,TBD,pending a new run on the current code
-fast,100k,none,TBD,TBD,pending a new run on the current code
-fast,100k,2 fields,TBD,TBD,pending a new run on the current code
+fast,100k,none,58.8,8097.3,A100 40 GB grpc-e2e run 2026-11-13 (core/bench/grpc_e2e.py; 30 queries)
+fast,100k,2 fields,58.7,65.8,A100 40 GB grpc-e2e run 2026-11-13 (core/bench/grpc_e2e.py; 30 queries)
 fast,1M,none,TBD,TBD,pending a new run on the current code
 fast,1M,2 fields,TBD,TBD,pending a new run on the current code

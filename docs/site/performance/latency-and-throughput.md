@@ -51,14 +51,16 @@ Most of this is query expansion, which costs about 19 ms at d = 384, 37 ms at 76
 
 ## Over gRPC with a real server
 
-The same query through the gRPC API, with the client encrypting in 16 processes, on an A100 80 GB. Medians over 30 queries at d = 384.
+The same query through the gRPC API, with the client encrypting in 16 processes, on an A100 40 GB in a container with 32 CPUs. Medians over 30 queries at d = 384, with p95 in brackets.
 
 | Collection | Filter | Balanced | Fast |
 | --- | --- | --- | --- |
-| 100,000 | none | TBD | TBD |
-| 100,000 | 2 fields | TBD | TBD |
+| 100,000 | none | 143 ms (170 ms) | 59 ms (8.1 s) |
+| 100,000 | 2 fields | 143 ms (163 ms) | 59 ms (66 ms) |
 
-A filter is part of the same encrypted search, so it adds no extra round. A query sends 0.79 MB (Balanced) or 0.39 MB (Fast) up. The answer size depends on how many blocks are searched.
+A filter is part of the same encrypted search, so it adds no extra round. A query sends 0.79 MB (Balanced) or 0.39 MB (Fast) up and, in this run, gets 3.7 MB (Balanced) or 2.0 MB (Fast) back over both stages. The answer size depends on how many blocks are searched.
+
+The 8.1 s p95 of Fast without a filter comes from a few queries that waited about 8 s for the first answer of the second stage. The median is not affected and the filtered run shows no such wait. We have not found the cause yet.
 
 ## What is slow
 
@@ -66,7 +68,7 @@ A filter is part of the same encrypted search, so it adds no extra round. A quer
 
 | Collection | Cache | Balanced median | Fast median |
 | --- | --- | --- | --- |
-| 100,000 | fits | TBD | TBD |
+| 100,000 | fits | 143 ms | 59 ms |
 | 1,000,000 | does not fit | TBD | TBD |
 
 A cold cache with small budgets is the worst case, not what a tuned A100 box would show. Nobody has profiled the disk path yet, so we cannot say whether disk speed, parsing or copies cost the time.
@@ -83,7 +85,7 @@ The path from host memory to the GPU runs at 22 to 26 GB/s on the A100's PCIe li
 | --- | --- |
 | One query stream, Balanced, A100, client included | TBD queries per second |
 | One query stream, server alone | TBD queries per second |
-| Ingest, d = 384, A100 server, 16 client processes | TBD vectors per second |
+| Ingest, d = 384, A100 server, 16 client processes, 100,000 vectors | 1,132 (Balanced) and 2,010 (Fast) vectors per second, unseeded |
 
 Sending several queries together helps the search kernel: four queries at once ran 1.75x to 1.78x faster per query than one at a time (A100, kernel only, which the changes above do not affect).
 

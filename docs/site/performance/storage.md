@@ -26,12 +26,11 @@ These figures count the stored column ciphertexts of Balanced. They are the seri
 
 A collection takes more than the column ciphertexts alone. It also holds the keys, the sealed record blobs and the cluster centers, and clusters fill their blocks only partly. Filter fields add columns: two fields of 8 values add 16 columns, so 400 columns at d = 384.
 
-!!! note "Numbers pending a new benchmark run on the current code."
-    The data directory sizes measured before seeded ciphertexts are being replaced.
+Measured on an A100 run of the gRPC benchmark at d = 384. That benchmark's client uploads stored columns without seeding, so these sizes are the unseeded case. A client with seeding, the default in the wheels, stores the columns in about half the space. The 1,000,000 row waits for the next run.
 
 | Vectors | Filter fields | Balanced | Fast |
 | --- | --- | --- | --- |
-| 100,000 | 2 fields of 8 values | TBD | TBD |
+| 100,000 | 2 fields of 8 values | 5.70 GB (57.0 KB per vector) | 4.91 GB (49.1 KB per vector) |
 | 1,000,000 | 2 fields of 8 values | TBD | TBD |
 
 The 400 columns alone would be 19.2 KB per vector at 48 bytes each. Measure your own collection before you plan disk.
