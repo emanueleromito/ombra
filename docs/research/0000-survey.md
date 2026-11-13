@@ -50,7 +50,7 @@ exist twice during the handoff; four twiddle tables and one key per tree level s
 | Monomial in evaluation form on the CPU | local-mode expansion 1.07x to 1.25x | 0004 | adopted |
 | Template reader for ciphertexts | minus 3.3 ms per query and per block | 0005, 0009 | proposed |
 | Lazy Karatsuba search kernel on the GPU | none: 2% to 10% slower | 0006 | rejected: the kernel is memory-bound |
-| Expansion writes leaves in place | server 1.07x to 1.19x, minus 1.2 GB at d = 1536 | 0007 | adopted |
+| Expansion writes leaves in place | server 1.09x to 1.14x, minus 1.2 GB at d = 1536 | 0007 | adopted |
 | GPU families beyond Ampere | T4, L4, L40S, H200 all exact | 0008 | adopted as an option; decision 0024 proposed |
 | Hand-written CPU key switch | local-mode expansion 2x or more | 0010 | not run: large; proposed as a task |
 | Lazy inner product in the key switch | at most 5% of expansion | none | not run: the inner product is 23% of a split and mostly gathers, not arithmetic |

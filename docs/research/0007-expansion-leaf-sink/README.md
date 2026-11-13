@@ -1,6 +1,6 @@
 # 0007. Expansion writes its leaves in place
 
-- **Outcome:** adopted (server time 1.07x to 1.19x; d leaves no longer held twice)
+- **Outcome:** adopted (server time 1.09x to 1.14x; d leaves no longer held twice)
 - **Date:** 2026-11-13
 - **Area:** GPU host, GPU memory
 
@@ -72,10 +72,35 @@ went from 3.08, 6.13 and 12.55 ms (d = 384, 768, 1536) to 0.00; expansion is unc
 - Device memory: the d leaves exist once. At d = 1536 that is 1.2 GB less at the peak
   (1536 x 786,432 B), by construction; not measured with a memory probe.
 
+## Second run, at the final commit
+
+Same command at `3c36b14` (after the lazy kernel of 0006 was removed, so both files use the kept
+search kernel and differ only in the handoff): `raw/final-e2e-before-a100.json` and
+`raw/final-e2e-after-a100.json`, same A100 model, another host.
+
+| d | N | searched | expansion + handoff before (ms) | after (ms) | stage 2 GPU before | after | server before (ms) | after (ms) | server speedup |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 384 | 100,000 | 5% | 28.86 | 25.05 | 1.28 | 1.24 | 42.33 | 38.15 | 1.11x |
+| 384 | 100,000 | 20% | 28.85 | 25.03 | 2.38 | 2.34 | 43.75 | 39.57 | 1.11x |
+| 384 | 1,000,000 | 5% | 28.88 | 25.04 | 4.09 | 4.04 | 46.05 | 41.89 | 1.10x |
+| 384 | 1,000,000 | 20% | 28.95 | 25.04 | 11.53 | 11.51 | 56.93 | 51.71 | 1.10x |
+| 768 | 100,000 | 5% | 45.65 | 38.42 | 1.62 | 1.62 | 59.92 | 52.38 | 1.14x |
+| 768 | 100,000 | 20% | 45.23 | 38.34 | 3.36 | 3.33 | 61.66 | 54.17 | 1.14x |
+| 768 | 1,000,000 | 5% | 45.73 | 38.85 | 5.74 | 6.41 | 64.85 | 58.40 | 1.11x |
+| 768 | 1,000,000 | 20% | 53.64 | 46.44 | 21.22 | 21.24 | 90.53 | 83.38 | 1.09x |
+| 1536 | 100,000 | 5% | 86.05 | 73.46 | 2.67 | 2.69 | 102.02 | 89.55 | 1.14x |
+| 1536 | 100,000 | 20% | 86.21 | 73.55 | 6.13 | 6.23 | 106.01 | 94.09 | 1.13x |
+| 1536 | 1,000,000 | 5% | 86.04 | 73.47 | 10.71 | 10.74 | 110.99 | 99.23 | 1.12x |
+| 1536 | 1,000,000 | 20% | 86.07 | 73.48 | 33.33 | 33.35 | 135.99 | 124.34 | 1.09x |
+
+The handoff went from 3.79, 7.16 and 12.52 ms to 0; the server is 1.09x to 1.14x faster. This
+host's CPU steps are slower than the first run's (the server totals are higher in both columns),
+which is why the two runs are not compared with each other.
+
 ## Limits
 
-- The "after" file was measured with the lazy search kernel of 0006, which was then removed. It
-  changes stage 2 by -1.2 to +1.3 ms in these cases, so the server speedup with the kept kernel
-  differs from the table by at most that. The handoff and expansion columns are not affected.
+- In the first run the "after" file used the lazy search kernel of 0006, which was then removed
+  (stage 2 differs by -1.2 to +1.3 ms because of it). The second run has no such difference and
+  is the one to quote.
 - One run. The bench's stage 2 keeps its own query buffer and still receives a copy, outside the
   timed steps; the server has one buffer.

@@ -1,0 +1,15 @@
+{
+  "utc": "20261113T122721Z",
+  "git_commit": "3c36b14",
+  "build_type": "Release",
+  "cuda_archs": "75;80;86;89;90",
+  "gpu": "NVIDIA A100-SXM4-40GB, 40960 MiB, 610.57.04",
+  "cpu_model": "unknown",
+  "logical_cpus": 20,
+  "cuda_image": "nvidia/cuda:12.6.3-devel-ubuntu22.04",
+  "openfhe": "v1.6.1",
+  "commands": [
+    "OMBRA_LEAF_HANDOFF=copy python core/bench/run.py --task e2e-latency --out /data/results --name-e2e-latency final-e2e-before-a100.json --e2e-queries 10",
+    "python core/bench/run.py --task e2e-latency --out /data/results --name-e2e-latency final-e2e-after-a100.json --e2e-queries 10"
+  ]
+}
