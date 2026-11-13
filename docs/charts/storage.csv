@@ -1,0 +1,10 @@
+d,mode,bytes_per_million,source
+384,encrypted,37191563136,2026-11-09-t0.9-sizes.md
+384,plaintext_db,18572378112,2026-11-09-t0.9-sizes.md
+384,float32,1536000000,2026-11-09-t0.9-sizes.md
+768,encrypted,74383126272,2026-11-09-t0.9-sizes.md
+768,plaintext_db,37144756224,2026-11-09-t0.9-sizes.md
+768,float32,3072000000,2026-11-09-t0.9-sizes.md
+1536,encrypted,148766252544,2026-11-09-t0.9-sizes.md
+1536,plaintext_db,74289512448,2026-11-09-t0.9-sizes.md
+1536,float32,6144000000,2026-11-09-t0.9-sizes.md
