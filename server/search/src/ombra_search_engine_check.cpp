@@ -270,6 +270,7 @@ int main(int argc, char** argv) {
     // ---- Refusals before the keys are uploaded -------------------------------------------------
     ombra::search::EngineConfig cfg;
     cfg.gpu_budget_bytes = gpu_blocks * block_bytes;
+    cfg.session_budget_bytes = std::size_t{1} << 34;  // the cache budget is tiny here on purpose
     cfg.host_budget_bytes = host_blocks * block_bytes;
     cfg.lookahead = 1;
     cfg.blocks_per_batch = 3;  // ragged chunks: 4 blocks of a query give batches of 3 and 1

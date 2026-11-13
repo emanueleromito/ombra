@@ -338,12 +338,15 @@ PreparedKeys SearchEngine::prepare_keys(const std::string& name,
     const auto rns = std::dynamic_pointer_cast<CryptoParametersRNS>(c->cc->GetCryptoParameters());
     if (!rns) throw SearchError("context is not an RNS scheme");
     const auto& towers = rns->GetElementParams()->GetParams();
-    std::size_t scale_bits = 0;
+    // OpenFHE picks the scaling primes near 2^scale on both sides, so their bit lengths differ by
+    // one (for example 50 and 51). Pass the smallest; towers that differ by more never match.
+    std::size_t lo = 0, hi = 0;
     for (std::size_t i = 1; i < towers.size(); ++i) {
       const std::size_t b = towers[i]->GetModulus().GetMSB();
-      if (scale_bits != 0 && b != scale_bits) scale_bits = 1;  // towers differ: never matches
-      else if (scale_bits == 0) scale_bits = b;
+      lo = (lo == 0 || b < lo) ? b : lo;
+      hi = b > hi ? b : hi;
     }
+    const std::size_t scale_bits = hi > lo + 1 ? 1 : lo;
     if (towers.size() < 2 ||
         !e.cfg.preset_check(c->spec.preset, c->cc->GetRingDimension(),
                             c->cc->GetEncodingParams()->GetBatchSize(), towers.size() - 1,

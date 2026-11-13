@@ -331,7 +331,7 @@ int main(int argc, char** argv) {
       const auto* p = ombra::server::find_preset(preset);
       const auto close = [](std::size_t a, std::size_t b) { return a + 1 >= b && b + 1 >= a; };
       return p && p->ring_dim == ring && p->batch_size == batch && p->depth == depth &&
-             p->first_mod_bits == first_bits && close(p->scale_bits, scale_bits);
+             close(p->first_mod_bits, first_bits) && close(p->scale_bits, scale_bits);
     };
     store.set_shape_provider([](const std::string& preset, std::uint32_t* ring,
                                 std::uint32_t* slots) {
