@@ -317,6 +317,7 @@ def gpu_run(cmd: str, build_type: str = "Release", commit: str = "") -> None:
     the caller (`on_gpu`), not here. Refuses a cached build made from another commit."""
     import json
     import os
+    import time
 
     meta = json.loads(Path(_cache_tar(build_type) + ".json").read_text())
     if commit and meta["commit"] != commit:
@@ -325,6 +326,40 @@ def gpu_run(cmd: str, build_type: str = "Release", commit: str = "") -> None:
     _run(["nvidia-smi", "--query-gpu=name,memory.total,driver_version", "--format=csv,noheader"])
     out_dir = Path(DATA_DIR) / "results"
     out_dir.mkdir(parents=True, exist_ok=True)
+    # The setup of this run, next to its results: which commit, which GPU, which commands.
+    gpu_line = subprocess.run(
+        ["nvidia-smi", "--query-gpu=name,memory.total,driver_version", "--format=csv,noheader"],
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    cpu_model = next(
+        (
+            ln.split(":", 1)[1].strip()
+            for ln in open("/proc/cpuinfo")
+            if ln.startswith("model name")
+        ),
+        "unknown",
+    )
+    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    slug = re.sub(r"[^a-z0-9]+", "-", gpu_line.split(",")[0].lower()).strip("-")
+    (out_dir / f"run-{stamp}-{slug}.json").write_text(
+        json.dumps(
+            {
+                "utc": stamp,
+                "git_commit": meta["commit"],
+                "build_type": build_type,
+                "cuda_archs": meta["archs"],
+                "gpu": gpu_line,
+                "cpu_model": cpu_model,
+                "logical_cpus": os.cpu_count(),
+                "cuda_image": CUDA_IMAGE,
+                "openfhe": OPENFHE_TAG,
+                "commands": cmd.split(" ;; "),
+            },
+            indent=2,
+        )
+        + "\n"
+    )
     try:
         for one in cmd.split(" ;; "):
             env = {
