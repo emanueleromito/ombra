@@ -74,7 +74,7 @@ These are warm-cache times: the benchmark loads every cluster once before it tim
 
 ![Median query time at 100k and 1M vectors on a log scale](img/cold-cache.svg)
 
-Going from a collection that fits the cache to one that does not makes the median query 30 to 60 times slower.
+Going from a collection that fits the cache to one that does not makes the median query about 30 (Fast) to 65 (Balanced) times slower.
 
 Loading one cluster from disk took 11.1 s at the median on Balanced (5.0 s on Fast), for about 0.6 GB (0.3 GB) of columns: roughly 60 MB/s. That is slow for a local disk. Nobody has profiled the disk path yet, so we cannot say whether disk speed, parsing or copies cost the time. A cold cache with small budgets is the worst case, not what a tuned A100 box would show. This benchmark uploads columns without seeding, so a client with seeding, the default, reads about half the bytes.
 
