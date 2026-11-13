@@ -95,4 +95,4 @@ def test_packaged_third_party_licenses_match_the_root_ones():
     copies = sorted((ROOT / "client" / "licenses").glob("*.txt"))
     assert copies, "client/licenses/ is expected"
     for copy in copies:
-        assert copy.read_bytes() == (root / copy.name).read_bytes(), f"{copy} differs from licenses/"
+        assert copy.read_bytes() == (root / copy.name).read_bytes(), copy.name
