@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
-# Starts the Ombra GPU server. Needs Docker, an NVIDIA GPU (Ampere: A100, A10, RTX 30xx) and the
+# Starts the Ombra GPU server. Needs Docker, an NVIDIA GPU (Turing to Hopper: sm_75, 80, 86, 89, 90) and the
 # NVIDIA container toolkit.
 #
 #   docker compose up -d
@@ -19,7 +19,8 @@ services:
       context: .
       dockerfile: docker/Dockerfile.server
     ports:
-      - "50051:50051"  # gRPC
+      # Published on this machine only. To serve other machines, set OMBRA_BIND=0.0.0.0 on purpose.
+      - "${OMBRA_BIND:-127.0.0.1}:50051:50051"  # gRPC
       - "127.0.0.1:8080:8080"  # REST admin and metrics, on this machine only
     volumes:
       - ombra-data:/data
@@ -30,6 +31,20 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+    # The server needs no privileges and writes only to /data and /tmp.
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    # The gRPC port accepts connections (bash opens the TCP port; the image has no curl).
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/50051"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     restart: unless-stopped
     stop_grace_period: 10s
 

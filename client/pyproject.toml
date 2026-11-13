@@ -41,7 +41,7 @@ test-command = "python {project}/tests/wheel_check.py"
 test-environment = { OMBRA_LOCAL_DEBUG = "1" }
 # The client process imports openfhe-python for keys and encryption (the child process of local
 # mode never does). It is the ombra-openfhe wheel built by the same workflow, in openfhe-wheels/.
-before-test = "pip install --find-links {project}/openfhe-wheels ombra-openfhe==1.6.1.0"
+before-test = "pip install --no-index --no-deps --find-links {project}/openfhe-wheels ombra-openfhe==1.6.1.0"
 
 [tool.cibuildwheel.linux]
 manylinux-x86_64-image = "manylinux_2_28"

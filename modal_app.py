@@ -22,10 +22,28 @@ from pathlib import Path
 import modal
 
 # Pinned versions. OpenFHE and openfhe-python must be a matching pair; change both together.
-CUDA_IMAGE = "nvidia/cuda:12.6.3-devel-ubuntu22.04"
+CUDA_IMAGE = "nvidia/cuda:12.6.3-devel-ubuntu22.04@sha256:d49bb8a4ff97fb5fe477947a3f02aa8c0a53eae77e11f00ec28618a0bcaa2ad1"
 PYTHON_VERSION = "3.11"
 OPENFHE_TAG = "v1.6.1"
 OPENFHE_PYTHON_TAG = "v1.6.1.0"
+# The tags above, pinned by commit; the SHA-256 is of GitHub's archive of the openfhe-python commit.
+OPENFHE_COMMIT = "b59e1f291965f14fbee5172cd83a20f5b856204f"
+OPENFHE_PYTHON_COMMIT = "a016560c6a03e13f09ba59e07cb131597202039a"
+OPENFHE_PYTHON_SHA256 = "27464e784fe2a69d9d94da21f19a054703165b1a1d0b3b30b8bfb3c3c93d1927"
+_FETCH_OPENFHE = (
+    "git init --quiet /opt/openfhe-src",
+    "git -C /opt/openfhe-src fetch --quiet --depth 1 "
+    f"https://github.com/openfheorg/openfhe-development {OPENFHE_COMMIT}",
+    "git -C /opt/openfhe-src checkout --quiet --detach FETCH_HEAD",
+    f'test "$(git -C /opt/openfhe-src rev-parse HEAD)" = "{OPENFHE_COMMIT}"',
+)
+_FETCH_OPENFHE_PYTHON = (
+    "curl -sSfL -o /tmp/ofp.tgz "
+    f"https://codeload.github.com/openfheorg/openfhe-python/tar.gz/{OPENFHE_PYTHON_COMMIT}",
+    f'echo "{OPENFHE_PYTHON_SHA256}  /tmp/ofp.tgz" | sha256sum -c -',
+    "mkdir /opt/openfhe-python-src",
+    "tar xzf /tmp/ofp.tgz -C /opt/openfhe-python-src --strip-components=1",
+)
 
 # Decision 0024: Turing, Ampere, Ada, Hopper.
 CUDA_ARCHS = "75;80;86;89;90"
@@ -45,20 +63,18 @@ def _upload_ignore(p: Path) -> bool:
 
 image = (
     modal.Image.from_registry(CUDA_IMAGE, add_python=PYTHON_VERSION)
-    .apt_install("git", "build-essential", "cmake", "ninja-build", "libomp-dev")
+    .apt_install("git", "curl", "build-essential", "cmake", "ninja-build", "libomp-dev")
     .pip_install("pybind11[global]", "numpy", "pytest", "faiss-cpu")
     .run_commands(
         # OpenFHE (C++), installed to /usr/local
-        f"git clone --depth 1 --branch {OPENFHE_TAG} "
-        "https://github.com/openfheorg/openfhe-development /opt/openfhe-src",
+        *_FETCH_OPENFHE,
         "cmake -S /opt/openfhe-src -B /opt/openfhe-build -G Ninja "
         "-DCMAKE_BUILD_TYPE=Release -DBUILD_UNITTESTS=OFF -DBUILD_EXAMPLES=OFF "
         "-DBUILD_BENCHMARKS=OFF",
         "cmake --build /opt/openfhe-build -j",
         "cmake --install /opt/openfhe-build",
         # openfhe-python, built against the OpenFHE above
-        f"git clone --depth 1 --branch {OPENFHE_PYTHON_TAG} "
-        "https://github.com/openfheorg/openfhe-python /opt/openfhe-python-src",
+        *_FETCH_OPENFHE_PYTHON,
         "cmake -S /opt/openfhe-python-src -B /opt/openfhe-python-build -G Ninja "
         "-DCMAKE_BUILD_TYPE=Release",
         "cmake --build /opt/openfhe-python-build -j",
@@ -469,11 +485,13 @@ def _client_ignore(p: Path) -> bool:
 
 
 local_install_image = (
-    modal.Image.from_registry("ubuntu:24.04", add_python="3.12")  # libstdc++ of GCC 13+
+    modal.Image.from_registry(
+        "ubuntu:24.04@sha256:2198e4c65076e9cb0b3d695219df667c0e3b0072da64ca3c2648aca17dcecaf5",
+        add_python="3.12",
+    )  # libstdc++ of GCC 13+
     .apt_install("git", "build-essential", "cmake", "ninja-build", "libomp-dev")
     .run_commands(
-        f"git clone --depth 1 --branch {OPENFHE_TAG} "
-        "https://github.com/openfheorg/openfhe-development /opt/openfhe-src",
+        *_FETCH_OPENFHE,
         "cmake -S /opt/openfhe-src -B /opt/openfhe-build -G Ninja "
         "-DCMAKE_BUILD_TYPE=Release -DBUILD_UNITTESTS=OFF -DBUILD_EXAMPLES=OFF "
         "-DBUILD_BENCHMARKS=OFF -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++",

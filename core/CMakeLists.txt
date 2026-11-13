@@ -28,7 +28,7 @@ if(NOT OMBRA_ENABLE_CUDA)
   return()
 endif()
 
-find_package(OpenFHE REQUIRED)
+find_package(OpenFHE 1.6.1 EXACT REQUIRED)
 
 # The kernels copy 64-bit words, so OpenFHE's native integer must be 64 bits.
 if(NOT "${OpenFHE_NATIVE_SIZE}" STREQUAL "64")
