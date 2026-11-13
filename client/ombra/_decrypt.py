@@ -35,3 +35,12 @@ def decrypt_values(cc: Any, sk: Any, ct: Any, slots: int) -> np.ndarray:
     dec = cc.Decrypt(ct, sk)
     dec.SetLength(slots)
     return np.asarray(dec.GetRealPackedValue(), dtype=np.float64)
+
+
+def usable_cpus() -> int:
+    """CPUs this process may use; os.sched_getaffinity exists on Linux only."""
+    import os
+
+    if hasattr(os, "sched_getaffinity"):
+        return len(os.sched_getaffinity(0))
+    return os.cpu_count() or 1

@@ -24,6 +24,8 @@ from typing import Any
 
 import numpy as np
 
+from ombra._decrypt import usable_cpus
+
 _NATIVE_HINT = (
     "this collection holds seeded columns (envelope kind 4), which need the compiled module "
     "ombra._native (build client/ with OpenFHE 1.6.1, see client/CMakeLists.txt)"
@@ -89,7 +91,7 @@ class SeedPool:
     ):
         import multiprocessing as mp
 
-        n = workers or max(1, min(4, len(os.sched_getaffinity(0))))
+        n = workers or max(1, min(4, usable_cpus()))
         self._workers = n
         self._pool = ProcessPoolExecutor(
             max_workers=n,
