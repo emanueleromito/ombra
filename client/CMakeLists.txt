@@ -29,6 +29,7 @@ string(REPLACE "-Werror" "" OMBRA_OPENFHE_CXX_FLAGS "${OpenFHE_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OMBRA_OPENFHE_CXX_FLAGS}")
 
 pybind11_add_module(_native native/ombra_native.cpp "${OMBRA_CORE_DIR}/src/security_floor.cpp")
+target_include_directories(_native PRIVATE native)
 target_include_directories(
   _native PRIVATE "${OMBRA_CORE_DIR}/include" "${OMBRA_CORE_DIR}/src" ${OpenFHE_INCLUDE}
                   ${OpenFHE_INCLUDE}/third-party/include ${OpenFHE_INCLUDE}/core
@@ -37,3 +38,15 @@ target_link_directories(_native PRIVATE ${OpenFHE_LIBDIR})
 target_link_libraries(_native PRIVATE ${OpenFHE_SHARED_LIBRARIES})
 set_target_properties(_native PROPERTIES INSTALL_RPATH "${OpenFHE_LIBDIR}" BUILD_WITH_INSTALL_RPATH ON)
 install(TARGETS _native DESTINATION ombra)
+
+# Exactness test of the fast CPU operations against the reference (PERF-B); run by
+# tests/test_openfhe_native_exact.py. Not installed.
+find_package(OpenMP QUIET)
+add_executable(ombra_native_exact native/exact_test.cpp "${OMBRA_CORE_DIR}/src/security_floor.cpp")
+target_include_directories(
+  ombra_native_exact PRIVATE native "${OMBRA_CORE_DIR}/include" "${OMBRA_CORE_DIR}/src" ${OpenFHE_INCLUDE}
+                             ${OpenFHE_INCLUDE}/third-party/include ${OpenFHE_INCLUDE}/core
+                             ${OpenFHE_INCLUDE}/pke ${OpenFHE_INCLUDE}/binfhe)
+target_link_directories(ombra_native_exact PRIVATE ${OpenFHE_LIBDIR})
+target_link_libraries(ombra_native_exact PRIVATE ${OpenFHE_SHARED_LIBRARIES})
+set_target_properties(ombra_native_exact PROPERTIES INSTALL_RPATH "${OpenFHE_LIBDIR}" BUILD_WITH_INSTALL_RPATH ON)

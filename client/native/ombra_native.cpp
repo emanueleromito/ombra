@@ -36,6 +36,7 @@
 
 #include "ciphertext-ser.h"
 #include "cryptocontext-ser.h"
+#include "fast_cpu_ops.hpp"
 #include "key/key-ser.h"
 #include "ombra/core/expansion_tree.hpp"
 #include "ombra/core/security_floor_context.hpp"
@@ -84,8 +85,9 @@ struct Columns {
 // reads the key map, so the nodes of a level are independent.
 class ParallelOps {
  public:
-  ParallelOps(CC cc, const std::map<uint32_t, EvalKey<DCRTPoly>>& keys)
-      : base_(std::move(cc), keys) {}
+  ParallelOps(CC cc, const std::map<uint32_t, EvalKey<DCRTPoly>>& keys,
+              ombra::native::MonomialCache& cache)
+      : base_(std::move(cc), keys, cache) {}
 
   std::pair<Ct, Ct> split(const Ct& c, std::size_t level, std::uint32_t galois, std::size_t shift,
                           bool want_odd) {
@@ -112,7 +114,7 @@ class ParallelOps {
   }
 
  private:
-  ombra::core::cpu_ref::OpenFheOps base_;
+  ombra::native::FastSplitOps base_;
 };
 
 class Engine {
@@ -193,7 +195,7 @@ class Engine {
       throw KeyTagError("query ciphertext was made under another key than the collection's");
     if (q->GetElements().size() != 2 || q->GetLevel() != 0 || q->GetNoiseScaleDeg() != 1)
       throw std::invalid_argument("query ciphertext has an unexpected shape, level or scale");
-    ParallelOps ops(cc_, keys_);
+    ParallelOps ops(cc_, keys_, mono_cache_);
     auto out = std::make_shared<Leaves>();
     out->cts = ombra::core::expand_tree(q, n_leaves, ring_, ops);
     for (const Ct& l : out->cts)
@@ -227,41 +229,8 @@ class Engine {
     std::string out;
     {
       py::gil_scoped_release nogil;
-      const long n = static_cast<long>(cols.size());
-      int threads = 1;
-#ifdef _OPENMP
-      threads = omp_get_max_threads();
-#endif
-      std::vector<Ct> partial(static_cast<std::size_t>(threads));
-      std::exception_ptr err;
-#pragma omp parallel num_threads(threads)
-      {
-        int me = 0;
-#ifdef _OPENMP
-        me = omp_get_thread_num();
-#endif
-        Ct acc;
-        try {
-#pragma omp for schedule(static)
-          for (long j = 0; j < n; ++j) {
-            Ct t = cc_->EvalMultNoRelin(leaves.cts[j], cols.cts[j]);
-            acc = acc ? cc_->EvalAdd(acc, t) : t;
-          }
-        } catch (...) {
-#pragma omp critical(ombra_err)
-          err = std::current_exception();
-        }
-        partial[me] = acc;
-      }
-      if (err) std::rethrow_exception(err);
-      Ct acc;
-      for (auto& p : partial)
-        if (p) acc = acc ? cc_->EvalAdd(acc, p) : p;
-      Ct res = cc_->Rescale(cc_->Relinearize(acc));
-      if (!penalty.empty()) {
-        Plaintext pt = cc_->MakeCKKSPackedPlaintext(penalty, 1, res->GetLevel());
-        res = cc_->EvalAdd(res, pt);
-      }
+      Ct sum = ombra::native::score_sum(cc_, leaves.cts, cols.cts, cols.size());
+      Ct res = ombra::native::score_finish(cc_, sum, penalty);
       result_level_ = res->GetLevel();
       std::ostringstream os(std::ios::out | std::ios::binary);
       Serial::Serialize(res, os, SerType::BINARY);
@@ -283,6 +252,7 @@ class Engine {
   std::map<uint32_t, EvalKey<DCRTPoly>> keys_;
   std::size_t ring_ = 0, batch_ = 0;
   std::size_t result_level_ = 0;
+  ombra::native::MonomialCache mono_cache_;  // X^-2^l in evaluation form, per tree level
 };
 
 }  // namespace
