@@ -1,4 +1,0 @@
-{"ring_dim": 8192, "d": 384, "threads": 1, "leaves": 384, "exact": true, "metadata_equal": true, "baseline_ms": 4145.92, "eval_mono_ms": 3684.88}
-{"ring_dim": 16384, "d": 384, "threads": 1, "leaves": 384, "exact": true, "metadata_equal": true, "baseline_ms": 8230.79, "eval_mono_ms": 6683.42}
-{"ring_dim": 8192, "d": 384, "threads": 4, "leaves": 384, "exact": true, "metadata_equal": true, "baseline_ms": 1369.19, "eval_mono_ms": 1276.40}
-{"ring_dim": 16384, "d": 384, "threads": 4, "leaves": 384, "exact": true, "metadata_equal": true, "baseline_ms": 3036.25, "eval_mono_ms": 2430.91}

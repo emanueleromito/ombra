@@ -18,8 +18,8 @@ Every kernel ships with three things: the kernel, an oracle test against OpenFHE
 3. **Write the kernel** in `core/kernels/<family>.cu` with a host wrapper in `core/src/`. Above the kernel, document what it computes, the expected grid and block shape, and memory assumptions. Check every CUDA call with the error macro.
 4. **Build for Ampere only** (`sm_80`, `sm_86`); do not change the architecture list.
 5. **Run** `make test` then `make test-gpu` (see the run-on-gpu skill) until the test passes.
-6. **Add a benchmark case** in `core/bench/` for the sizes used in `docs/plan/` (d = 384, 768, 1536) and run `make bench TASK=<task id>` on A100.
-7. **Record results** in `docs/plan/results/` and update the task's status in `docs/plan/`.
+6. **Add a benchmark case** in `core/bench/` for the supported sizes (d = 384, 768, 1536) and run `make bench TASK=<task id>` on A100.
+7. **Record results** in `docs/plan/results/` and update the task's status in `docs/plan/` (local maintainer folders; skip if absent).
 
 ## Never
 

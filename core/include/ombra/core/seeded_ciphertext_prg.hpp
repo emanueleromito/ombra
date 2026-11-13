@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
-// Generator 1 of seeded ciphertexts (docs/decisions/0023): BLAKE2xb as shipped in OpenFHE
+// Generator 1 of seeded ciphertexts (file-formats.md): BLAKE2xb as shipped in OpenFHE
 // (utils/prng/blake2.h, exported by libOPENFHEcore). Needs only that one C header, not OpenFHE's
 // C++ headers. For tower t with modulus q of bit length n and block c = 0, 1, ...:
 //   BLAKE2xb(outlen 4096, in = "ombra-seeded-v1" || seed(32) || u32 LE t || u64 LE c, no key)

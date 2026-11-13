@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
-"""Payload of envelope kind 4 (seeded ciphertext, docs/decisions/0023), pure Python.
+"""Payload of envelope kind 4 (seeded ciphertext, file-formats.md), pure Python.
 
 Mirrors core/include/ombra/core/seeded_ciphertext.hpp. The client normally gets these bytes from
 ombra._native; this module reads and writes the layout without OpenFHE, for tests and tools.

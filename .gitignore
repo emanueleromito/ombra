@@ -108,3 +108,9 @@ Thumbs.db
 .claude/worktrees/
 CLAUDE.local.md
 /site/
+
+# Internal planning, decision records and research logs: kept by the maintainers locally, not
+# published. CLAUDE.md explains how agents use them when they are present.
+/docs/plan/
+/docs/decisions/
+/docs/research/

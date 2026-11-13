@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
-// Seeded stored columns (envelope kind 4, docs/decisions/0023) in the storage layer: accepted at
+// Seeded stored columns (envelope kind 4, file-formats.md) in the storage layer: accepted at
 // insert, replace and segment read, structural refusals, kind 2 and kind 4 mixed. Synthetic data:
 // the moduli are odd numbers below 2^60 used only as format inputs, not real RNS primes.
 #include "ombra/core/seeded_ciphertext.hpp"

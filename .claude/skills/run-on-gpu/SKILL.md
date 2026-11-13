@@ -23,7 +23,7 @@ There is no local GPU. All CUDA execution goes through Modal via the Makefile.
 2. Run `make test-gpu`. Read the full output: CMake errors, ctest output, then pytest output.
 3. On failure, fix and rerun. The image is cached, so only your code is rebuilt; if the first run rebuilds OpenFHE, that is expected and takes several minutes.
 4. For benchmarks, run `make bench TASK=<task id>`, then `make results-pull`.
-5. Write a result summary in `docs/plan/results/YYYY-MM-DD-<task>-<gpu>.md` with: the command, git commit (`git rev-parse --short HEAD`), GPU, CUDA and OpenFHE versions (from `make gpu-info`), the parameter set, and the numbers in a table.
+5. Write a result summary (local maintainer folder) in `docs/plan/results/YYYY-MM-DD-<task>-<gpu>.md` with: the command, git commit (`git rev-parse --short HEAD`), GPU, CUDA and OpenFHE versions (from `make gpu-info`), the parameter set, and the numbers in a table.
 
 ## If something goes wrong
 

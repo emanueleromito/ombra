@@ -12,7 +12,7 @@
 //  - Engine.expand: the server's expansion tree (core/include/ombra/core/expansion_tree.hpp with
 //    the CPU operations of core/src/openfhe_expand_ops.hpp), the same levels as the server: no
 //    level is used, every leaf is checked to be at NoiseScaleDeg 1 and Level 0.
-//  - Engine.load_columns also takes seeded columns (envelope kind 4, docs/decisions/0023): the
+//  - Engine.load_columns also takes seeded columns (envelope kind 4, file-formats.md): the
 //    payload (c0', seed) is expanded to the ciphertext (c0', u) with the key tag checked.
 //  - Seeder: the CLIENT side of seeded columns. Built from the context, public key and secret key
 //    as bytes in memory (never written, never logged); encrypts a column with the public key

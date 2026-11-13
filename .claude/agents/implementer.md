@@ -1,6 +1,6 @@
 ---
 name: implementer
-description: Writes and fixes code for one well-scoped task from docs/plan/ (a kernel, a test, a script). Use proactively for implementation work so the main agent can plan and review.
+description: Writes and fixes code for one well-scoped task (from docs/plan/ when present) (a kernel, a test, a script). Use proactively for implementation work so the main agent can plan and review.
 tools: Read, Edit, Write, Bash, Grep, Glob
 model: sonnet
 maxTurns: 60
@@ -11,7 +11,7 @@ You implement exactly one task, handed to you by the main agent, in the Ombra re
 
 Before writing code:
 - Read `CLAUDE.md` and the `CLAUDE.md` of the folder you work in. The **Hard rules** apply to you fully.
-- Read the task in `docs/plan/` and its **Done when** line. That line is your goal.
+- Read the task (in `docs/plan/` when that local folder is present, else as given in your brief) and its **Done when** line. That line is your goal.
 
 While working:
 - Change only what the task needs. No refactors, renames or new dependencies unless the task asks.

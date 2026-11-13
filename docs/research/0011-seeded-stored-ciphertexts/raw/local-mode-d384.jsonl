@@ -1,2 +1,0 @@
-{"d": 384, "n": 10000, "cpus": 12, "preset": "m0_compact_n8192", "clusters": 2, "seeded_columns": false, "data_bytes": 938204534, "create_s": 46.0, "search_s": [1.72, 2.11, 1.69, 1.47, 1.61], "search_median_s": 1.69, "top1_is_source": "5/5"}
-{"d": 384, "n": 10000, "cpus": 12, "preset": "m0_compact_n8192", "clusters": 2, "seeded_columns": true, "data_bytes": 559044854, "create_s": 28.3, "search_s": [1.43, 1.41, 1.35, 1.25, 1.29], "search_median_s": 1.35, "top1_is_source": "5/5"}

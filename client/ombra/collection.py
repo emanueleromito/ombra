@@ -236,7 +236,7 @@ class KeyKit:
         return self.encrypt_columns([values])[0]
 
     def encrypt_columns(self, columns: Sequence[np.ndarray]) -> list[bytes]:
-        """Stored columns as envelopes: seeded (kind 4, half the bytes, docs/decisions/0023) when
+        """Stored columns as envelopes: seeded (kind 4, half the bytes, file-formats.md) when
         ombra._native is installed and OMBRA_SEEDED is not "0", else ordinary ciphertexts
         (kind 2). Queries never go through here; they stay ordinary ciphertexts."""
         import openfhe as ofhe

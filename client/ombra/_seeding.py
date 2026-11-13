@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
-"""Seeded stored columns (docs/decisions/0023), client side: worker processes around ombra._native.
+"""Seeded stored columns (file-formats.md), client side: worker processes around ombra._native.
 
 The compiled module is never imported by the client process (it holds the secret key through the
 openfhe-python wheel, and one process must not hold two OpenFHE copies). A small pool of spawned

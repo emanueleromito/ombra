@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
-// ombra_seeded_exact: exact test of seeded stored ciphertexts (docs/decisions/0023) against
+// ombra_seeded_exact: exact test of seeded stored ciphertexts (file-formats.md) against
 // OpenFHE. Synthetic data; keys are made in this process and never written; the only output is
 // pass/fail lines and, in `kat` mode, generator words of public seeds (no secrets).
 //

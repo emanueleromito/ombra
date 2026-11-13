@@ -9,19 +9,20 @@ Ombra is a vector database with fully homomorphic encryption (FHE): vectors, que
 Background, in this order:
 1. `docs/product-requirements.md`: what we build and why, design decisions for users
 2. `docs/architecture.md`: how it is built
-3. `docs/decisions/`: one file per decision, with the reasoning
-4. `docs/plan/`: milestones and the current tasks
+3. `docs/site/`: the user documentation (MkDocs), including the roadmap
 
-**Current stage:** milestone M2, the minimal server (`docs/plan/m2-server.md`), with M3 (`docs/plan/m3-client.md`) next. M1 is done (`docs/plan/results/m1-report.md`); M0 findings are in `docs/plan/results/spike-report.md`. Build only what the current M2 task asks for.
+**Maintainer folders, local only.** `docs/plan/` (milestones, tasks, results), `docs/decisions/` (one file per decision) and `docs/research/` (experiment logs) are kept by the maintainers on their own machines and are not in the public repository (`.gitignore` lists them). When they are present, read the current milestone in `docs/plan/` and the relevant decisions before you work. When they are absent, work from the public docs above and the code, and ask the maintainer for the task.
+
+**Current stage:** release preparation for 0.1.0.
 
 ## Layout
 
 | Folder | Language | Purpose |
 | --- | --- | --- |
 | `core/` | C++20 / CUDA | CUDA kernels; reading and writing OpenFHE's ciphertext format |
-| `server/` | C++20 | gRPC API, storage, clustering, GPU scheduling (not started) |
+| `server/` | C++20 | gRPC API, storage, clustering, GPU scheduling |
 | `client/` | Python 3.11+ | keys, encryption (openfhe-python), top-k, re-ranking |
-| `integrations/` | Python | LangChain and LlamaIndex adapters (not started) |
+| `integrations/` | Python | LangChain adapter (LlamaIndex planned) |
 | `tests/` | Python + C++ | cross-component and end-to-end tests |
 | `modal_app.py` | Python | GPU environment on Modal |
 
@@ -102,12 +103,12 @@ Rules for the main session:
 
 ## How to work on a task
 
-1. Pick the task in `docs/plan/`. Its "Done when" line is the acceptance test.
+1. Pick the task in `docs/plan/` (maintainers only, see above), or the task the maintainer gave you. Its "Done when" line is the acceptance test.
 2. Write or update the test first when possible.
 3. Implement, then run `make test` (and `make test-gpu` for anything in `core/`).
 4. Iterate until the "Done when" condition holds. Do not mark a task done on a partial result.
-5. If you make a design choice not already in `docs/`, add a short file in `docs/decisions/` (copy `docs/decisions/template.md`). Agents mark a decision "proposed" only; the user accepts or rejects it, and an agent never changes a status to "accepted" or "rejected".
-6. Record benchmark numbers in `docs/plan/results/`, never only in chat.
+5. If you make a design choice not already in `docs/`, add a short file in `docs/decisions/` (copy `docs/decisions/template.md`; local only, so it is not committed). Agents mark a decision "proposed" only; the user accepts or rejects it, and an agent never changes a status to "accepted" or "rejected".
+6. Record benchmark numbers in `docs/plan/results/` (local) and, when they are public, in `docs/site/performance/` with their source; never only in chat.
 
 ## Do not
 

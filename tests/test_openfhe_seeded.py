@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
-"""SEED-1: seeded stored ciphertexts (docs/decisions/0023) against OpenFHE, CPU only.
+"""SEED-1: seeded stored ciphertexts (file-formats.md) against OpenFHE, CPU only.
 
 Runs the C++ test `ombra_seeded_exact` (client/native/seeded_test.cpp) once per preset of
 core/params/ckks_presets.json, parameters read through ombra.params:

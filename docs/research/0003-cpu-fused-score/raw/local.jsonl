@@ -1,6 +1,0 @@
-{"ring_dim": 8192, "d": 384, "threads": 1, "towers": 3, "words_compared": 73728, "fused_exact": true, "karatsuba_exact": true, "baseline_ms": 137.452, "fused_ms": 38.003, "karatsuba_ms": 26.416}
-{"ring_dim": 8192, "d": 768, "threads": 1, "towers": 3, "words_compared": 73728, "fused_exact": true, "karatsuba_exact": true, "baseline_ms": 252.286, "fused_ms": 75.195, "karatsuba_ms": 48.703}
-{"ring_dim": 16384, "d": 384, "threads": 1, "towers": 3, "words_compared": 147456, "fused_exact": true, "karatsuba_exact": true, "baseline_ms": 268.325, "fused_ms": 84.068, "karatsuba_ms": 55.785}
-{"ring_dim": 8192, "d": 384, "threads": 4, "towers": 3, "words_compared": 73728, "fused_exact": true, "karatsuba_exact": true, "baseline_ms": 59.502, "fused_ms": 13.498, "karatsuba_ms": 10.522}
-{"ring_dim": 8192, "d": 768, "threads": 4, "towers": 3, "words_compared": 73728, "fused_exact": true, "karatsuba_exact": true, "baseline_ms": 105.138, "fused_ms": 28.344, "karatsuba_ms": 18.247}
-{"ring_dim": 16384, "d": 384, "threads": 4, "towers": 3, "words_compared": 147456, "fused_exact": true, "karatsuba_exact": true, "baseline_ms": 139.208, "fused_ms": 31.906, "karatsuba_ms": 25.257}

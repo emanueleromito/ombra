@@ -5,7 +5,7 @@ Little-endian layout, mirrored by core/include/ombra/core/file_envelope.hpp:
   magic "OMBR" | u16 version (1, or 2 which adds kind 4) | u16 kind | u16 preset length | preset |
   u16 OpenFHE version length | OpenFHE version | u64 payload length | payload (file ends here)
 Kinds: 1 context, 2 ciphertext, 3 public evaluation key, 4 seeded ciphertext (version 2 only; its
-payload is described in docs/decisions/0023). Writers emit version 1 for kinds 1-3 and version 2 for
+payload is described in file-formats.md). Writers emit version 1 for kinds 1-3 and version 2 for
 kind 4; readers accept version 1 (kinds 1-3) and version 2 (kinds 1-4). There is no kind for a
 secret key (the secret key never leaves the client). No OpenFHE dependency.
 """

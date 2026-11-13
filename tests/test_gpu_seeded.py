@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
-"""SEED-2: seeded stored columns (docs/decisions/0023) through the real gRPC server.
+"""SEED-2: seeded stored columns (file-formats.md) through the real gRPC server.
 
 Synthetic data, d = 384 on the "fast" preset. The same small collection is created twice on one
 server, once with OMBRA_SEEDED=0 (kind 2 columns) and once seeded (kind 4). The server loads the

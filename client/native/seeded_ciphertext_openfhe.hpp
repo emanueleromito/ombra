@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
-// OpenFHE part of seeded stored ciphertexts (docs/decisions/0023). Lives in client/native, NOT in
+// OpenFHE part of seeded stored ciphertexts (file-formats.md). Lives in client/native, NOT in
 // core/: make_seeded takes the secret key, and core/ never touches it (core/CLAUDE.md). The pure
 // format and the generator are in core/include/ombra/core/seeded_ciphertext*.hpp.
 //

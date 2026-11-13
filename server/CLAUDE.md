@@ -1,10 +1,10 @@
 # server/ rules
 
-C++20. gRPC data API, REST admin API, storage, clustering metadata and GPU scheduling. **Not started:** work here only when a task in `docs/plan/` asks for it.
+C++20. gRPC data API, REST health and metrics endpoints, storage, clustering metadata and GPU scheduling. Work here when a task asks for it.
 
 ## Design to follow
 
-See `docs/architecture.md`: router plus sharded nodes, clusters as the unit of distribution, query batching per node, segment files plus write-ahead log plus catalog database, a GPU memory cache, and one two-way gRPC stream per search.
+See `docs/architecture.md`: one server per machine (a router and several nodes are planned), clusters as the unit of distribution, segment files plus write-ahead log plus catalog database, a GPU memory cache, and one two-way gRPC stream per search.
 
 ## Rules
 

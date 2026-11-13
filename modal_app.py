@@ -294,7 +294,7 @@ def bench_e2e(extra: str = "") -> None:
     volume.commit()
 
 
-# ---- GPU families beyond Ampere (research: docs/research/, proposal in docs/decisions/) -------
+# ---- GPU families beyond Ampere ----------------------------------------------------------
 # One build on CPUs, many runs on GPUs. `prebuild` compiles the tree once for every listed
 # architecture on a CPU-only container (nvcc needs no GPU) and stores the build directory in the
 # volume; `gpu_run` restores it on the GPU asked for and runs commands. A GPU container therefore

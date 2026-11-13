@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
-"""SEED-1, client and local mode: seeded stored columns (docs/decisions/0023) end to end.
+"""SEED-1, client and local mode: seeded stored columns (file-formats.md) end to end.
 
 CPU only, synthetic data, d = 384 on the "fast" preset (m0_compact_n8192). Checks: (a) a collection
 created seeded answers like the same data created with OMBRA_SEEDED=0 (plain, filtered, after a
