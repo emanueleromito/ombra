@@ -436,6 +436,17 @@ def _skip_core(p: Path) -> bool:
     return not keep
 
 
+def _client_ignore(p: Path) -> bool:
+    # Paths are relative to client/. Same secret and data patterns as the main image, plus the
+    # folders the install does not need.
+    from modal_upload import is_unsafe
+
+    s = str(p)
+    return is_unsafe(s) or any(
+        x in s for x in ("__pycache__", ".pytest_cache", "tests", ".ruff_cache", "_native.cpython")
+    )
+
+
 local_install_image = (
     modal.Image.from_registry("ubuntu:24.04", add_python="3.12")  # libstdc++ of GCC 13+
     .apt_install("git", "build-essential", "cmake", "ninja-build", "libomp-dev")
@@ -454,10 +465,7 @@ local_install_image = (
         "client",
         remote_path="/work/client",
         copy=True,
-        ignore=lambda p: any(
-            s in str(p)
-            for s in ("__pycache__", ".pytest_cache", "tests", ".ruff_cache", "_native.cpython")
-        ),
+        ignore=_client_ignore,
     )
     .add_local_file("tests/local_install_check.py", "/work/local_install_check.py", copy=True)
     .run_commands(
