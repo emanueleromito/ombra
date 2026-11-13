@@ -87,3 +87,12 @@ def test_images_carry_the_source_and_license_labels():
         assert (
             'LABEL org.opencontainers.image.source="https://github.com/erailabs/ombra"' in text
         ), path
+
+
+def test_packaged_third_party_licenses_match_the_root_ones():
+    # client/licenses/ is a subset of licenses/ with the same file names; keep the texts equal.
+    root = ROOT / "licenses"
+    copies = sorted((ROOT / "client" / "licenses").glob("*.txt"))
+    assert copies, "client/licenses/ is expected"
+    for copy in copies:
+        assert copy.read_bytes() == (root / copy.name).read_bytes(), f"{copy} differs from licenses/"

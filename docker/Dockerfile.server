@@ -39,7 +39,7 @@ COPY CMakeLists.txt /src/CMakeLists.txt
 COPY core /src/core
 COPY server /src/server
 COPY proto /src/proto
-RUN cmake -S /src -B /build -DCMAKE_BUILD_TYPE=Release -DOMBRA_ENABLE_CUDA=ON \
+RUN cmake -S /src -B /build -DCMAKE_BUILD_TYPE=Release -DOMBRA_ENABLE_CUDA=ON -DOMBRA_ENABLE_TEST_HOOKS=OFF \
         "-DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCHS}" \
     && cmake --build /build -j --target ombra_server
 
