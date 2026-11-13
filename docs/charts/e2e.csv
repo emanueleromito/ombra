@@ -1,0 +1,9 @@
+preset,n_vectors,filter,total_p50_ms,total_p95_ms,source
+balanced,100k,none,94,106,2026-11-10-t2.10-e2e-bench.md
+balanced,100k,2 fields,92,104,2026-11-10-t2.10-e2e-bench.md
+balanced,1M,none,16231,53875,2026-11-10-t2.10-e2e-bench.md
+balanced,1M,2 fields,4544,30928,2026-11-10-t2.10-e2e-bench.md
+fast,100k,none,54,5430,2026-11-10-t2.10-e2e-bench.md
+fast,100k,2 fields,54,58,2026-11-10-t2.10-e2e-bench.md
+fast,1M,none,8000,18038,2026-11-10-t2.10-e2e-bench.md
+fast,1M,2 fields,79,13581,2026-11-10-t2.10-e2e-bench.md
