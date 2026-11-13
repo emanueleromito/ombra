@@ -9,7 +9,7 @@ pyarrow==17.0.0
 grpcio
 grpcio-tools
 protobuf
-cryptography
+cryptography==50.0.2
 langchain-core
 langchain-tests
 ruff

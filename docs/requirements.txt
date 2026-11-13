@@ -7,3 +7,6 @@ mkdocs-macros-plugin==1.5.0
 # mkdocstrings[python]: the Python API reference, generated from the docstrings in client/ombra/.
 mkdocstrings[python]==1.0.8
 mkdocstrings-python==2.0.11
+# cryptography: lets the macros import ombra.documents and ombra.keyfile, so pages read the blob and
+# key-file format constants (sizes, KDF cost) from the code.
+cryptography==50.0.2
