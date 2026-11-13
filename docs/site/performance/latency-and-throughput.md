@@ -1,8 +1,5 @@
 # Latency and throughput
 
-!!! note "Some numbers are pending a new benchmark run on the current code."
-    Figures from before the one-tower decrypt, in-place query expansion and seeded storage were removed. The A10 figures are TBD until they are rerun.
-
 Synthetic vectors are used for the speed runs. The server and the client run on the same machine, so the network is not in the times unless a line says otherwise. Latency means the whole query as a user sees it: the client encrypts the query, the server searches, the client decrypts and ranks.
 
 Two names first. Balanced is the default preset (ring dimension {{ preset("balanced", "ring_dim") }}, {{ preset("balanced", "batch_size") }} vectors per ciphertext). Fast is the smaller preset (ring dimension {{ preset("fast", "ring_dim") }}, {{ preset("fast", "batch_size") }} vectors per ciphertext). "Searched" below is the share of the collection the second search stage reads.
@@ -97,4 +94,16 @@ Sending several queries together helps the search kernel: four queries at once r
 
 ## On an A10
 
-The A10 numbers on filtered queries over real text embeddings (Fast, d = 384, 10,003 vectors in 6 clusters) were measured before the changes above and are TBD until they are rerun. Recall under encryption matched plaintext recall in those runs. The accuracy pages have the numbers.
+Filtered queries over real text embeddings on an A10 (24 GB): the banking77 dataset, 10,003 vectors embedded with all-MiniLM-L6-v2 at d = 384, 6 clusters, Fast preset, 200 queries per row, 16 GB GPU and 8 GB host budget (`core/bench/filtered_recall.py`). "Clustered" filters pick values that sit in few clusters, "spread" filters pick values found in every cluster.
+
+| Filter | Share of vectors that match | Clusters searched | Mean latency | p95 |
+| --- | --- | --- | --- | --- |
+| none | 100% | 3 | 112 ms | 79 ms |
+| clustered | 1.2% | 1 | 59 ms | 62 ms |
+| clustered | 8.0% | 4 | 74 ms | 78 ms |
+| clustered | 40.5% | 6 | 84 ms | 88 ms |
+| spread | 1.0% | 6 | 89 ms | 113 ms |
+| spread | 8.1% | 6 | 82 ms | 85 ms |
+| spread | 40.1% | 6 | 83 ms | 89 ms |
+
+The unfiltered mean is above its p95 because a few queries were much slower than the rest; the p95 is the better guide there. Recall under encryption equals plaintext recall with the same clusters in every row: 0.999 without a filter and 1.000 with one. The accuracy pages have the recall numbers.

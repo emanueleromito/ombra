@@ -58,6 +58,18 @@ Recall gaps 0.000 at 1, 2 and 4 probes. The collection is about 1.5x the GPU plu
 
 Throughput figures on the pages are derived: 1 / median latency of the e2e-latency grid (2.5 to 15.8 queries per second, client included) and 1 / median server time (8.2 to 30.7).
 
-## Not run
+## A10: filtered recall and latency on banking77
 
-A10 rows (no ready entry point in `modal_app.py`).
+`modal run modal_app.py::on_gpu --gpu a10 --cmd "pip install --quiet sentence-transformers ;; OMBRA_GPU_BUDGET_MB=16000 OMBRA_HOST_BUDGET_MB=8000 python core/bench/filtered_recall.py --out /data/results --datasets /data/datasets/filtered-recall --dataset banking77 --queries 200 --preset fast"` after `prebuild` (Release). The default 30 GB GPU budget does not fit the A10 (cudaMalloc out of memory at start). Fast, 10,003 vectors, 6 clusters, 200 queries per cell. Modal spend about $0.40.
+
+| filter | share | clusters | mean ms | p95 ms | recall@10 (enc = plaintext) |
+| --- | --- | --- | --- | --- | --- |
+| none | 100% | 3 | 112.0 | 79.3 | 0.999 |
+| clustered | 1.2% | 1 | 59.2 | 62.1 | 1.000 |
+| clustered | 8.0% | 4 | 74.0 | 78.1 | 1.000 |
+| clustered | 40.5% | 6 | 84.2 | 88.1 | 1.000 |
+| spread | 1.0% | 6 | 88.6 | 112.8 | 1.000 |
+| spread | 8.1% | 6 | 81.6 | 84.9 | 1.000 |
+| spread | 40.1% | 6 | 83.5 | 89.0 | 1.000 |
+
+Earlier (T3.11 A10 confirmation, before the speedups): 70 to 148 ms mean.
