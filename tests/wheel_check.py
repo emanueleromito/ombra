@@ -6,7 +6,9 @@ It proves, with synthetic data only, that:
      openfhe-python (so the expansion is the C++ OpenFHE tree of core/, not a Python one);
   2. a tiny encrypted search in local mode finds the source vector;
   3. the score blocks come back at ciphertext level 1, the level the GPU server's search leaves
-     them at (the expansion uses no level): same number of levels as the server.
+     them at (the expansion uses no level): same number of levels as the server;
+  4. both collection builds leave faiss out of this process (it runs in its own child process),
+     while openfhe-python is loaded here: on macOS two libomp copies in one process abort.
 
 The same level is asserted against the server's by tests/test_gpu_local_parity.py (Modal, GPU).
 Needs openfhe-python 1.6.1 in the environment (it is the client's own dependency for keys).
@@ -14,6 +16,7 @@ Needs openfhe-python 1.6.1 in the environment (it is the client's own dependency
 
 from __future__ import annotations
 
+import sys
 import tempfile
 from pathlib import Path
 
@@ -53,6 +56,8 @@ def main() -> None:
             )
             mods = client._core._t.modules_loaded()
             assert mods == {"openfhe_loaded": False, "native_loaded": True}, mods
+            # faiss runs in its own child process: two libomp copies in one process abort on macOS.
+            assert "faiss" not in sys.modules, "faiss was imported in the client process"
             hits = client.search("tiny", x[5], k=3)
             assert hits[0].id == "v5" and abs(hits[0].score - 1.0) < 1e-5, hits
         finally:
@@ -87,6 +92,7 @@ def main() -> None:
             p.write_bytes(env.payload)
             ct, ok = ofhe.DeserializeCiphertext(str(p), ofhe.BINARY)
             assert ok and ct.GetLevel() == SERVER_RESULT_LEVEL, ct.GetLevel()
+            assert "faiss" not in sys.modules, "faiss was imported in the client process"
             col.close()
         finally:
             transport.close()
