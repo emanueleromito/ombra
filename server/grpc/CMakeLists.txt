@@ -21,7 +21,8 @@ foreach(_i RANGE ${_last})
   string(JSON _batch GET ${_presets_json} presets ${_name} batch_size)
   string(JSON _first GET ${_presets_json} presets ${_name} first_mod_size)
   string(JSON _scale GET ${_presets_json} presets ${_name} scaling_mod_size)
-  string(APPEND _entries "    {\"${_name}\", ${_ring}, ${_batch}, ${_first}, ${_scale}},\n")
+  string(JSON _depth GET ${_presets_json} presets ${_name} multiplicative_depth)
+  string(APPEND _entries "    {\"${_name}\", ${_ring}, ${_batch}, ${_first}, ${_scale}, ${_depth}},\n")
 endforeach()
 set(_gen_dir ${CMAKE_CURRENT_BINARY_DIR}/gen)
 file(WRITE ${_gen_dir}/preset_table.hpp.tmp
@@ -44,8 +45,14 @@ target_link_libraries(server_policy_test PRIVATE ombra_server_policy)
 add_test(NAME server_policy COMMAND server_policy_test)
 
 # ---- API keys, metrics, HTTP parsing: plain C++ (own SHA-256, no OpenSSL), CPU tests ---------
-add_library(ombra_server_admin STATIC src/auth.cpp src/metrics.cpp src/http.cpp)
+add_library(ombra_server_admin STATIC src/auth.cpp src/metrics.cpp src/http.cpp src/limits.cpp)
 target_include_directories(ombra_server_admin PUBLIC include)
+find_package(Threads REQUIRED)
+target_link_libraries(ombra_server_admin PUBLIC Threads::Threads)
+
+add_executable(server_limits_test tests/limits_test.cpp)
+target_link_libraries(server_limits_test PRIVATE ombra_server_admin)
+add_test(NAME server_limits COMMAND server_limits_test)
 
 add_executable(server_admin_test tests/admin_test.cpp)
 target_link_libraries(server_admin_test PRIVATE ombra_server_admin)

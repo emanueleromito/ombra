@@ -47,6 +47,22 @@ int main() {
   expect_refused(c, 16384, 280, 279, "extra limit just below");
   expect_ok(c, 16384, 280, 280, "extra limit equal");
   expect_refused(c, 16384, 500, 100000, "huge extra limit never accepts more");
+  // Secret key distribution: ternary and Gaussian pass; sparse or unknown refuse.
+  try {
+    check_security_floor(c, 16384, 280, 0, SecretDist::kUniformTernary);
+    check_security_floor(c, 16384, 280, 0, SecretDist::kGaussian);
+  } catch (const std::exception& e) {
+    std::printf("FAIL (should accept ternary and gaussian): %s\n", e.what());
+    ++failures;
+  }
+  for (auto d : {SecretDist::kSparseTernary, SecretDist::kOther}) {
+    try {
+      check_security_floor(c, 16384, 280, 0, d);
+      std::printf("FAIL (should refuse a weak secret distribution)\n");
+      ++failures;
+    } catch (const std::invalid_argument&) {
+    }
+  }
   if (failures) {
     std::printf("security_floor_test: %d failures\n", failures);
     return 1;

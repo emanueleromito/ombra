@@ -33,8 +33,8 @@ pytestmark = pytest.mark.gpu
 PRESETS = ["m0_depth2", "m0_compact_n8192"]
 SEED = 20260110  # same seed and data as test_gpu_filter_mask.py
 
-# Max |decrypted slot - (stored @ q) * mask|. Same agreed bound as the other GPU tests; do not
-# loosen.
+# Max |decrypted slot - (stored @ q) * mask|. Same agreed bound as the other GPU tests. Do not
+# loosen TOLERANCE; the compact preset has its own, deliberately looser COMPACT_SANITY_BOUND below.
 TOLERANCE = 1e-6
 # m0_compact_n8192 is known to miss 1e-6 at d >= 384 (3.5e-6 to 6.3e-6; here up to 7.6e-6 on
 # the CPU result too). The GPU output is bit-identical to OpenFHE's, so this is the preset's own

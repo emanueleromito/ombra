@@ -59,6 +59,10 @@ target_include_directories(ombra_rns_cuda PUBLIC include PRIVATE kernels src)
 # this file needs nothing beyond C++17 device code.
 set_target_properties(ombra_rns_cuda PROPERTIES CUDA_SEPARABLE_COMPILATION OFF CUDA_STANDARD 17)
 
+if(OMBRA_ENABLE_TEST_HOOKS)
+  set_source_files_properties(src/security_floor.cpp PROPERTIES COMPILE_DEFINITIONS
+                                                                 OMBRA_ENABLE_TEST_HOOKS)
+endif()
 add_library(ombra_core STATIC src/ciphertext_ops.cpp src/expansion_gpu.cpp src/gpu_search.cpp
                       src/security_floor.cpp)
 target_include_directories(

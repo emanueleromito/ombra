@@ -61,6 +61,9 @@ int main(int argc, char** argv) {
     const std::size_t dims = std::stoul(argv[4]);
     const std::size_t blocks = std::stoul(argv[5]);
     const std::size_t nq = std::stoul(argv[6]);
+    if (dims == 0 || blocks == 0 || nq == 0) {
+      throw std::invalid_argument("dims, blocks and queries must be positive");
+    }
     CryptoContext<DCRTPoly> cc;
     if (!Serial::DeserializeFromFile(argv[1], cc, SerType::BINARY)) {
       throw std::runtime_error("cannot read crypto context");

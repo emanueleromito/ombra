@@ -110,6 +110,29 @@ static void test_key_file() {
   CHECK(store.verify(tr)->scope == Scope::Read && store.verify(ta)->scope == Scope::Admin);
   CHECK(!store.verify("") && !store.verify(tr + "0") && !store.verify(tr.substr(1)));
 
+  // Reload (SIGHUP): a changed file takes effect, a broken file keeps the loaded keys.
+  {
+    ApiKeyStore live = ApiKeyStore::load(path);
+    const std::string tnew = create_api_key(d, Scope::Read);
+    CHECK(!live.verify(tnew));
+    live.reload(path);
+    CHECK(live.size() == 4 && live.verify(tnew));
+    const std::string saved = slurp(path);
+    { std::ofstream(path) << "OMBRA-API-KEYS v1\nnot a key line\n"; }
+    ::chmod(path.c_str(), 0600);
+    bool reload_threw = false;
+    try {
+      live.reload(path);
+    } catch (const std::exception&) {
+      reload_threw = true;
+    }
+    CHECK(reload_threw && live.size() == 4 && live.verify(tnew));
+    { std::ofstream(path) << saved; }
+    ::chmod(path.c_str(), 0600);
+    // Revocation: a file without the new key.
+    CHECK(slurp(path) == saved);
+  }
+
   // authorize(): header parsing and scope checks.
   CHECK(authorize(&store, "", Scope::Read) == AuthResult::Unauthenticated);
   CHECK(authorize(&store, tr, Scope::Read) == AuthResult::Unauthenticated);  // no "Bearer "

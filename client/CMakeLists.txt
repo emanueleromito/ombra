@@ -65,7 +65,7 @@ set_target_properties(ombra_native_exact PROPERTIES INSTALL_RPATH "${OpenFHE_LIB
 
 # Exact test of seeded stored ciphertexts (SEED-1, docs/decisions/0023) against OpenFHE; run by
 # tests/test_openfhe_seeded.py. Not installed.
-add_executable(ombra_seeded_exact native/seeded_test.cpp)
+add_executable(ombra_seeded_exact native/seeded_test.cpp "${OMBRA_CORE_DIR}/src/security_floor.cpp")
 target_include_directories(
   ombra_seeded_exact PRIVATE native "${OMBRA_CORE_DIR}/include" ${OpenFHE_INCLUDE}
                              ${OpenFHE_INCLUDE}/third-party/include ${OpenFHE_INCLUDE}/core

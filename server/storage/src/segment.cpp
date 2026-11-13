@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 #include "ombra/storage/segment.hpp"
 
+#include <cmath>
 #include <stdexcept>
 
 #include "ombra/core/file_envelope.hpp"
@@ -18,6 +19,22 @@ void check_column_envelope(const std::uint8_t* data, std::size_t size,
   // Kind 4: only the cheap structural check; the word range is checked when the block is loaded.
   if (env.kind == ombra::core::EnvelopeKind::SeededCiphertext)
     ombra::core::check_seeded_header(env.payload);
+}
+
+void check_column_for_insert(const std::uint8_t* data, std::size_t size,
+                             const std::string& expected_preset,
+                             const std::string& expected_openfhe_version,
+                             const ColumnExpect& expect) {
+  const auto env =
+      ombra::core::read_column_envelope(data, size, expected_preset, expected_openfhe_version);
+  if (env.kind != ombra::core::EnvelopeKind::SeededCiphertext) return;  // kind 2: opaque payload
+  const auto p = ombra::core::read_seeded_payload(env.payload);         // also checks the words
+  if (p.key_tag != expect.key_tag)
+    throw std::runtime_error("seeded column was made under another key than the collection's");
+  if ((expect.ring_dim != 0 && p.ring_dim != expect.ring_dim) ||
+      (expect.slots != 0 && p.slots != expect.slots) || p.level != 0 || p.noise_scale_deg != 1 ||
+      !std::isfinite(p.scaling_factor) || !(p.scaling_factor > 1.0))
+    throw std::runtime_error("seeded column has an unexpected ring, slots, level or scale");
 }
 
 namespace {

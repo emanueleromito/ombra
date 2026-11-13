@@ -575,6 +575,19 @@ bool Catalog::get_blob(const std::string& collection, std::uint32_t kind, const 
   return true;
 }
 
+void Catalog::blob_totals(const std::string& collection, std::uint64_t* count,
+                          std::uint64_t* bytes) const {
+  Stmt q(db_, "SELECT COUNT(*), COALESCE(SUM(size),0) FROM blobs WHERE collection=?");
+  q.text(1, collection);
+  std::uint64_t n = 0, b = 0;
+  if (q.step()) {
+    n = static_cast<std::uint64_t>(q.col_num(0));
+    b = static_cast<std::uint64_t>(q.col_num(1));
+  }
+  if (count) *count = n;
+  if (bytes) *bytes = b;
+}
+
 std::vector<std::string> Catalog::delete_blobs(const std::string& collection, std::uint32_t kind,
                                                const std::vector<std::string>& ids) {
   Tx tx(db_);

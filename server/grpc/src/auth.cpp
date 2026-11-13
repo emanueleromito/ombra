@@ -2,6 +2,7 @@
 #include "ombra/server/auth.hpp"
 
 #include <fcntl.h>
+#include <sys/file.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -241,6 +242,7 @@ ApiKeyStore ApiKeyStore::load(const std::string& path) {
   if (!std::getline(in, line) || line != kHeader)
     throw std::runtime_error("the API key file has an unknown version header");
   ApiKeyStore store;
+  auto entries = std::make_shared<Entries>();
   while (std::getline(in, line)) {
     if (line.empty()) continue;
     std::istringstream ls(line);
@@ -251,14 +253,29 @@ ApiKeyStore ApiKeyStore::load(const std::string& path) {
     if (!from_hex(salt_hex, e.salt.data(), e.salt.size()) ||
         !from_hex(hash_hex, e.hash.data(), e.hash.size()) || !parse_scope(scope_s, &e.scope))
       throw std::runtime_error("malformed line in the API key file");
-    store.entries_.push_back(e);
+    entries->push_back(e);
   }
+  store.entries_ = std::move(entries);
   return store;
+}
+
+std::shared_ptr<const ApiKeyStore::Entries> ApiKeyStore::snapshot() const {
+  std::lock_guard lk(*mu_);
+  return entries_;
+}
+
+std::size_t ApiKeyStore::size() const { return snapshot()->size(); }
+
+void ApiKeyStore::reload(const std::string& path) {
+  ApiKeyStore fresh = load(path);  // throws: the old keys stay
+  std::lock_guard lk(*mu_);
+  entries_ = std::move(fresh.entries_);
 }
 
 std::optional<Verified> ApiKeyStore::verify(std::string_view token) const {
   std::optional<Verified> found;
-  for (const Entry& e : entries_) {
+  const auto entries = snapshot();
+  for (const Entry& e : *entries) {
     const auto h = salted_hash(e.salt, token);
     const bool match = constant_time_equal(h.data(), e.hash.data(), h.size());
     if (match && !found) found = Verified{to_hex(e.hash.data(), 4), e.scope};
@@ -270,6 +287,15 @@ std::string create_api_key(const std::string& data_dir, Scope scope, std::string
   namespace fs = std::filesystem;
   fs::create_directories(data_dir);
   const std::string path = ApiKeyStore::path_in(data_dir);
+  // One creator at a time: the read-modify-write below would otherwise lose a concurrent key.
+  struct Lock {
+    int fd;
+    ~Lock() {
+      if (fd >= 0) ::close(fd);  // closing releases the flock
+    }
+  } lock{::open((path + ".lock").c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0600)};
+  if (lock.fd < 0 || ::flock(lock.fd, LOCK_EX) != 0)
+    throw std::runtime_error("cannot lock the API key file");
   std::string content;
   if (fs::exists(path)) {
     std::ifstream in(path);

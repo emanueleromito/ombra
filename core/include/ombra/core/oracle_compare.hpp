@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
-// The one exact ciphertext comparator the oracle drivers share (review finding F5).
+// The one exact ciphertext comparator the oracle drivers share.
 //
 // Compares everything a GPU result must carry to equal OpenFHE's: level, noise-scale degree,
 // scaling factor, key tag, encoding type, slots, number of components, format, moduli and every

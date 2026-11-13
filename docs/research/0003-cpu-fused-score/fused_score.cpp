@@ -27,6 +27,7 @@
 #include <random>
 #include <vector>
 
+#include "ombra/core/security_floor_context.hpp"
 #include "openfhe.h"
 
 using namespace lbcrypto;
@@ -222,6 +223,7 @@ int main(int argc, char** argv) {
   const int reps = std::stoi(argv[8]);
   const u64 seed = std::stoull(argv[9]);
   auto cc = GenCryptoContext(p);
+  ombra::core::require_security_floor(cc);  // hard rule 1: never below the 128-bit floor
   cc->Enable(PKE);
   cc->Enable(KEYSWITCH);
   cc->Enable(LEVELEDSHE);
