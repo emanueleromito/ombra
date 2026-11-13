@@ -5,6 +5,7 @@ PYTHON      ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 BUILD_DIR   ?= build
 CUDA_ARCHS  ?= 75;80;86;89;90
 TASK        ?= all
+RESULTS_DIR ?= results-raw
 BUILD_TYPE  ?= Release
 GPU         ?= a10
 CMD         ?= nvidia-smi
@@ -15,9 +16,10 @@ CMD         ?= nvidia-smi
 help: ## List commands
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-14s %s\n", $$1, $$2}'
 
-venv: ## Create .venv with pytest and ruff
+venv: ## Create .venv with pytest, ruff and the docs packages
 	python3 -m venv .venv
 	.venv/bin/python -m pip install --quiet pytest ruff grpcio-tools cryptography numpy
+	.venv/bin/python -m pip install --quiet -r docs/requirements.txt
 
 build: ## Build C++/CUDA locally (needs CUDA)
 	cmake -S . -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=Debug -DOMBRA_ENABLE_CUDA=ON "-DCMAKE_CUDA_ARCHITECTURES=$(CUDA_ARCHS)"
@@ -47,8 +49,7 @@ test-openfhe-local: ## Run tests marked openfhe here, no Modal (needs OpenFHE 1.
 	cp $(BUILD_DIR)-native/_native*.so client/ombra/
 	$(PYTHON) -m pytest -m openfhe -v
 
-bench: ## Run benchmarks on Modal (A100); TASK=t0.4 to pick one
-bench: ## Run benchmarks on Modal (A100); TASK=column-search to pick one
+bench: ## Run benchmarks on Modal (A100); TASK=<name> to pick one
 	modal run modal_app.py::bench --task $(TASK)
 
 prebuild: ## Build once on Modal CPUs for every GPU family (no GPU billed); BUILD_TYPE=Release|Debug
@@ -60,9 +61,9 @@ on-gpu: ## Run CMD on one GPU family from the prebuilt binaries; GPU=t4|a10|a100
 gpu-info: ## Check GPU, CUDA and OpenFHE in the Modal image (A10)
 	modal run modal_app.py::gpu_info
 
-results-pull: ## Copy benchmark results from the Modal volume into docs/plan/results/raw/
-	mkdir -p docs/plan/results/raw
-	modal volume get --force ombra-data results docs/plan/results/raw
+results-pull: ## Copy benchmark results from the Modal volume into $(RESULTS_DIR)/
+	mkdir -p $(RESULTS_DIR)
+	modal volume get --force ombra-data results $(RESULTS_DIR)
 
 fmt: ## Format C++/CUDA (clang-format) and Python (ruff)
 	@files=$$(git ls-files '*.cpp' '*.hpp' '*.h' '*.cu' '*.cuh'); [ -z "$$files" ] || clang-format -i $$files

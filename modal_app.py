@@ -8,7 +8,7 @@ Use the Makefile instead of calling these directly:
     make test-gpu      # build and run GPU tests on an A10
     make test-openfhe  # run tests marked `openfhe` on CPU in the pinned image
     make bench         # build and run benchmarks on an A100
-    make results-pull  # copy benchmark results from the Modal volume to docs/plan/results/raw/
+    make results-pull  # copy benchmark results from the Modal volume to results-raw/
 
 Needs MODAL_TOKEN_ID and MODAL_TOKEN_SECRET in the environment (or `modal token new`).
 """
@@ -95,6 +95,17 @@ def _run(cmd: list[str], cwd: str = REPO_DIR, ok_codes: tuple[int, ...] = (0,)) 
     print("$", " ".join(cmd), flush=True)
     code = subprocess.run(cmd, cwd=cwd).returncode
     if code not in ok_codes:
+        raise SystemExit(f"command failed with exit code {code}: {' '.join(cmd)}")
+
+
+def _run_no_skips(cmd: list[str]) -> None:
+    """Run pytest so that a skipped test fails the run (conftest.py, OMBRA_FAIL_ON_SKIP)."""
+    import os
+
+    print("$", " ".join(cmd), flush=True)
+    env = {**os.environ, "OMBRA_FAIL_ON_SKIP": "1"}
+    code = subprocess.run(cmd, cwd=REPO_DIR, env=env).returncode
+    if code != 0:
         raise SystemExit(f"command failed with exit code {code}: {' '.join(cmd)}")
 
 
@@ -200,10 +211,7 @@ def test_gpu(pytest_args: str = "") -> None:
     _run(["ctest", "--test-dir", BUILD_DIR, "--output-on-failure", "--no-tests=ignore"])
     # Zero collected tests (pytest exit code 5) is a failure: GPU tests exist now. The
     # driver for tests/test_gpu_ciphertext_roundtrip.py is built into BUILD_DIR above.
-    _run(
-        ["python", "-m", "pytest", "-m", "gpu", "-v", "-s", *pytest_args.split()],
-        ok_codes=(0,),
-    )
+    _run_no_skips(["python", "-m", "pytest", "-m", "gpu", "-v", "-s", *pytest_args.split()])
 
 
 # memory: with --expansion-large the C++ expansion driver holds all d = 1536 expanded ciphertexts
@@ -220,7 +228,7 @@ def test_openfhe(pytest_args: str = "") -> None:
     _build("Release", targets=("ombra_expand", "ombra_encoding_check"))
     _build_native()  # local mode runs the compiled expansion in a child process
     cmd = ["python", "-m", "pytest", "-m", "openfhe", "-v", "-s", *pytest_args.split()]
-    _run(cmd, ok_codes=(0,))
+    _run_no_skips(cmd)
     volume.commit()
 
 
@@ -302,7 +310,13 @@ def prebuild(build_type: str = "Release", archs: str = ALL_CUDA_ARCHS, commit: s
     _build_native()
     os.makedirs(BUILD_CACHE, exist_ok=True)
     natives = [str(p) for p in Path(f"{REPO_DIR}/client/ombra").glob("_native*.so")]
-    _run(["tar", "-cf", _cache_tar(build_type), BUILD_DIR, *natives], cwd="/")
+    # Members are relative: the build directory's content, and the native modules by name.
+    _run(["tar", "-cf", _cache_tar(build_type), "-C", BUILD_DIR, "."], cwd="/")
+    _run(
+        ["tar", "-cf", _cache_tar(build_type) + ".native", "-C", f"{REPO_DIR}/client/ombra"]
+        + [Path(n).name for n in natives],
+        cwd="/",
+    )
     Path(_cache_tar(build_type) + ".json").write_text(
         f'{{"commit": "{commit}", "archs": "{archs}", "build_type": "{build_type}"}}\n'
     )
@@ -322,7 +336,14 @@ def gpu_run(cmd: str, build_type: str = "Release", commit: str = "") -> None:
     meta = json.loads(Path(_cache_tar(build_type) + ".json").read_text())
     if commit and meta["commit"] != commit:
         raise SystemExit(f"cached build is from commit {meta['commit']!r}, asked for {commit!r}")
-    _run(["tar", "-xf", _cache_tar(build_type)], cwd="/")
+    # Unpack into the build directory and the client folder only, never into /.
+    os.makedirs(BUILD_DIR, exist_ok=True)
+    _run(["tar", "-xf", _cache_tar(build_type), "-C", BUILD_DIR, "--no-same-owner"], cwd="/")
+    _run(
+        ["tar", "-xf", _cache_tar(build_type) + ".native", "-C", f"{REPO_DIR}/client/ombra"]
+        + ["--no-same-owner"],
+        cwd="/",
+    )
     _run(["nvidia-smi", "--query-gpu=name,memory.total,driver_version", "--format=csv,noheader"])
     out_dir = Path(DATA_DIR) / "results"
     out_dir.mkdir(parents=True, exist_ok=True)
