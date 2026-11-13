@@ -27,7 +27,6 @@ namespace ombra::native {
 using lbcrypto::Ciphertext;
 using lbcrypto::CryptoContext;
 using lbcrypto::DCRTPoly;
-using lbcrypto::Format;
 using lbcrypto::NativeInteger;
 using lbcrypto::NativeVector;
 using lbcrypto::PrivateKey;
