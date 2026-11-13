@@ -7,7 +7,7 @@ numpy
 pytest
 pytest-asyncio
 faiss-cpu
-pyarrow==17.0.0
+pyarrow==26.0.1
 grpcio
 grpcio-tools
 protobuf
