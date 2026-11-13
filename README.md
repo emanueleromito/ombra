@@ -57,7 +57,7 @@ make bench       # benchmarks on Modal (A100)
 Ombra is source-available and dual-licensed. You may use it under either:
 
 1. the [PolyForm Noncommercial License 1.0.0](LICENSE), free for noncommercial use, or
-2. a commercial license, required for any business use, including internal use inside a company. Contact: <CONTACT_LINK_PLACEHOLDER>
+2. a commercial license, required for any business use, including internal use inside a company. Contact: emanuele.romito@erailabs.com
 
 You only need one of them. Source files carry the SPDX identifier `PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial`. The full legal text in [LICENSE](LICENSE) is what counts; this section is a summary.
 

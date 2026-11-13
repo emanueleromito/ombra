@@ -20,4 +20,4 @@ D. PolyForm Noncommercial 1.0.0 in `LICENSE`, with a dual-license header naming 
 
 ## Consequences
 
-We never call the project "open source". Outside contributors must sign a CLA. Full reasoning in [licensing.md](../licensing.md).
+We never call the project "open source". Outside contributors must sign a CLA. The terms are in the root `LICENSE` file.

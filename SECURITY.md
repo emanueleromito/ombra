@@ -4,7 +4,7 @@
 
 Please report vulnerabilities privately. Use GitHub private vulnerability reporting: open the Security tab of this repository and choose "Report a vulnerability". Do not open a public issue or pull request for a security problem.
 
-If you cannot use GitHub, write to emanueleromito@erailabs.com.
+If you cannot use GitHub, write to emanuele.romito@erailabs.com.
 
 Include the version or commit, what you did, what you expected and what happened. A short proof of concept helps. Use synthetic data only; do not send real vectors, queries, documents or keys.
 

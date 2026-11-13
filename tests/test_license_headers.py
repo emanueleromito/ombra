@@ -83,3 +83,9 @@ def test_images_carry_the_source_and_license_labels():
         assert (
             'LABEL org.opencontainers.image.source="https://github.com/erailabs/ombra"' in text
         ), path
+
+
+def test_license_texts_carry_no_placeholder():
+    for name in ("LICENSE", "README.md", "SECURITY.md"):
+        text = (ROOT / name).read_text(encoding="utf-8")
+        assert "PLACEHOLDER" not in text, f"{name} still has a placeholder"
