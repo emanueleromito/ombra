@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 # Builds the CI image (ci/Dockerfile) and pushes it to GHCR, tagged with a hash of the files it is
 # built from. If that tag is already in GHCR the job does nothing, so a normal PR run does not build
-# OpenFHE. Runs when ci/Dockerfile or ci/requirements.txt change on dev, on manual dispatch (use
+# OpenFHE. Pull requests that change the files get a pr<N>- tag of their own and never write the
+# shared tag. Runs when ci/Dockerfile or ci/requirements.txt change on dev, on manual dispatch (use
 # "force" to rebuild the current tag), and as the first job of ci.yml, so a PR that changes the
 # Dockerfile builds its own image before the tests run.
 name: CI image
@@ -37,17 +38,29 @@ jobs:
       contents: read
       packages: write
     outputs:
-      image: ${{ steps.tag.outputs.image }}
+      image: ${{ steps.exists.outputs.image }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
 
+      # The shared tag (hash only) is pushed only from dev, so a pull request cannot replace the image
+      # that dev runs use. Other runs use a prefixed tag of their own, and reuse the shared tag when
+      # it already exists for the same file contents.
       - id: tag
+        env:
+          PR: ${{ github.event.pull_request.number }}
         run: |
           repo=$(echo "ghcr.io/${GITHUB_REPOSITORY_OWNER}/ombra-ci" | tr '[:upper:]' '[:lower:]')
           hash=$(cat ci/Dockerfile ci/requirements.txt | sha256sum | cut -c1-16)
-          echo "image=${repo}:${hash}" >> "$GITHUB_OUTPUT"
+          echo "shared=${repo}:${hash}" >> "$GITHUB_OUTPUT"
+          if [ "${GITHUB_REF}" = "refs/heads/dev" ] && [ "${GITHUB_EVENT_NAME}" != "pull_request" ]; then
+            echo "image=${repo}:${hash}" >> "$GITHUB_OUTPUT"
+          elif [ -n "$PR" ]; then
+            echo "image=${repo}:pr${PR}-${hash}" >> "$GITHUB_OUTPUT"
+          else
+            echo "image=${repo}:manual-${hash}" >> "$GITHUB_OUTPUT"
+          fi
 
       # Pull requests from forks get a read-only token: they can pull the image but not push one.
       - id: can_push
@@ -64,13 +77,20 @@ jobs:
       - id: exists
         env:
           IMAGE: ${{ steps.tag.outputs.image }}
+          SHARED: ${{ steps.tag.outputs.shared }}
           FORCE: ${{ inputs.force }}
         run: |
-          if [ "$FORCE" != true ] && docker manifest inspect "$IMAGE" > /dev/null 2>&1; then
+          if [ "$FORCE" != true ] && docker manifest inspect "$SHARED" > /dev/null 2>&1; then
             echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "image=${SHARED}" >> "$GITHUB_OUTPUT"
+            echo "$SHARED already exists, not rebuilding"
+          elif [ "$FORCE" != true ] && docker manifest inspect "$IMAGE" > /dev/null 2>&1; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
             echo "$IMAGE already exists, not rebuilding"
           else
             echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
           fi
 
       - if: steps.exists.outputs.found == 'false' && steps.can_push.outputs.push == 'false'
