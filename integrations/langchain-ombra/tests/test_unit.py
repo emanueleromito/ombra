@@ -96,3 +96,23 @@ def test_existing_key_file_is_never_overwritten(tmp_path):
     (tmp_path / "k.key").write_bytes(b"x")
     with pytest.raises(FileExistsError):
         make(tmp_path).add_texts(["a"])
+
+
+def test_passphrase_is_not_kept_and_failed_create_removes_the_key_file(tmp_path):
+    s = make(tmp_path)
+    key = tmp_path / "k.key"
+    real = s._client.create_collection
+
+    def failing(*a, **kw):
+        kw["key_file"].write_bytes(b"half written key file")
+        raise RuntimeError("server refused")
+
+    s._client.create_collection = failing
+    with pytest.raises(RuntimeError, match="server refused"):
+        s.add_texts(["a"])
+    assert not key.exists()  # the retry is not blocked
+
+    s._client.create_collection = real
+    s.add_texts(["a"])
+    assert "correct horse" not in repr(vars(s)) and "correct horse" not in str(s.__dict__)
+    assert not any(v == "correct horse" for v in vars(s).values())
