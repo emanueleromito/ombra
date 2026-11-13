@@ -44,8 +44,14 @@ target_link_libraries(server_policy_test PRIVATE ombra_server_policy)
 add_test(NAME server_policy COMMAND server_policy_test)
 
 # ---- API keys, metrics, HTTP parsing: plain C++ (own SHA-256, no OpenSSL), CPU tests ---------
-add_library(ombra_server_admin STATIC src/auth.cpp src/metrics.cpp src/http.cpp)
+add_library(ombra_server_admin STATIC src/auth.cpp src/metrics.cpp src/http.cpp src/limits.cpp)
 target_include_directories(ombra_server_admin PUBLIC include)
+find_package(Threads REQUIRED)
+target_link_libraries(ombra_server_admin PUBLIC Threads::Threads)
+
+add_executable(server_limits_test tests/limits_test.cpp)
+target_link_libraries(server_limits_test PRIVATE ombra_server_admin)
+add_test(NAME server_limits COMMAND server_limits_test)
 
 add_executable(server_admin_test tests/admin_test.cpp)
 target_link_libraries(server_admin_test PRIVATE ombra_server_admin)

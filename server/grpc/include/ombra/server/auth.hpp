@@ -7,6 +7,8 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -70,8 +72,12 @@ class ApiKeyStore {
   static std::string path_in(const std::string& data_dir);
 
   // Hashes the token with every entry's salt and compares in constant time; no early exit.
+  // Thread-safe, also against reload().
   std::optional<Verified> verify(std::string_view token) const;
-  std::size_t size() const { return entries_.size(); }
+  std::size_t size() const;
+  // Re-reads the key file (SIGHUP) so that revoked keys stop working without a restart. On any
+  // error (missing file, bad mode, malformed line) throws and keeps the keys that are loaded.
+  void reload(const std::string& path);
 
  private:
   struct Entry {
@@ -79,12 +85,16 @@ class ApiKeyStore {
     std::array<std::uint8_t, 32> hash{};
     Scope scope = Scope::Read;
   };
-  std::vector<Entry> entries_;
+  using Entries = std::vector<Entry>;
+  std::shared_ptr<const Entries> snapshot() const;
+  std::shared_ptr<const Entries> entries_ = std::make_shared<const Entries>();
+  std::unique_ptr<std::mutex> mu_ = std::make_unique<std::mutex>();
 };
 
 // Makes a random 32-byte token (64 hex characters), appends its salted hash to the key file of
-// `data_dir` (created if needed) with an atomic write (tmp, fsync, rename, mode 0600) and returns
-// the token. The caller prints it once. Throws std::runtime_error.
+// `data_dir` (created if needed) with an atomic write (tmp, fsync, rename, mode 0600) under an
+// exclusive lock on <data_dir>/api_keys.v1.lock, so two concurrent creations cannot lose a key, and
+// returns the token. The caller prints it once. Throws std::runtime_error.
 std::string create_api_key(const std::string& data_dir, Scope scope, std::string* key_id = nullptr);
 
 // `authorization` is the value of the `authorization` header ("Bearer <token>"), empty if absent.
