@@ -89,7 +89,8 @@ int main(int argc, char** argv) {
         },
         reps);
     std::vector<char> sink(bytes.size());
-    const double cp = median_us([&] { std::memcpy(sink.data(), bytes.data(), bytes.size()); }, reps);
+    const double cp =
+        median_us([&] { std::memcpy(sink.data(), bytes.data(), bytes.size()); }, reps);
     // words_only: clone a sample and overwrite its towers from a flat word array.
     std::vector<std::uint64_t> flat;
     for (const auto& e : ct->GetElements())

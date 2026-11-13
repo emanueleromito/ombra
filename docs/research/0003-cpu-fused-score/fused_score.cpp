@@ -14,7 +14,8 @@
 // to OpenFHE in all three, so they are not part of the comparison.
 //
 // Usage: fused_score <preset.json fields...> see run.py. Arguments:
-//   <ring_dim> <depth> <scaling_bits> <first_bits> <batch> <num_large_digits or 0> <d> <reps> <seed>
+//   <ring_dim> <depth> <scaling_bits> <first_bits> <batch> <num_large_digits or 0> <d> <reps>
+//   <seed>
 // Synthetic data, keys made in-process and never written.
 
 #include <omp.h>
@@ -58,7 +59,8 @@ inline u64 redc(u128 x, const Mod& m) {
 }
 // One column adds at most (2q)^2 = 4 q^2 to an accumulator (the Karatsuba term; the plain cross
 // term adds 2 q^2). REDC needs the sum below q * 2^64, so K columns are safe when
-// K * 4 q^2 < q * 2^64, i.e. K < 2^62 / q. For q < 2^60 that is at least 4; for a 50-bit tower 4096.
+// K * 4 q^2 < q * 2^64, i.e. K < 2^62 / q. For q < 2^60 that is at least 4; for a 50-bit tower
+// 4096.
 u64 fold_interval(u64 q) {
   const u64 k = ((u64)1 << 62) / q;  // floor; K * 4 q^2 <= 2^62 * 4 q = q * 2^64 needs K < 2^62/q
   const u64 safe = k * q == ((u64)1 << 62) ? k - 1 : k;
