@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Resource limits and hardening of `ombra_server` (pre-release audit A-02, A-03, A-18, A-22, A-54).
 
-Needs the server binary (it is built with CUDA), so the tests are marked gpu. They use synthetic
-data only: a stream that sends nothing, a large junk message, bad flag values. The logic behind the caps
-(session limiter, stream watchdog, flag parsing) also has CPU unit tests in server/grpc/tests.
+Needs the server binary (it is built with CUDA), so the tests are marked gpu. They use
+synthetic data only: a stream that sends nothing, a large junk message, bad flag values. The logic
+behind the caps (session limiter, stream watchdog, flag parsing) also has CPU unit tests
+in server/grpc/tests.
 """
 
 from __future__ import annotations
