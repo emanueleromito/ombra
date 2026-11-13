@@ -116,6 +116,11 @@ class GpuSearch {
   // expansion's output is not an OpenFHE object. run() rejects a mismatch with the stored blocks.
   void set_query_from_device(const std::vector<const std::uint64_t*>& column_ptrs,
                              const CtMeta& meta);
+  // The query buffer ([dim][component][tower][coeff], dims * 2 * num_q * N words) for a producer
+  // that writes the columns in place (expand_tree_into); call set_query_meta afterwards with the
+  // same checks as set_query_from_device. Writes must be ordered before run().
+  std::uint64_t* query_device();
+  void set_query_meta(const CtMeta& meta);
   void upload_mask(std::size_t block, const Ct& mask);  // level L + 1, same metadata for all
 
   // Runs all five steps on the GPU for every block; waits between steps to time them.

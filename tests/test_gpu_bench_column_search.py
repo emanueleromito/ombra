@@ -47,7 +47,10 @@ def test_bench_column_search_tiny(tmp_path: Path) -> None:
     assert record["preset"] == "m0_depth2"
     assert record["gpu_name"] and record["gpu_name"] != "unknown"
     assert "excluded" in record["note"]
-    (entry,) = record["results"]
+    mont, entry = record["results"]  # one row per kernel: mont, then lazy (the default)
+    assert mont["kernel"] == "mont"
+    assert entry["kernel"] == "lazy"
+    assert entry["speedup_vs_mont"] > 0
     assert entry["dims"] == 4
     assert entry["blocks"] == 5
     assert entry["total_vectors_scored"] == 5 * entry["vectors_per_block"]

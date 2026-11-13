@@ -110,6 +110,15 @@ class ExpansionDevice {
   std::vector<std::pair<CtHandle, CtHandle>> split_level(const std::vector<CtHandle>& nodes,
                                                          std::uint32_t galois, std::size_t level,
                                                          const std::vector<char>& want_odd);
+  // Like split_level, but the children are written to caller-given device pointers instead of
+  // pool slots (each ct_bytes() long, [component][Q tower][N] words): node k gives even_dst[k] and,
+  // iff want_odd[k], odd_dst[k] (which must then be non-null, and null otherwise). Same chunking and
+  // kernels as split_level; results are word-for-word equal. The destinations must not overlap each
+  // other or any node's own words. Asynchronous: the caller synchronizes before reading them.
+  void split_level_into(const std::vector<CtHandle>& nodes, std::uint32_t galois, std::size_t level,
+                        const std::vector<char>& want_odd,
+                        const std::vector<std::uint64_t*>& even_dst,
+                        const std::vector<std::uint64_t*>& odd_dst);
   // Largest chunk of nodes per batch (default from a ~1 GiB scratch budget); tests lower it to
   // exercise chunking. The scratch grows to the largest chunk used and is never shrunk.
   // Memory planning (T0.7). Bytes of one ciphertext on the device; bytes of scratch for a chunk of

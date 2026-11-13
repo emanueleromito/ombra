@@ -18,6 +18,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -51,9 +52,19 @@ inline std::size_t expansion_depth(std::size_t d) {
 // which must return exactly what calling split on every node would. All nodes of a level share the
 // Galois element and the shift, so a GPU can batch them. If it is absent, split is called per node.
 // Returns the d leaves in index order.
-template <class Ct, class Ops>
-std::vector<Ct> expand_tree(const Ct& root, std::size_t d, std::size_t ring_dim, Ops& ops,
-                            ExpansionStats* stats = nullptr) {
+//
+// expand_tree_into (below) runs the same tree but never materialises the leaves as Ct objects: the
+// last level is handed to  ops.split_level_into(nodes, level, galois, shift, want_odd, residues,
+// sink)  which must write the even child of nodes[k] to leaf residues[k] and, if want_odd[k], the
+// odd child to leaf residues[k] + shift, wherever `sink` says (e.g. one contiguous device buffer).
+namespace detail {
+
+// Shared level loop. Sink = std::nullptr_t: the d leaves are returned. Otherwise the last level
+// goes to the sink through ops.split_level_into and an empty vector is returned.
+template <class Ct, class Ops, class Sink>
+std::vector<Ct> expand_tree_core(const Ct& root, std::size_t d, std::size_t ring_dim, Ops& ops,
+                                 ExpansionStats* stats, const Sink& sink) {
+    (void)sink;
     if (d == 0 || d > ring_dim / 2) {  // also guarantees 2^L <= N
         throw std::invalid_argument("expansion: d must be in [1, N/2]");
     }
@@ -68,6 +79,34 @@ std::vector<Ct> expand_tree(const Ct& root, std::size_t d, std::size_t ring_dim,
     for (std::size_t l = 0; l < depth; ++l) {
         const std::size_t step = std::size_t{1} << l;
         const auto galois = static_cast<std::uint32_t>(ring_dim / step + 1);
+        if constexpr (!std::is_null_pointer_v<Sink>) {
+            if (l + 1 == depth) {  // last level: children go straight to the sink
+                std::vector<Ct> nodes;
+                std::vector<char> odd;
+                std::vector<std::size_t> residues;
+                nodes.reserve(level_nodes.size());
+                std::size_t leaves = 0;
+                for (auto& [r, c] : level_nodes) {
+                    nodes.push_back(std::move(c));
+                    odd.push_back((r + step) < d ? 1 : 0);
+                    residues.push_back(r);
+                    leaves += odd.back() ? 2 : 1;
+                    ++local.splits;
+                    ++local.automorphisms;
+                }
+                if (leaves != d) {
+                    throw std::logic_error("expansion: leaf count differs from d");
+                }
+                ops.split_level_into(nodes, l, galois, step, odd, residues, sink);
+                nodes.clear();  // release the parents' handles
+                local.nodes += leaves;
+                local.nodes_per_level.push_back(leaves);
+                if (stats != nullptr) {
+                    *stats = std::move(local);
+                }
+                return {};
+            }
+        }
         std::vector<std::pair<std::size_t, Ct>> next;
         next.reserve(level_nodes.size() * 2);
         if constexpr (requires(Ops& o, const std::vector<Ct>& v, const std::vector<char>& w) {
@@ -119,6 +158,27 @@ std::vector<Ct> expand_tree(const Ct& root, std::size_t d, std::size_t ring_dim,
         *stats = std::move(local);
     }
     return out;
+}
+
+}  // namespace detail
+
+template <class Ct, class Ops>
+std::vector<Ct> expand_tree(const Ct& root, std::size_t d, std::size_t ring_dim, Ops& ops,
+                            ExpansionStats* stats = nullptr) {
+    return detail::expand_tree_core(root, d, ring_dim, ops, stats, nullptr);
+}
+
+// Same tree, but the d leaves are written by ops.split_level_into into `sink` (see above) instead
+// of being returned. d >= 1 always gives depth >= 1 (2^depth >= 2d >= 2), so the last level exists
+// and every leaf, including d == 1, is produced by a split; the root alone is never a leaf.
+template <class Ct, class Ops, class Sink>
+void expand_tree_into(const Ct& root, std::size_t d, std::size_t ring_dim, Ops& ops,
+                      const Sink& sink, ExpansionStats* stats = nullptr) {
+    static_assert(!std::is_null_pointer_v<Sink>, "expand_tree_into needs a sink");
+    if (d == 0 || d > ring_dim / 2 || expansion_depth(d) == 0) {
+        throw std::invalid_argument("expansion: d must be in [1, N/2]");
+    }
+    detail::expand_tree_core(root, d, ring_dim, ops, stats, sink);
 }
 
 // Nodes alive at the same time while expanding ONE tree level by level: a level's parents are

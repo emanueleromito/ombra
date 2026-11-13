@@ -35,6 +35,7 @@
 
 #include <algorithm>
 
+#include "column_search_lazy.cuh"
 #include "kernel_launch.hpp"
 #include "modarith.cuh"
 
@@ -86,6 +87,71 @@ __global__ void __launch_bounds__(kBlockThreads, 4) column_search_kernel(const u
             out[o] = mont_finish(acc0[k], c);
             out[o + poly_words] = mont_finish(acc1[k], c);
             out[o + 2 * poly_words] = mont_finish(acc2[k], c);
+        }
+    }
+}
+
+// Lazy variant of column_search_kernel: same inputs, outputs, launch shape and memory layout, and
+// bit-identical output, with far fewer instructions per (dimension, block). Instead of 4 Montgomery
+// products (each 2 wide 64x64 products and 1 low product) and 3 modular additions it does 3 wide
+// products and 3 128-bit additions, and reduces the 128-bit sums (REDC) only every
+// lazy_fold_interval(c) dimensions (4 for 60-bit towers, up to 256 for towers of 54 bits or less).
+// The cross term uses Karatsuba: (s0 + s1)(q0 + q1) - s0 q0 - s1 q1. Arithmetic, overflow proof and
+// fold interval: column_search_lazy.cuh (the same functions are unit-tested on the CPU).
+// Launch shape: as column_search_kernel (grid.x = ceil(P / kBlockThreads), grid.y = ceil(blocks /
+// kBlockTile), block = kBlockThreads threads, no shared memory). Registers (32-bit): per tile block
+// 3 u128 + 3 u64 = 12 + 6 = 18, so 72 for the 4 blocks of a tile, against 24 for the Montgomery
+// kernel, plus the loaded words, addresses and tower constants. That cannot fit the 64 registers
+// of __launch_bounds__(kBlockThreads, 4), so the bound is (kBlockThreads, 2): up to 128 registers.
+// If ptxas reports spills, reduce kBlockTile for this kernel (not done without a compiler run).
+__global__ void __launch_bounds__(kBlockThreads, 2) column_search_lazy_kernel(
+    const u64* __restrict__ stored, const u64* __restrict__ query, u64* __restrict__ out,
+    const TowerConst* __restrict__ tc, u64 dims, u64 blocks, u64 ring_dim, u64 poly_words) {
+    const u64 e = blockIdx.x * (u64)blockDim.x + threadIdx.x;
+    if (e >= poly_words) return;
+    const TowerConst c = tc[e / ring_dim];
+    const u64 b0 = (u64)blockIdx.y * kBlockTile;
+    const u64 nb = min((u64)kBlockTile, blocks - b0);
+    const u64 fold = lazy_fold_interval(c);
+
+    LazyAcc acc[kBlockTile];
+#pragma unroll
+    for (int k = 0; k < kBlockTile; ++k) acc[k] = lazy_zero();
+
+    u64 pending = 0;  // dimensions accumulated since the last fold
+    for (u64 j = 0; j < dims; ++j) {
+        const u64 q0 = query[(j * 2) * poly_words + e];
+        const u64 q1 = query[(j * 2 + 1) * poly_words + e];
+#pragma unroll
+        for (int k = 0; k < kBlockTile; ++k) {
+            if ((u64)k < nb) {
+                const u64 base = (((b0 + k) * dims + j) * 2) * poly_words + e;
+                lazy_mac(acc[k], stored[base], stored[base + poly_words], q0, q1);
+            }
+        }
+        if (++pending == fold) {
+#pragma unroll
+            for (int k = 0; k < kBlockTile; ++k) {
+                if ((u64)k < nb) lazy_fold(acc[k], c);
+            }
+            pending = 0;
+        }
+    }
+    if (pending != 0) {
+#pragma unroll
+        for (int k = 0; k < kBlockTile; ++k) {
+            if ((u64)k < nb) lazy_fold(acc[k], c);
+        }
+    }
+#pragma unroll
+    for (int k = 0; k < kBlockTile; ++k) {
+        if ((u64)k < nb) {
+            u64 o0, o1, o2;
+            lazy_finish(acc[k], c, o0, o1, o2);
+            const u64 o = ((b0 + k) * 3) * poly_words + e;
+            out[o] = o0;
+            out[o + poly_words] = o1;
+            out[o + 2 * poly_words] = o2;
         }
     }
 }
@@ -181,15 +247,20 @@ __global__ void __launch_bounds__(kBlockThreads, 2) column_search_batched_kernel
 
 cudaError_t launch_column_search(const u64* stored, const u64* query, u64* out,
                                  const TowerConst* tc, const ColumnSearchDims& d,
-                                 cudaStream_t stream) {
+                                 cudaStream_t stream, ColumnSearchKernel kernel) {
     const u64 poly_words = d.num_towers * d.ring_dim;
     const u64 grid_y = (d.blocks + kBlockTile - 1) / kBlockTile;
     if (poly_words == 0 || d.dims == 0 || d.blocks == 0 || grid_y > 65535) {
         return cudaErrorInvalidValue;
     }
     const dim3 grid((unsigned)((poly_words + kBlockThreads - 1) / kBlockThreads), (unsigned)grid_y);
-    column_search_kernel<<<grid, kBlockThreads, 0, stream>>>(stored, query, out, tc, d.dims,
-                                                             d.blocks, d.ring_dim, poly_words);
+    if (kernel == ColumnSearchKernel::kLazy) {
+        column_search_lazy_kernel<<<grid, kBlockThreads, 0, stream>>>(
+            stored, query, out, tc, d.dims, d.blocks, d.ring_dim, poly_words);
+    } else {
+        column_search_kernel<<<grid, kBlockThreads, 0, stream>>>(stored, query, out, tc, d.dims,
+                                                                 d.blocks, d.ring_dim, poly_words);
+    }
     return cudaGetLastError();
 }
 

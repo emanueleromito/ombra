@@ -359,22 +359,22 @@ std::unique_ptr<SearchSession> SearchEngine::open_session(
   const std::size_t leaves = c->layout.leaves();
   const std::size_t leaf_words = 2 * c->nq * c->ring;
 
-  // Expand once; the leaves are copied into one contiguous device buffer (the column search kernel
-  // reads the query as D consecutive ciphertexts), the first d of them serve stage 1.
+  // Expand once; the last tree level writes every leaf straight into one contiguous device buffer
+  // (the column search kernel reads the query as D consecutive ciphertexts, leaf j at offset
+  // j * leaf_words), the first d of them serve stage 1. No second copy of the leaves exists.
   auto sess = std::unique_ptr<SearchSession::Impl>(new SearchSession::Impl);
   sess->eng = &e;
   sess->coll = c;
   sess->query = std::make_unique<cache::DeviceArray>(leaves * leaf_words);
   {
     core::GpuExpansion& gx = *c->gx;
+    const core::GpuExpansion::LeafMeta leaf = gx.leaf_meta();  // what the leaves carry (the sample's)
+    if (leaf.level != 0 || leaf.noise_scale_deg != 1)
+      throw SearchError("expansion leaves are not at level 0 and noise degree 1");
     const core::GpuCt root = gx.upload(query);
-    std::vector<core::GpuCt> lv = core::expand_tree(root, leaves, c->ring, gx);
+    core::expand_tree_into(root, leaves, c->ring, gx,
+                           core::GpuExpansion::LeafBuffer{sess->query->get(), leaf_words, leaves});
     gx.synchronize();
-    for (std::size_t j = 0; j < leaves; ++j)
-      device_copy_words(sess->query->get() + j * leaf_words, gx.device().device_ptr(lv[j].dev),
-                        leaf_words);
-    device_sync();
-    lv.clear();
   }
   log_line("expand", leaves, ms_since(t0));
   return std::unique_ptr<SearchSession>(new SearchSession(std::move(sess)));
