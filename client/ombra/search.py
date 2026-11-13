@@ -233,6 +233,8 @@ def run_search(
             msgs = [stream.next().scores for _ in part]
             envs, counts, owners = [], [], []
             for m in msgs:
+                if m.cluster_id not in part:
+                    raise RuntimeError("server answered a cluster that was not asked")
                 blocks = sizes.get(m.cluster_id, [])
                 if len(m.score_blocks) != len(blocks) or len(m.ids) != sum(blocks):
                     raise RuntimeError("block layout changed during the search")
@@ -256,6 +258,8 @@ def run_search(
     fell_back = False
     try:
         centers = stream.next().centers
+        if centers.center_count != total or len(centers.score_blocks) != 1:
+            raise RuntimeError("center scores do not match the collection")
         cs = col.kit.decrypt_column(bytes(centers.score_blocks[0]))[: centers.center_count]
         order = [int(i) for i in np.argsort(-cs, kind="stable")]
         first = max(1, math.ceil(math.sqrt(total))) if n_probe is None else max(1, n_probe)

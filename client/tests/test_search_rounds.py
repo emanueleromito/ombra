@@ -1,9 +1,8 @@
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Round counts and cluster requests of run_search per security level (no OpenFHE, fake server)."""
 
-from types import SimpleNamespace
-
 import random
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -79,7 +78,7 @@ def _run(level, flt, per_cluster=5, seed=1):
     requests: list[list[int]] = []
     col = _fake(level, per_cluster, requests)
     q = np.array([1.0, 0, 0, 0])
-    res = search.run_search(col, q, 3, filter=flt, level=level, _rng=random.Random(seed))
+    res = search.run_search(col, q, 3, filter=flt, level=level, _rng=random.Random(seed))  # noqa: S311
     return res, requests
 
 
@@ -135,6 +134,35 @@ def test_public_search_refuses_a_seed():
     from ombra.collection import Collection
 
     col = Collection.__new__(Collection)
-    for opt in ({"seed": 1}, {"_rng": random.Random(1)}):
+    for opt in ({"seed": 1}, {"_rng": random.Random(1)}):  # noqa: S311
         with pytest.raises(TypeError):
             col.search(np.zeros(4), 3, **opt)
+
+
+def test_server_center_count_and_cluster_ids_are_checked():
+    requests: list[list[int]] = []
+    col = _fake("fast", 5, requests)
+    good = col.stub.Search
+
+    def lying_count(it):
+        for m in good(it):
+            if m.kind == "centers":
+                m.centers.center_count = C * 1000
+            yield m
+
+    col.stub.Search = lying_count
+    with pytest.raises(RuntimeError, match="center scores"):
+        search.run_search(col, np.array([1.0, 0, 0, 0]), 3, level="fast")
+
+    col = _fake("fast", 5, requests)
+    good = col.stub.Search
+
+    def lying_cluster(it):
+        for m in good(it):
+            if m.kind == "scores":
+                m.scores.cluster_id = 10_000
+            yield m
+
+    col.stub.Search = lying_cluster
+    with pytest.raises(RuntimeError, match="not asked"):
+        search.run_search(col, np.array([1.0, 0, 0, 0]), 3, level="fast")

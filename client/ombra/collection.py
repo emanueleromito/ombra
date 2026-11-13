@@ -72,6 +72,13 @@ def _check(err: Any) -> None:
         raise CollectionError(err.code, err.message)
 
 
+def check_server_spec(derived: presets.Derived, cards: Sequence[int], cluster_count: int) -> None:
+    """Bound the sizes a server reports (audit A-23): they size allocations and key generation."""
+    presets.check_filter_schema(derived, cards)  # fields, cardinalities, d + sum(V) <= N/2
+    if not 1 <= cluster_count <= derived.batch_size:  # the centers fit in one block
+        raise CollectionError(0, "the server reports an invalid cluster count")
+
+
 class KeyKit:
     """Context, key pair and evaluation keys of one collection. The secret key stays inside."""
 
@@ -451,6 +458,7 @@ class Collection:
         spec = r.info.spec
         derived = presets.derive(spec.preset, spec.dimension)
         cards = tuple(f.cardinality for f in sorted(spec.filter_fields, key=lambda f: f.field_id))
+        check_server_spec(derived, cards, spec.cluster_count)  # sizes from the server are bounded
         if kit.key_tag != spec.key_tag or kit.n_leaves != derived.dimension + sum(cards):
             raise ValueError("the key kit does not belong to this collection")
         m = re.fullmatch(r"(.*)\.g(\d+)", name)
@@ -688,6 +696,12 @@ class Collection:
                 cols.append(bytes(m.column))
         if header is None or len(cols) != header.n_columns:
             raise CollectionError(0, "incomplete block stream")
+        if (
+            len(cols) > self.derived.dimension + sum(self.cards)
+            or len(header.ids) > self.slots
+            or len(header.deleted) not in (0, len(header.ids))
+        ):
+            raise CollectionError(0, "block has more columns or ids than the layout allows")
         return header, cols
 
     def read_live(self, segment: str) -> tuple[list[bytes], np.ndarray, np.ndarray, int]:

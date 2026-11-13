@@ -43,6 +43,8 @@ class FakeClient:
         api_key: str | None = None,
         root_certificates: bytes | None = None,
         insecure: bool = False,
+        timeout: float | None = None,
+        stream_timeout: float | None = None,
     ) -> None:
         self._colls: dict[str, _Coll] = {}
 
