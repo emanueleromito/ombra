@@ -511,7 +511,11 @@ local_install_image = (
     )
     .add_local_file("tests/local_install_check.py", "/work/local_install_check.py", copy=True)
     .run_commands(
-        "CC=gcc CXX=g++ OMBRA_REQUIRE_NATIVE=1 pip install '/work/client[local]'",
+        # ombra-openfhe (the [local] extra) is not on PyPI until the first release, so this image
+        # takes openfhe-python from the PyPI `openfhe` wheel (CPython 3.12, x86-64 Linux) and
+        # installs the client without the extra. Same OpenFHE 1.6.1 underneath.
+        "pip install 'openfhe==1.6.1.0.24.4' 'protobuf>=5,<8' 'grpcio-tools>=1.60,<2'",
+        "CC=gcc CXX=g++ OMBRA_REQUIRE_NATIVE=1 pip install /work/client",
     )
 )
 
