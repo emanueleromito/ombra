@@ -155,7 +155,7 @@ def run_search(
     max_probe_factor: int = 8,
     rerank_factor: int = 3,
     workers: int = 1,
-    seed: int | None = None,
+    _rng: random.Random | None = None,
 ) -> SearchResult:
     """Search `col` for the k nearest vectors that pass `filter`.
 
@@ -198,8 +198,9 @@ def run_search(
     )
     for b in listing.blocks:
         sizes.setdefault(b.cluster_id, []).append(b.n_vectors)  # catalog order = result order
-    # decoys must be unpredictable; a seed is for tests only
-    rng = secrets.SystemRandom() if seed is None else random.Random(seed)  # noqa: S311
+    # Decoys and the request order must be unpredictable. `_rng` is a private hook for tests only;
+    # Collection.search refuses it (audit A-42).
+    rng = secrets.SystemRandom() if _rng is None else _rng
 
     start = pb.SearchStart(
         collection=col.name,
@@ -221,6 +222,10 @@ def run_search(
         if pad_to is not None and len(asked) < pad_to:  # Decoy: fixed requested count
             left = [c for c in range(total) if c not in asked_all and c not in set(asked)]
             asked += rng.sample(left, min(pad_to - len(asked), len(left)))
+        if pad_to is not None:
+            # Decoy: real clusters (score order) and decoys are mixed, or the position of a request
+            # would tell the server which are real (audit A-13).
+            rng.shuffle(asked)
         asked_all.update(asked)
         rounds += 1
         for part in _chunks(asked):

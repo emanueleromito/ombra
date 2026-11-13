@@ -3,6 +3,8 @@
 
 from types import SimpleNamespace
 
+import random
+
 import numpy as np
 import pytest
 from ombra import search
@@ -77,7 +79,7 @@ def _run(level, flt, per_cluster=5, seed=1):
     requests: list[list[int]] = []
     col = _fake(level, per_cluster, requests)
     q = np.array([1.0, 0, 0, 0])
-    res = search.run_search(col, q, 3, filter=flt, level=level, seed=seed)
+    res = search.run_search(col, q, 3, filter=flt, level=level, _rng=random.Random(seed))
     return res, requests
 
 
@@ -118,3 +120,21 @@ def test_strict_covers_every_cluster_exactly_once():
 def test_fast_unfiltered_keeps_single_round():
     res, req = _run("fast", None)
     assert res.rounds == 1 and len(req) == 1
+
+
+def test_decoy_requests_are_shuffled_with_real_clusters_not_always_first():
+    firsts_real = []
+    for seed in range(30):
+        res, req = _run("decoy", None, seed=seed)
+        firsts_real.append(req[0][0] in set(res.probed))
+    assert not all(firsts_real)  # chance of 30 real-first requests: 2**-30
+    assert any(firsts_real)
+
+
+def test_public_search_refuses_a_seed():
+    from ombra.collection import Collection
+
+    col = Collection.__new__(Collection)
+    for opt in ({"seed": 1}, {"_rng": random.Random(1)}):
+        with pytest.raises(TypeError):
+            col.search(np.zeros(4), 3, **opt)

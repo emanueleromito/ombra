@@ -489,6 +489,8 @@ class Collection:
         """Top-k search with exact re-ranking; see ombra.search.run_search for the options."""
         from ombra.search import run_search
 
+        if any(name.startswith("_") or name == "seed" for name in options):
+            raise TypeError("search() got an unexpected option (decoys are never seedable)")
         return run_search(self, query, k, **options)
 
     def close(self) -> None:
