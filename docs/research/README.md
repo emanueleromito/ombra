@@ -39,6 +39,8 @@ experiments that compare candidates.
 | 0008 | GPU families: T4, L4, L40S, H100 | GPU families | not run yet (Modal) |
 | 0009 | Template reader for ciphertexts | server and client CPU | proposed, not built |
 | 0010 | Hand-written CPU key switch for local mode | client CPU | not run: proposed as a task |
+| [0011](0011-seeded-stored-ciphertexts/README.md) | Seeded stored ciphertexts (decision 0023) | disk, upload | adopted pending 0023: stored columns 0.50x, collection data 0.60x |
 
 Needs the user's decision before any work (see the last rows of [0000](0000-survey.md)): the
-server dropping results to one tower, a depth-1 preset, seeded ciphertexts, 32-bit RNS words.
+server dropping results to one tower, a depth-1 preset, 32-bit RNS words. Seeded ciphertexts were
+approved on 2026-11-13 and are experiment 0011.

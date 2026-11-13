@@ -1,0 +1,2 @@
+{"ring_dim": 16384, "towers": 3, "plain_bytes": 787423, "seeded_bytes": 393336, "plain_load_us": 3615.3, "seeded_parse_us": 93.7, "seeded_load_us": 2134.7}
+{"ring_dim": 8192, "towers": 3, "plain_bytes": 394207, "seeded_bytes": 196728, "plain_load_us": 1092.0, "seeded_parse_us": 66.8, "seeded_load_us": 1250.7}
