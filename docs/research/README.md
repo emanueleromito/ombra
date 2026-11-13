@@ -28,3 +28,17 @@ experiments that compare candidates.
 
 | # | Experiment | Area | Outcome |
 | --- | --- | --- | --- |
+| [0000](0000-survey.md) | Survey: baseline, sources, candidate list | all | reference |
+| [0001](0001-cpu-client-profile/README.md) | Client CPU profile; drop to one tower before decrypting | client CPU | adopted: block decrypt 1.9x to 2.2x |
+| 0002 | GPU baseline profile on the current commit | GPU | not run yet (Modal) |
+| [0003](0003-cpu-fused-score/README.md) | Local mode: fused lazy score | client CPU | adopted: score 4.8x to 5.8x |
+| [0004](0004-cpu-expansion-monomial/README.md) | Local mode: monomial in evaluation form | client CPU | adopted: expansion 1.07x to 1.25x |
+| [0005](0005-ciphertext-deserialize/README.md) | Cost of deserializing a ciphertext | server and client CPU | baseline; 3.3 ms of fixed cost per ciphertext |
+| 0006 | GPU search kernel: lazy accumulation, Karatsuba cross term | GPU kernel | not run yet (Modal) |
+| 0007 | Expansion writes its leaves in place (no handoff) | GPU host, memory | not run yet (Modal) |
+| 0008 | GPU families: T4, L4, L40S, H100 | GPU families | not run yet (Modal) |
+| 0009 | Template reader for ciphertexts | server and client CPU | proposed, not built |
+| 0010 | Hand-written CPU key switch for local mode | client CPU | not run: proposed as a task |
+
+Needs the user's decision before any work (see the last rows of [0000](0000-survey.md)): the
+server dropping results to one tower, a depth-1 preset, seeded ciphertexts, 32-bit RNS words.
