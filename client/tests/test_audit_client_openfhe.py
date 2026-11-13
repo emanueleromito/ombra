@@ -107,18 +107,3 @@ def test_garbage_payload_is_refused(kit) -> None:
     env = write_envelope(Kind.CIPHERTEXT, kit.derived.preset, VERSION, b"not a ciphertext")
     with pytest.raises(ValueError):
         kit.decrypt_column(env)
-
-
-def test_insecure_warns_for_non_loopback_hosts() -> None:
-    import warnings
-
-    pytest.importorskip("grpc")
-    pytest.importorskip("grpc_tools")
-    from ombra._transport import GrpcTransport
-
-    with pytest.warns(UserWarning, match="not encrypted"):
-        GrpcTransport("10.255.255.1:1", None, None, True).close()
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        GrpcTransport("localhost:1", None, None, True).close()
-        GrpcTransport("[::1]:1", None, None, True).close()

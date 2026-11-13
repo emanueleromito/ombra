@@ -80,3 +80,14 @@ def test_receive_limit_is_far_below_a_gibibyte():
 )
 def test_host_parsing(address, host):
     assert _transport._host(address) == host
+
+
+def test_insecure_warns_for_non_loopback_hosts():
+    import warnings
+
+    with pytest.warns(UserWarning, match="not encrypted"):
+        _transport._warn_if_not_loopback("10.255.255.1:1")
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        for ok in ("localhost:1", "127.0.0.1:1", "[::1]:1"):
+            _transport._warn_if_not_loopback(ok)

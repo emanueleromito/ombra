@@ -33,6 +33,16 @@ def _host(address: str) -> str:
     return address
 
 
+def _warn_if_not_loopback(address: str) -> None:
+    """insecure=True off the loopback interface: no encryption or server authentication (A-49)."""
+    if _host(address) not in _LOOPBACK:
+        warnings.warn(
+            "insecure=True on a non-loopback address: the connection is not encrypted "
+            "or authenticated; use TLS",
+            stacklevel=4,
+        )
+
+
 class _DeadlineStub:
     """Gives every call of the generated stub a deadline unless the caller sets one."""
 
@@ -74,14 +84,7 @@ class GrpcTransport:
                 raise ValueError(
                     "an API key is only sent over TLS; do not combine it with insecure"
                 )
-            if _host(address) not in _LOOPBACK:
-                # Everything but the keys is encrypted, but the metadata and traffic pattern are not
-                # protected from the network, and a man in the middle can swap the server (A-49).
-                warnings.warn(
-                    "insecure=True on a non-loopback address: the connection is not encrypted "
-                    "or authenticated; use TLS",
-                    stacklevel=3,
-                )
+            _warn_if_not_loopback(address)
             self.channel = grpc.insecure_channel(address, options=options)
         else:
             creds: Any = grpc.ssl_channel_credentials(root_certificates=root_certificates)
