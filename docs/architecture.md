@@ -123,7 +123,7 @@ GPU development and benchmarks run on Modal (`modal_app.py`): A10 for day-to-day
 
 ## Planned
 
-Not built. None of this exists in the code today.
+Not built. None of this exists in the code today. The public version of this list is `docs/site/roadmap.md`.
 
 - **Router and several nodes.** A router would forward each query to the nodes that hold the clusters it needs and merge the encrypted results. Clusters would be the unit of distribution.
 - **Batching of queries** into one pass over the stored ciphertexts by a scheduler.

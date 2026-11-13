@@ -107,7 +107,7 @@ Every ciphertext, key file and collection format carries a version, and a reader
 
 ## Planned
 
-Not built. None of this exists in the code today.
+Not built. None of this exists in the code today. The public version of this list is `docs/site/roadmap.md`.
 
 - **LlamaIndex integration.**
 - **Plaintext-database mode,** for corpora that any client may read, which would be faster. Only the query and the results would be private.

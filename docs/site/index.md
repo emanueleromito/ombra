@@ -16,6 +16,7 @@ Ombra works with embeddings from any model that gives 384, 768 or 1536 dimension
 - To understand the ideas first, read [what homomorphic encryption is](concepts/homomorphic-encryption.md).
 - To see what the server can and cannot learn, read the [threat model](security/threat-model.md).
 - To see how the search works, start at [encoding](how-it-works/encoding.md).
+- To see what is not built yet, read the [roadmap](roadmap.md).
 
 ## License
 
