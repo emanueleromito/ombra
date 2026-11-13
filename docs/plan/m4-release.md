@@ -57,7 +57,7 @@ T4.3, T4.5 and T4.7 can start at once. T4.1 and T4.4 both edit the workflows fro
 **Depends on:** none
 **Steps:** remove task IDs (`T1.4`), milestone names (`M2`), design decision references ("decision 0022", "the 0016 envelope", links into `docs/decisions/`) and references to "hard rule N" and to `CLAUDE.md` from code, comments, tests, test names, markers, error messages, file names and benchmark flags; where a reference explains why the code does something, replace it with the reason in plain words (for example "the server never receives the secret key" instead of "hard rule 2", "the versioned file envelope" instead of "the 0016 envelope"); rename files, functions and flags by what they do. Rewrite comments and docstrings so they are concise: say what the code does and why in few words, cut history and restatements of the code, keep invariants, security reasons, units and kernel launch shapes. `docs/plan/` and `docs/decisions/` keep their IDs.
 **Done when:** a grep for task IDs, milestone names, "hard rule", `CLAUDE.md`, `\b[Dd]ecisions? [0-9]{4}`, `\b0[0-9]{3}\b (envelope|mode)` and `docs/decisions` outside `CLAUDE.md`, `.claude/`, `docs/plan/` and `docs/decisions/` finds nothing; comments read concisely; `make test`, `make lint`, `make test-openfhe` and `make test-gpu` pass.
-**Status:** todo
+**Status:** done (the Done-when grep finds nothing on dev)
 
 ### T4.6 Public docs
 
@@ -71,7 +71,7 @@ T4.6 is split into subtasks so different implementers can run them in parallel. 
 **Depends on:** T4.5
 **Steps:** `mkdocs.yml` (Material, MathJax, Mermaid) with the full navigation for sections 1 to 7 below and a stub page for each; a CI job that builds with `--strict` and deploys to GitHub Pages from `main`; a deep-dive page marker; a way to put code constants in pages (for example a macro that reads them from the code) plus a CPU test that fails when a page's constant or formula no longer matches the code; a CPU style test over the public docs (dashes as punctuation, the listed words, emoji); add the "Docs style" section to `CLAUDE.md`; add a "Security invariants" section to `CONTRIBUTING.md` stating, as project rules, the 128-bit minimum, the secret key only on the client, every GPU kernel tested for exact agreement with OpenFHE, no plaintext in logs and versioned file formats.
 **Done when:** `mkdocs build --strict` passes with every stub in the navigation; the Pages deploy job runs; the style test and the constants test fail on a planted violation and pass on the stubs; `CLAUDE.md` and `CONTRIBUTING.md` have their new sections.
-**Status:** todo
+**Status:** done
 
 ### T4.6.2 README, getting started and examples
 

@@ -1,0 +1,101 @@
+# The public docs site. Pages are in docs/site/; the rest of docs/ is internal and not published.
+# Build: mkdocs build --strict (CI, .github/workflows/docs.yml). Values from the code come from
+# docs/macros.py; see docs/site/contributing-docs.md.
+site_name: Ombra
+site_description: An encrypted vector database. Vectors, queries and scores stay encrypted with FHE.
+repo_url: https://github.com/erailabs/ombra
+docs_dir: docs/site
+strict: true
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.footer
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle: {icon: material/weather-night, name: Dark mode}
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle: {icon: material/weather-sunny, name: Light mode}
+
+plugins:
+  - search
+  - macros:
+      module_name: docs/macros
+      on_error_fail: true
+      on_undefined: strict
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [client]
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+extra_css:
+  - stylesheets/extra.css
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - getting-started/install.md
+      - getting-started/quickstart.md
+      - getting-started/first-search.md
+      - getting-started/local-or-server.md
+      - getting-started/examples.md
+  - Concepts:
+      - concepts/homomorphic-encryption.md
+      - concepts/ckks.md
+      - concepts/keys.md
+  - How it works:
+      - how-it-works/encoding.md
+      - how-it-works/query-expansion.md
+      - how-it-works/encrypted-search.md
+      - how-it-works/clusters.md
+      - how-it-works/filters.md
+      - how-it-works/deletes.md
+      - how-it-works/accuracy.md
+      - how-it-works/documents.md
+  - Security:
+      - security/threat-model.md
+      - security/what-the-server-learns.md
+      - security/parameters.md
+      - security/out-of-scope.md
+  - Performance:
+      - performance/latency-and-throughput.md
+      - performance/storage.md
+      - performance/choosing-a-preset.md
+      - performance/reproducing.md
+  - Reference:
+      - reference/python-api.md
+      - reference/grpc-api.md
+      - reference/configuration.md
+      - reference/presets.md
+      - reference/file-formats.md
+  - Operations:
+      - operations/docker.md
+      - operations/gpus.md
+      - operations/backups.md
+      - operations/monitoring.md
+      - operations/upgrades.md
+  - Contributing: contributing-docs.md
