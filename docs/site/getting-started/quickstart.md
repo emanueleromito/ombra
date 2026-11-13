@@ -68,7 +68,7 @@ You should see output like this. The scores can differ in the last digit:
 0.133  A GPU runs thousands of threads in parallel.
 ```
 
-On a laptop-class machine the whole run, model load included, took about 22 seconds. Creating the collection (keys, encryption, upload) takes most of that. A single search takes several seconds in local mode.
+Creating the collection (keys, encryption, upload) takes most of the run time, and a single search takes a second or more in local mode. The exact times are on the [latency page](../performance/latency-and-throughput.md).
 
 ## Things to know
 
@@ -78,6 +78,6 @@ The `if __name__ == "__main__":` guard is required, because local mode starts a 
 
 Local mode is for trying Ombra, for tests and for small collections of a few thousand vectors. It is slow and not meant for production. There is no plaintext mode: local mode encrypts exactly like a server does.
 
-The script prints a folder at the end. It holds the secret key and about 300 MB of files, so delete it when you are done.
+The script prints a folder at the end. It holds the secret key and the encrypted collection, which is a few hundred MB, so delete it when you are done.
 
 Next: [your first search, step by step](first-search.md).

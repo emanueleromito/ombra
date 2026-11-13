@@ -58,26 +58,26 @@ z
    <g id="patch_6">
     <path d="M 105.687016 202.677656 
 L 138.730162 202.677656 
-L 138.730162 179.985578 
-L 105.687016 179.985578 
+L 138.730162 179.978653 
+L 105.687016 179.978653 
 z
-" clip-path="url(#pb5812484eb)" style="fill: #d9822b"/>
+" clip-path="url(#pb5812484eb)" style="fill: #3b5b92"/>
    </g>
    <g id="patch_7">
     <path d="M 237.859599 202.677656 
 L 270.902745 202.677656 
-L 270.902745 157.293499 
-L 237.859599 157.293499 
+L 270.902745 157.279649 
+L 237.859599 157.279649 
 z
-" clip-path="url(#pb5812484eb)" style="fill: #d9822b"/>
+" clip-path="url(#pb5812484eb)" style="fill: #3b5b92"/>
    </g>
    <g id="patch_8">
     <path d="M 370.032182 202.677656 
 L 403.075327 202.677656 
-L 403.075327 111.909342 
-L 370.032182 111.909342 
+L 403.075327 111.881642 
+L 370.032182 111.881642 
 z
-" clip-path="url(#pb5812484eb)" style="fill: #d9822b"/>
+" clip-path="url(#pb5812484eb)" style="fill: #3b5b92"/>
    </g>
    <g id="patch_9">
     <path d="M 141.373614 202.677656 
@@ -85,7 +85,7 @@ L 174.416759 202.677656
 L 174.416759 157.23631 
 L 141.373614 157.23631 
 z
-" clip-path="url(#pb5812484eb)" style="fill: #3b5b92"/>
+" clip-path="url(#pb5812484eb)" style="fill: #d9822b"/>
    </g>
    <g id="patch_10">
     <path d="M 273.546196 202.677656 
@@ -93,7 +93,7 @@ L 306.589342 202.677656
 L 306.589342 111.794963 
 L 273.546196 111.794963 
 z
-" clip-path="url(#pb5812484eb)" style="fill: #3b5b92"/>
+" clip-path="url(#pb5812484eb)" style="fill: #d9822b"/>
    </g>
    <g id="patch_11">
     <path d="M 405.718779 202.677656 
@@ -101,7 +101,7 @@ L 438.761925 202.677656
 L 438.761925 20.912269 
 L 405.718779 20.912269 
 z
-" clip-path="url(#pb5812484eb)" style="fill: #3b5b92"/>
+" clip-path="url(#pb5812484eb)" style="fill: #d9822b"/>
    </g>
    <g id="matplotlib.axis_1">
     <g id="xtick_1">
@@ -253,13 +253,13 @@ L 457.2 202.677656
     <text style="font-size: 8px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle" x="350.867157" y="191.248927" transform="rotate(-0 350.867157 191.248927)">6.1</text>
    </g>
    <g id="text_17">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle" x="122.208589" y="176.063703" transform="rotate(-0 122.208589 176.063703)">18.6</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle" x="122.208589" y="176.056778" transform="rotate(-0 122.208589 176.056778)">18.6</text>
    </g>
    <g id="text_18">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle" x="254.381172" y="153.371624" transform="rotate(-0 254.381172 153.371624)">37.1</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle" x="254.381172" y="153.357774" transform="rotate(-0 254.381172 153.357774)">37.2</text>
    </g>
    <g id="text_19">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle" x="386.553755" y="107.987467" transform="rotate(-0 386.553755 107.987467)">74.3</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle" x="386.553755" y="107.959767" transform="rotate(-0 386.553755 107.959767)">74.3</text>
    </g>
    <g id="text_20">
     <text style="font-size: 8px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle" x="157.895187" y="153.314435" transform="rotate(-0 157.895187 153.314435)">37.2</text>
@@ -288,10 +288,10 @@ L 80.562344 43.423219
 L 80.562344 36.423219 
 L 60.562344 36.423219 
 z
-" style="fill: #d9822b"/>
+" style="fill: #3b5b92"/>
     </g>
     <g id="text_24">
-     <text style="font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start" x="88.562344" y="43.423219" transform="rotate(-0 88.562344 43.423219)">Plaintext-DB</text>
+     <text style="font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start" x="88.562344" y="43.423219" transform="rotate(-0 88.562344 43.423219)">Encrypted, seeded (default)</text>
     </g>
     <g id="patch_16">
      <path d="M 60.562344 58.424 
@@ -299,10 +299,10 @@ L 80.562344 58.424
 L 80.562344 51.424 
 L 60.562344 51.424 
 z
-" style="fill: #3b5b92"/>
+" style="fill: #d9822b"/>
     </g>
     <g id="text_25">
-     <text style="font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start" x="88.562344" y="58.424" transform="rotate(-0 88.562344 58.424)">Encrypted</text>
+     <text style="font-size: 10px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start" x="88.562344" y="58.424" transform="rotate(-0 88.562344 58.424)">Encrypted, not seeded</text>
     </g>
    </g>
   </g>

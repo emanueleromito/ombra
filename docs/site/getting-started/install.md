@@ -19,7 +19,7 @@ Python 3.11, 3.12 and 3.13 are supported. Wheels exist for these platforms, so n
 
 There is no Windows build.
 
-Local mode needs about 1 GB of free disk space and a few GB of memory. A collection of six short texts writes about 300 MB of keys and ciphertexts.
+Local mode needs about 1 GB of free disk space and a few GB of memory. A collection of six short texts writes a few hundred MB of keys and ciphertexts.
 
 The quickstart also uses an embedding model. Any model works as long as its vectors have 384, 768 or 1536 dimensions. The examples use `sentence-transformers`:
 

@@ -1,28 +1,40 @@
 # Storage
 
-Encrypted vectors are large. Each dimension of each vector takes 96 bytes on disk, against 4 bytes for a plain float32. That is 24 times the size, and it is the price of keeping the vectors encrypted during search.
+Encrypted vectors are large. Each dimension of each vector takes 48 bytes on disk, against 4 bytes for a plain float32. That is 12 times the size, and it is the price of keeping the vectors encrypted during search.
 
-The 96 bytes come from the ciphertext layout. A ciphertext holds one dimension of many vectors, one vector per slot. Balanced has {{ preset("balanced", "batch_size") }} slots per ciphertext and a ring dimension of {{ preset("balanced", "ring_dim") }}. Fast has {{ preset("fast", "batch_size") }} slots and a ring dimension of {{ preset("fast", "ring_dim") }}. Both end up at the same size per vector, because halving the ring halves the slots. For Balanced, a stored ciphertext is 787,423 bytes on disk for 8,192 slots, which is 96.12 bytes per dimension per vector. A measured Fast collection came out at the same size per vector as Balanced (49.0 KB per vector at 1,000,000 vectors, d = 384, both presets).
+The 48 bytes come from the ciphertext layout. A ciphertext holds one dimension of many vectors, one vector per slot. Balanced has {{ preset("balanced", "batch_size") }} slots per ciphertext and a ring dimension of {{ preset("balanced", "ring_dim") }}. Fast has {{ preset("fast", "batch_size") }} slots and a ring dimension of {{ preset("fast", "ring_dim") }}. Both end up at the same size per vector, because halving the ring halves the slots.
+
+A ciphertext is a pair of polynomials, and one of them is a uniformly random polynomial. The client stores a 32-byte seed in its place, and the server regenerates that polynomial when it loads the block. This is called a seeded ciphertext. A stored Balanced ciphertext is 393,336 bytes for 8,192 slots, which is 48.01 bytes per dimension per vector. Without the seed it would be 787,423 bytes, or 96.12 bytes. The client writes seeded ciphertexts when its compiled module is installed, which the wheels include. The GPU holds the same data as before, so memory on the card and search speed do not change.
 
 ## Per million vectors
 
 For one million vectors, whole blocks included, an encrypted collection takes:
 
-| Dimension | Encrypted | Plaintext-DB | Plain float32 |
+| Dimension | Encrypted (seeded) | Encrypted (not seeded) | Plain float32 |
 | --- | --- | --- | --- |
-| 384 | 37.2 GB | 18.6 GB | 1.5 GB |
-| 768 | 74.4 GB | 37.1 GB | 3.1 GB |
-| 1536 | 148.8 GB | 74.3 GB | 6.1 GB |
+| 384 | 18.6 GB | 37.2 GB | 1.5 GB |
+| 768 | 37.2 GB | 74.4 GB | 3.1 GB |
+| 1536 | 74.3 GB | 148.8 GB | 6.1 GB |
 
-![Storage per million vectors by dimension and mode](img/storage.svg)
+![Storage per million vectors by dimension](img/storage.svg)
 
-The encrypted size is 24 times the float32 size at every dimension, and Plaintext-DB mode is 12 times.
+The seeded size is 12 times the float32 size at every dimension.
 
-These figures count the stored column ciphertexts of Balanced, from a measurement of real serialized objects. The encrypted figure rounds up to whole blocks of 8,192 vectors (123 blocks for a million), so it overstates slightly. Plaintext-DB mode is for corpora that any client may read, and its 48 bytes per dimension per vector is the raw size, because serializing a plaintext is not supported by the library we use.
+These figures count the stored column ciphertexts of Balanced. They are the serialized object sizes (393,336 and 787,423 bytes per ciphertext) multiplied by the number of columns and blocks. The encrypted figure rounds up to whole blocks of 8,192 vectors (123 blocks for a million), so it overstates slightly. There is no plaintext mode: every vector is stored encrypted.
 
 ## What a real collection takes
 
-A measured collection takes more than the column ciphertexts alone. With filter fields (two fields of 8 values, which add 16 columns, so 400 columns at d = 384), the data directory held 5.3 GiB for 100,000 vectors on Balanced (57.0 KB per vector) and 45.6 GiB for 1,000,000 (49.0 KB per vector). Fast held 4.6 GiB at 100,000 (49.1 KB per vector) and 45.6 GiB at 1,000,000. The 400 columns alone would be 38.4 KB per vector at 96 bytes each. The measured size is 10 KB above that, and more at 100,000 vectors. Clusters fill their blocks only partly, which would explain the gap and why it shrinks with size, but we did not break it down. Plan for about 50 KB per vector at d = 384 with two small filter fields, and measure your own collection.
+A collection takes more than the column ciphertexts alone. It also holds the keys, the sealed record blobs and the cluster centers, and clusters fill their blocks only partly. Filter fields add columns: two fields of 8 values add 16 columns, so 400 columns at d = 384.
+
+!!! note "Numbers pending a new benchmark run on the current code."
+    The data directory sizes measured before seeded ciphertexts are being replaced.
+
+| Vectors | Filter fields | Balanced | Fast |
+| --- | --- | --- | --- |
+| 100,000 | 2 fields of 8 values | TBD | TBD |
+| 1,000,000 | 2 fields of 8 values | TBD | TBD |
+
+The 400 columns alone would be 19.2 KB per vector at 48 bytes each. Measure your own collection before you plan disk.
 
 ## Keys
 
@@ -38,12 +50,12 @@ Fast keys are about 40% smaller. These keys are uploaded once per collection.
 
 ## Memory on the GPU
 
-How many vectors fit in the memory of one A100 (40 GB), for Balanced, with 1 GiB left for scratch and one expanded query? This is calculated from the measured object sizes, and nothing was allocated to check it:
+How many vectors fit in the memory of one A100 (40 GB), for Balanced, with 1 GiB left for scratch and one expanded query? This is calculated from the object sizes, and nothing was allocated to check it. The card holds full ciphertexts, so seeding does not change it:
 
-| Dimension | Encrypted | Plaintext-DB |
-| --- | --- | --- |
-| 384 | 1,105,920 | 2,211,840 |
-| 768 | 548,864 | 1,097,728 |
-| 1536 | 270,336 | 540,672 |
+| Dimension | Vectors |
+| --- | --- |
+| 384 | 1,105,920 |
+| 768 | 548,864 |
+| 1536 | 270,336 |
 
 A bigger collection still works. The server keeps the rest on disk and in host memory and pages clusters in as queries ask for them, which is slower. See [latency and throughput](latency-and-throughput.md) for what that costs.

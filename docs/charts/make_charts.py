@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Make the SVG charts of the performance pages from the CSV files next to this script.
 
-Every row of the CSV files names, in its `source` column, the file in docs/plan/results/ that its
-numbers were copied from. Run from the repo root:
+Every row of the CSV files names, in its `source` column, where its numbers came from. A number
+that is waiting for a new benchmark run is "TBD"; the chart for it is not drawn, and an old SVG of
+it is removed. Run from the repo root:
 
     python docs/charts/make_charts.py
 
@@ -43,6 +44,10 @@ def read(name: str) -> list[dict[str, str]]:
         return list(csv.DictReader(f))
 
 
+def pending(rows: list[dict[str, str]], *columns: str) -> bool:
+    return any(not r[c].replace(".", "", 1).isdigit() for r in rows for c in columns)
+
+
 def save(fig: plt.Figure, name: str) -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     fig.savefig(OUT / name, format="svg", metadata={"Date": None, "Creator": None})
@@ -51,6 +56,9 @@ def save(fig: plt.Figure, name: str) -> None:
 
 def latency() -> None:
     rows = read("latency.csv")
+    if pending(rows, "total_ms"):
+        (OUT / "latency.svg").unlink(missing_ok=True)
+        return
     cases = [
         ("100000", "5", "100k vectors, 5% searched"),
         ("1000000", "20", "1M vectors, 20% searched"),
@@ -84,8 +92,8 @@ def storage() -> None:
     rows = read("storage.csv")
     modes = [
         ("float32", "Plain float32", "#999999"),
-        ("plaintext_db", "Plaintext-DB", "#d9822b"),
-        ("encrypted", "Encrypted", "#3b5b92"),
+        ("encrypted", "Encrypted, seeded (default)", "#3b5b92"),
+        ("encrypted_unseeded", "Encrypted, not seeded", "#d9822b"),
     ]
     fig, ax = plt.subplots(figsize=(6.5, 3.4))
     for i, (mode, label, color) in enumerate(modes):
@@ -108,7 +116,10 @@ def storage() -> None:
 
 def cold() -> None:
     rows = [r for r in read("e2e.csv") if r["filter"] == "none"]
-    labels = ["100k vectors\n(fits in the GPU cache)", "1M vectors\n(46 GiB on disk)"]
+    if pending(rows, "total_p50_ms"):
+        (OUT / "cold-cache.svg").unlink(missing_ok=True)
+        return
+    labels = ["100k vectors\n(fits in the GPU cache)", "1M vectors\n(does not fit the cache)"]
     fig, ax = plt.subplots(figsize=(6.5, 3.4))
     for i, preset in enumerate(("balanced", "fast")):
         vals = [
