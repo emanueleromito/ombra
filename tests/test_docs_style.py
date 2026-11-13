@@ -44,7 +44,7 @@ RULES = [
 
 
 def prose_lines(text: str):
-    """(line number, text) of each prose line: fenced code dropped, inline code blanked."""
+    """(line number, text) of each prose line: fenced code dropped, inline code and math blanked."""
     fence = None
     for n, line in enumerate(text.splitlines(), 1):
         m = re.match(r"\s*(`{3,}|~{3,})", line)
@@ -56,7 +56,8 @@ def prose_lines(text: str):
             continue
         if fence is not None:
             continue
-        yield n, re.sub(r"(`+)(.+?)\1", "``", line)
+        line = re.sub(r"(`+)(.+?)\1", "``", line)
+        yield n, re.sub(r"\$\$.*?\$\$|\$[^$]+\$", "$$", line)  # math: a minus sign is not a dash
 
 
 def violations(text: str) -> list[tuple[int, str]]:
@@ -95,6 +96,10 @@ def test_planted_violation_is_found(planted, rule):
 def test_code_is_skipped():
     text = "Run `a - b` here.\n\n```\nx = 1 — 2  # leverage\n```\nPlain text.\n"
     assert violations(text) == []
+
+
+def test_math_is_skipped():
+    assert violations("The sum $a - b$ and $$N - j$$ are fine.\n") == []
 
 
 def test_list_items_and_ranges_pass():
