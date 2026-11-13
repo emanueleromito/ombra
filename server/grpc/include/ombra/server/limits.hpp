@@ -18,6 +18,23 @@
 
 namespace ombra::server {
 
+// All the caps of the service in one place; every field is a command-line flag of ombra_server with
+// this default (audit A-02, A-20). The values are sized for one GPU node, not for the largest
+// possible deployment: raise them with the flag.
+struct ServiceLimits {
+  std::size_t max_sessions = 8;           // open Search streams, all keys together
+  std::size_t max_sessions_per_key = 4;   // open Search streams of one API key
+  std::uint64_t search_idle_ms = 60000;   // a Search stream the client leaves idle this long ends
+  std::uint64_t search_total_ms = 600000; // a Search stream lives at most this long
+  std::size_t max_rounds = 64;            // SearchChosen rounds per stream
+  std::size_t max_collections = 256;
+  std::uint32_t max_cluster_count = 65536;           // per collection (catalog rows, one per cluster)
+  std::uint64_t max_blobs_per_collection = 1000000;
+  std::uint64_t max_blob_bytes_per_collection = std::uint64_t{16} << 30;
+  std::size_t max_key_upload_bytes = std::size_t{2} << 30;  // staged in memory, all kinds of one upload
+  std::size_t max_concurrent_key_uploads = 2;
+};
+
 // ---- Concurrent search sessions: global cap and per-key cap (audit A-02) ----------------------
 class SessionLimiter {
  public:

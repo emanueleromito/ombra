@@ -196,6 +196,8 @@ class Store {
   bool get_blob(const std::string& collection, std::uint32_t kind, const std::string& id,
                 std::vector<std::uint8_t>* out) const;
   // Removes the blobs that exist (missing ids are ignored); returns how many were removed.
+  // Number and payload bytes of the collection's blobs (quota checks).
+  void blob_totals(const std::string& collection, std::uint64_t* count, std::uint64_t* bytes) const;
   std::size_t delete_blobs(const std::string& collection, std::uint32_t kind,
                            const std::vector<std::string>& ids);
 

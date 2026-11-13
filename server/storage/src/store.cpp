@@ -459,6 +459,12 @@ bool Store::get_blob(const std::string& collection, std::uint32_t kind, const st
   return true;
 }
 
+void Store::blob_totals(const std::string& collection, std::uint64_t* count,
+                        std::uint64_t* bytes) const {
+  std::lock_guard lk(mu_);
+  catalog_->blob_totals(collection, count, bytes);
+}
+
 std::size_t Store::delete_blobs(const std::string& collection, std::uint32_t kind,
                                 const std::vector<std::string>& ids) {
   std::lock_guard lk(mu_);

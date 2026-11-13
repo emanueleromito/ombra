@@ -55,6 +55,12 @@ int main() {
   s.api_version = 2;
   CHECK(validate_spec(s).code == Err::UnsupportedVersion);
   s = base("m0_depth2");
+  s.key_tag = std::string(kMaxKeyTagBytes + 1, 'k');
+  CHECK(validate_spec(s).code == Err::SizeLimit);
+  s.key_tag = std::string(kMaxKeyTagBytes, 'k');
+  CHECK(validate_spec(s).ok());
+  CHECK(d2->depth == 2 && cp->depth == 2);
+  s = base("m0_depth2");
   s.name.clear();
   CHECK(validate_spec(s).code == Err::InvalidArgument);
   s.name = std::string(129, 'x');

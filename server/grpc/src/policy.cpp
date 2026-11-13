@@ -27,6 +27,7 @@ Status validate_spec(const storage::CollectionSpec& s) {
   if (!preset) return bad(Err::InvalidArgument, "unknown preset");
   if (s.dimension == 0) return bad(Err::InvalidArgument, "dimension must be positive");
   if (s.key_tag.empty()) return bad(Err::InvalidArgument, "key_tag is empty");
+  if (s.key_tag.size() > kMaxKeyTagBytes) return bad(Err::SizeLimit, "key_tag is too long");
   if (s.cluster_count == 0 || s.cluster_count > kMaxClusterCount)
     return bad(Err::InvalidArgument, "cluster_count out of range");
   if (s.security_level > 3) return bad(Err::InvalidArgument, "unknown security level");
