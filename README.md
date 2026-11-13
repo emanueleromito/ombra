@@ -1,12 +1,8 @@
 # Ombra
 
-Ombra is available under the [PolyForm Noncommercial License 1.0.0](LICENSE) or a commercial license. See [License](#license) for which one applies to you.
-
 Ombra is a vector database where your vectors, your queries and the scores stay encrypted with fully homomorphic encryption (FHE). The server stores and searches ciphertexts only, so it never sees your data or what you search for.
 
 You keep the secret key in a Python client. The client encrypts vectors and queries, the server computes similarity on the ciphertexts with CUDA kernels on an NVIDIA GPU, and the client decrypts the scores and picks the top results. Results are exact, because the client re-ranks the candidates itself. The cryptography is CKKS, and OpenFHE does key generation, encryption and decryption.
-
-An encrypted search is slower than a plain one and ciphertexts are much larger than vectors. The docs say by how much.
 
 ## Try it
 
