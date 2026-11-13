@@ -37,6 +37,8 @@ build-verbosity = 1
 # is in use and that the result level equals the server's.
 test-requires = ["protobuf", "grpcio-tools"]
 test-command = "python {project}/tests/wheel_check.py"
+# The check uses synthetic data only, so the local server child may print its tracebacks.
+test-environment = { OMBRA_LOCAL_DEBUG = "1" }
 # The client process imports openfhe-python for keys and encryption (the child process of local
 # mode never does). It is the ombra-openfhe wheel built by the same workflow, in openfhe-wheels/.
 before-test = "pip install --find-links {project}/openfhe-wheels ombra-openfhe==1.6.1.0"

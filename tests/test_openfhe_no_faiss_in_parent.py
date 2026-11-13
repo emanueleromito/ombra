@@ -35,7 +35,7 @@ CODE = textwrap.dedent(
     import ombra
 
     rng = np.random.default_rng(0)
-    x = rng.standard_normal((40, 64))
+    x = rng.standard_normal((40, 384))
     x /= np.linalg.norm(x, axis=1, keepdims=True)
     with tempfile.TemporaryDirectory() as t:
         client = ombra.Client.local(Path(t) / "data")
