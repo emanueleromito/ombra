@@ -6,25 +6,52 @@
 // never ids, ciphertext bytes or values.
 #pragma once
 
+#include <atomic>
+#include <grpcpp/security/auth_metadata_processor.h>
+
 #include <mutex>
 #include <set>
 #include <string>
 
 #include "ombra/search/session.hpp"
 #include "ombra/server/auth.hpp"
+#include "ombra/server/limits.hpp"
 #include "ombra/server/metrics.hpp"
 #include "ombra/storage/store.hpp"
 #include "ombra/v1/ombra.grpc.pb.h"
 
 namespace ombra::server {
 
+// Runs when a call's initial metadata arrives, before gRPC reads any message body: a request
+// without a valid API key is refused without its body being buffered (audit A-03). Scope checks
+// stay in the handlers (they need the method). Only effective with TLS credentials; the handlers
+// check again, so a plain-text (--insecure, loopback) server is still protected.
+class ApiKeyAuthProcessor final : public grpc::AuthMetadataProcessor {
+ public:
+  ApiKeyAuthProcessor(const ApiKeyStore* keys, Metrics& metrics) : keys_(keys), metrics_(metrics) {}
+  bool IsBlocking() const override { return false; }  // hashing only, no I/O
+  grpc::Status Process(const InputMetadata& auth_metadata, grpc::AuthContext* context,
+                       OutputMetadata* consumed_auth_metadata,
+                       OutputMetadata* response_metadata) override;
+
+ private:
+  const ApiKeyStore* keys_;
+  Metrics& metrics_;
+  LogLimiter log_{std::chrono::seconds(5)};
+};
+
 class OmbraService final : public ombra::v1::Ombra::Service {
  public:
   // keys == nullptr: authentication is off (--no-auth). Otherwise every RPC needs a valid key whose
   // scope allows it (auth.hpp); refused calls end with UNAUTHENTICATED or PERMISSION_DENIED.
   OmbraService(storage::Store& store, search::SearchEngine& engine, const ApiKeyStore* keys,
-               Metrics& metrics)
-      : store_(store), engine_(engine), keys_(keys), metrics_(metrics) {}
+               Metrics& metrics, const ServiceLimits& limits = ServiceLimits{})
+      : store_(store),
+        engine_(engine),
+        keys_(keys),
+        metrics_(metrics),
+        limits_(limits),
+        sessions_(limits.max_sessions, limits.max_sessions_per_key) {}
 
   grpc::Status CreateCollection(grpc::ServerContext*, const v1::CreateCollectionRequest*,
                                 v1::CreateCollectionResponse*) override;
@@ -70,7 +97,8 @@ class OmbraService final : public ombra::v1::Ombra::Service {
                           v1::InsertResponse*);
   grpc::Status run_Delete(grpc::ServerContext*, const v1::DeleteRequest*, v1::DeleteResponse*);
   grpc::Status run_Search(grpc::ServerContext*,
-                          grpc::ServerReaderWriter<v1::SearchResponse, v1::SearchRequest>*);
+                          grpc::ServerReaderWriter<v1::SearchResponse, v1::SearchRequest>*,
+                          const std::string& key_id);
   grpc::Status run_ListBlocks(grpc::ServerContext*, const v1::ListBlocksRequest*,
                               v1::ListBlocksResponse*);
   grpc::Status run_GetBlock(grpc::ServerContext*, const v1::GetBlockRequest*,
@@ -95,6 +123,11 @@ class OmbraService final : public ombra::v1::Ombra::Service {
   search::SearchEngine& engine_;
   const ApiKeyStore* keys_;
   Metrics& metrics_;
+  ServiceLimits limits_;
+  SessionLimiter sessions_;
+  Watchdog watchdog_;
+  LogLimiter refused_log_{std::chrono::seconds(5)};  // failed-login log lines
+  std::atomic<std::size_t> key_uploads_{0};          // uploads staging key files right now
   std::mutex load_mu_;
   std::set<std::string> loaded_;  // collections whose keys the engine holds, guarded by load_mu_
 };

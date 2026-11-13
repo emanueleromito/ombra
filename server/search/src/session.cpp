@@ -2,6 +2,7 @@
 #include "ombra/search/session.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -92,6 +93,9 @@ struct EngineCore {
   std::vector<Seg> segs;
   std::unordered_map<std::string, std::uint32_t> seg_index;  // "coll/file" -> index
   std::unordered_map<std::uint32_t, std::vector<std::string>> seg_ids;
+  std::size_t seg_ids_count = 0;                 // ids held in seg_ids
+  std::atomic<std::size_t> session_bytes{0};     // device bytes of the open sessions' queries
+  static constexpr std::size_t kMaxCachedIds = 1u << 20;  // seg_ids is a cache: cleared above this
 
   EngineCore(storage::Store& s, const EngineConfig& c) : store(s), cfg(c) {}
 
@@ -110,7 +114,36 @@ struct EngineCore {
     auto it = seg_ids.find(idx);
     if (it != seg_ids.end()) return it->second;
     const Seg& s = segs.at(idx);
-    return seg_ids.emplace(idx, store.read_segment(s.coll, s.file).ids).first->second;
+    auto ids = store.read_segment(s.coll, s.file).ids;
+    // Segments are replaced and compacted away over time and their entries would only grow.
+    if (seg_ids_count + ids.size() > kMaxCachedIds) {
+      seg_ids.clear();
+      seg_ids_count = 0;
+    }
+    seg_ids_count += ids.size();
+    return seg_ids.emplace(idx, std::move(ids)).first->second;
+  }
+
+  // Forgets a dropped collection's segment indices and ids. The indices are never reused (a cached
+  // device block is keyed by them), so the entries stay but release their strings.
+  void drop_segments_of(const std::string& name) {
+    for (auto it = seg_index.begin(); it != seg_index.end();) {
+      const std::uint32_t idx = it->second;
+      if (segs[idx].coll == name) {
+        auto sit = seg_ids.find(idx);
+        if (sit != seg_ids.end()) {
+          seg_ids_count -= std::min(seg_ids_count, sit->second.size());
+          seg_ids.erase(sit);
+        }
+        segs[idx].coll.clear();
+        segs[idx].coll.shrink_to_fit();
+        segs[idx].file.clear();
+        segs[idx].file.shrink_to_fit();
+        it = seg_index.erase(it);
+      } else {
+        ++it;
+      }
+    }
   }
 
   std::shared_ptr<Coll> find(const std::string& name) {
@@ -209,6 +242,11 @@ struct SearchSession::Impl {
   EngineCore* eng = nullptr;
   std::shared_ptr<Coll> coll;
   std::unique_ptr<cache::DeviceArray> query;  // D leaves, [leaf][comp][tower][coeff]
+  std::size_t reserved = 0;                   // bytes counted in eng->session_bytes
+
+  ~Impl() {
+    if (eng && reserved) eng->session_bytes.fetch_sub(reserved);
+  }
 
   std::vector<BlockScores> run(const std::vector<std::uint32_t>& clusters, bool centers);
 };
@@ -247,6 +285,28 @@ void SearchEngine::load_collection(const std::string& name) {
   install_keys(prepare_keys(name, ctx_b, mult_b, auto_b));
 }
 
+void SearchEngine::forget_collection(const std::string& collection) {
+  EngineCore& e = *impl_;
+  std::lock_guard g(e.gpu_mu);
+  auto it = e.colls.find(collection);
+  std::string tag;
+  if (it != e.colls.end()) {
+    tag = it->second->spec.key_tag;
+    e.colls.erase(it);  // the GPU objects go with the last session that still uses them
+  }
+  e.drop_segments_of(collection);
+  // OpenFHE's key stores are process-wide by key tag: clear the tag unless another loaded
+  // collection was made under the same key.
+  if (!tag.empty()) {
+    bool shared = false;
+    for (const auto& kv : e.colls) shared = shared || kv.second->spec.key_tag == tag;
+    if (!shared) {
+      CryptoContextImpl<DCRTPoly>::ClearEvalMultKeys(tag);
+      CryptoContextImpl<DCRTPoly>::ClearEvalAutomorphismKeys(tag);
+    }
+  }
+}
+
 void SearchEngine::install_keys(PreparedKeys&& prepared) {
   EngineCore& e = *impl_;
   if (!prepared.c_) throw SearchError("no prepared keys");
@@ -273,6 +333,23 @@ PreparedKeys SearchEngine::prepare_keys(const std::string& name,
     if (!c->cc) throw SearchError("cannot read the crypto context");
   }
   core::require_security_floor(c->cc);
+  // The uploaded context must be the collection's preset, not merely a secure one (audit A-16).
+  if (e.cfg.preset_check) {
+    const auto rns = std::dynamic_pointer_cast<CryptoParametersRNS>(c->cc->GetCryptoParameters());
+    if (!rns) throw SearchError("context is not an RNS scheme");
+    const auto& towers = rns->GetElementParams()->GetParams();
+    std::size_t scale_bits = 0;
+    for (std::size_t i = 1; i < towers.size(); ++i) {
+      const std::size_t b = towers[i]->GetModulus().GetMSB();
+      if (scale_bits != 0 && b != scale_bits) scale_bits = 1;  // towers differ: never matches
+      else if (scale_bits == 0) scale_bits = b;
+    }
+    if (towers.size() < 2 ||
+        !e.cfg.preset_check(c->spec.preset, c->cc->GetRingDimension(),
+                            c->cc->GetEncodingParams()->GetBatchSize(), towers.size() - 1,
+                            towers[0]->GetModulus().GetMSB(), scale_bits))
+      throw InvalidQuery("the uploaded context does not match the collection's preset");
+  }
 
   // The key stores of OpenFHE are process-wide, by key tag: drop this tag's entries, load, and
   // require that the collection's tag is now present (a file made under another key is refused).
@@ -373,7 +450,9 @@ std::unique_ptr<SearchSession> SearchEngine::open_session(
     std::istringstream in(to_string_bytes(env.payload), std::ios::in | std::ios::binary);
     Serial::Deserialize(query, in, SerType::BINARY);
   } catch (const std::exception& ex) {
-    throw InvalidQuery(std::string("bad query envelope: ") + ex.what());
+    // Fixed text to the client; the reason (an envelope or OpenFHE message, no data) goes to the log.
+    std::fprintf(stderr, "[ombra.search] bad query envelope: %s\n", ex.what());
+    throw InvalidQuery("bad query envelope");
   }
   if (!query) throw InvalidQuery("bad query ciphertext");
   if (query->GetKeyTag() != c->spec.key_tag)
@@ -395,6 +474,20 @@ std::unique_ptr<SearchSession> SearchEngine::open_session(
   auto sess = std::unique_ptr<SearchSession::Impl>(new SearchSession::Impl);
   sess->eng = &e;
   sess->coll = c;
+  {
+    // Count the session's device bytes against a budget before allocating them (audit A-02).
+    const std::size_t budget =
+        e.cfg.session_budget_bytes ? e.cfg.session_budget_bytes : e.cfg.gpu_budget_bytes / 4;
+    if (leaves > SIZE_MAX / sizeof(u64) / std::max<std::size_t>(leaf_words, 1))
+      throw ResourceExhausted("search session does not fit in memory");
+    const std::size_t need = leaves * leaf_words * sizeof(u64);
+    std::size_t cur = e.session_bytes.load();
+    do {
+      if (need > budget || cur > budget - need)
+        throw ResourceExhausted("too many concurrent searches for the GPU memory budget");
+    } while (!e.session_bytes.compare_exchange_weak(cur, cur + need));
+    sess->reserved = need;
+  }
   sess->query = std::make_unique<cache::DeviceArray>(leaves * leaf_words);
   {
     core::GpuExpansion& gx = *c->gx;
