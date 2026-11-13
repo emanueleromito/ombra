@@ -53,8 +53,8 @@ inline constexpr std::size_t kMaxKeyTagBytes = 256;
 // of the largest preset is far below these; they only stop a hostile size.
 inline constexpr std::size_t kMaxContextBytes = std::size_t{64} << 20;  // kind 1, crypto context
 inline constexpr std::size_t kMaxQueryBytes = std::size_t{64} << 20;    // kind 2, search query
-inline constexpr std::size_t kMaxColumnBytes = std::size_t{64} << 20;   // kind 2 or 4, stored column
-inline constexpr std::size_t kMaxEvalKeyBytes = std::size_t{1} << 30;   // kind 3, per key file
+inline constexpr std::size_t kMaxColumnBytes = std::size_t{64} << 20;  // kind 2 or 4, stored column
+inline constexpr std::size_t kMaxEvalKeyBytes = std::size_t{1} << 30;  // kind 3, per key file
 
 struct PresetInfo {
   const char* name;

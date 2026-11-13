@@ -53,7 +53,7 @@ static_assert(static_cast<std::uint64_t>(v1::LIMIT_BLOB_BUCKET_3) == storage::kB
 static_assert(static_cast<std::uint32_t>(v1::BLOB_KIND_RECORD) == storage::kBlobKindRecord);
 static_assert(static_cast<std::uint32_t>(v1::BLOB_KIND_DOCUMENT) == storage::kBlobKindDocument);
 
-constexpr std::size_t kClustersPerGroup = 16;                   // clusters scored per write burst
+constexpr std::size_t kClustersPerGroup = 16;  // clusters scored per write burst
 
 double ms_since(Clock::time_point t0) {
   return std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
@@ -497,7 +497,8 @@ grpc::Status OmbraService::run_Delete(grpc::ServerContext*, const v1::DeleteRequ
 // Search
 
 grpc::Status OmbraService::run_Search(
-    grpc::ServerContext* ctx, grpc::ServerReaderWriter<v1::SearchResponse, v1::SearchRequest>* stream,
+    grpc::ServerContext* ctx,
+    grpc::ServerReaderWriter<v1::SearchResponse, v1::SearchRequest>* stream,
     const std::string& key_id) {
   // Sends an error message and ends the stream (status OK: the error is in the message).
   const auto send_error = [&](const Status& s) {
@@ -509,8 +510,8 @@ grpc::Status OmbraService::run_Search(
 
   // Deadlines (audit A-02): a stream the client leaves idle, or that lives too long, is cancelled
   // from the watchdog thread; the blocking Read below then fails and the handler returns.
-  const auto guard = watchdog_.watch([ctx] { ctx->TryCancel(); }, limits_.search_idle_ms,
-                                     limits_.search_total_ms);
+  const auto guard =
+      watchdog_.watch([ctx] { ctx->TryCancel(); }, limits_.search_idle_ms, limits_.search_total_ms);
 
   v1::SearchRequest req;
   if (!stream->Read(&req)) return grpc::Status::OK;  // client closed without a request
@@ -521,8 +522,7 @@ grpc::Status OmbraService::run_Search(
   // One slot per open stream, globally and per API key; released when the handler returns, which
   // also frees the session's device memory.
   SessionLimiter::Ticket ticket = sessions_.try_acquire(key_id);
-  if (!ticket.valid())
-    return send_error(err(Err::SizeLimit, "too many concurrent searches"));
+  if (!ticket.valid()) return send_error(err(Err::SizeLimit, "too many concurrent searches"));
 
   std::unique_ptr<search::SearchSession> session;
   storage::CollectionSpec spec;
@@ -924,8 +924,10 @@ grpc::Status ApiKeyAuthProcessor::Process(const InputMetadata& auth_metadata, gr
     metrics_.count_unauthenticated();
     std::uint64_t suppressed = 0;
     if (log_.allow(&suppressed))
-      std::fprintf(stderr, "[ombra.server] refused call before its body reason=unauthenticated (+%llu not logged)\n",
-                   static_cast<unsigned long long>(suppressed));
+      std::fprintf(
+          stderr,
+          "[ombra.server] refused call before its body reason=unauthenticated (+%llu not logged)\n",
+          static_cast<unsigned long long>(suppressed));
     return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "missing or invalid API key");
   }
   return grpc::Status::OK;  // the header stays visible to the handler, which checks the scope

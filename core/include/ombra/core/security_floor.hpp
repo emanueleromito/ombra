@@ -18,8 +18,8 @@
 
 namespace ombra::core {
 
-// Distribution of the secret key. The 128-bit table assumes a ternary (or Gaussian) secret; a sparse
-// ternary or any other distribution is weaker than the table says, so the floor refuses it.
+// Distribution of the secret key. The 128-bit table assumes a ternary (or Gaussian) secret; a
+// sparse ternary or any other distribution is weaker than the table says, so the floor refuses it.
 enum class SecretDist { kUniformTernary, kGaussian, kSparseTernary, kOther };
 
 enum class StdLevel {

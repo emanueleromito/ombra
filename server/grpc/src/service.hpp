@@ -6,9 +6,9 @@
 // never ids, ciphertext bytes or values.
 #pragma once
 
-#include <atomic>
 #include <grpcpp/security/auth_metadata_processor.h>
 
+#include <atomic>
 #include <mutex>
 #include <set>
 #include <string>

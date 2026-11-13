@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // CPU unit tests of the resource limits: session caps, stream deadlines, log rate limit, strict
 // flag parsing, loopback checks.
+#include "ombra/server/limits.hpp"
+
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -8,8 +10,6 @@
 #include <cstdlib>
 #include <limits>
 #include <thread>
-
-#include "ombra/server/limits.hpp"
 
 #define CHECK(c)                                                                \
   do {                                                                          \
@@ -62,7 +62,9 @@ static void test_watchdog() {
   CHECK(busy_fired == 1);
   // A removed guard is never cancelled afterwards.
   std::atomic<int> gone{0};
-  { auto g = w.watch([&] { ++gone; }, 50, 0); }
+  {
+    auto g = w.watch([&] { ++gone; }, 50, 0);
+  }
   std::this_thread::sleep_for(150ms);
   CHECK(gone == 0);
 }

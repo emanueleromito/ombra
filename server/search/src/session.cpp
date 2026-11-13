@@ -93,8 +93,8 @@ struct EngineCore {
   std::vector<Seg> segs;
   std::unordered_map<std::string, std::uint32_t> seg_index;  // "coll/file" -> index
   std::unordered_map<std::uint32_t, std::vector<std::string>> seg_ids;
-  std::size_t seg_ids_count = 0;                 // ids held in seg_ids
-  std::atomic<std::size_t> session_bytes{0};     // device bytes of the open sessions' queries
+  std::size_t seg_ids_count = 0;              // ids held in seg_ids
+  std::atomic<std::size_t> session_bytes{0};  // device bytes of the open sessions' queries
   static constexpr std::size_t kMaxCachedIds = 1u << 20;  // seg_ids is a cache: cleared above this
 
   EngineCore(storage::Store& s, const EngineConfig& c) : store(s), cfg(c) {}
@@ -453,7 +453,8 @@ std::unique_ptr<SearchSession> SearchEngine::open_session(
     std::istringstream in(to_string_bytes(env.payload), std::ios::in | std::ios::binary);
     Serial::Deserialize(query, in, SerType::BINARY);
   } catch (const std::exception& ex) {
-    // Fixed text to the client; the reason (an envelope or OpenFHE message, no data) goes to the log.
+    // Fixed text to the client; the reason (an envelope or OpenFHE message, no data) goes to the
+    // log.
     std::fprintf(stderr, "[ombra.search] bad query envelope: %s\n", ex.what());
     throw InvalidQuery("bad query envelope");
   }

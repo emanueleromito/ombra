@@ -66,7 +66,8 @@ double ms_since(std::chrono::steady_clock::time_point t0) {
 bool is_segment_name(const std::string& n) {
   if (n.size() != 22 || n[0] != 's' || n.compare(17, 5, ".oseg") != 0) return false;
   for (std::size_t i = 1; i <= 16; ++i)
-    if (!std::isxdigit(static_cast<unsigned char>(n[i])) || std::isupper(static_cast<unsigned char>(n[i])))
+    if (!std::isxdigit(static_cast<unsigned char>(n[i])) ||
+        std::isupper(static_cast<unsigned char>(n[i])))
       return false;
   return true;
 }

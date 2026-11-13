@@ -31,6 +31,7 @@
 // free port), then, with --rest-port, "ombra_server rest listening on HOST:PORT". Shuts down on
 // SIGINT or SIGTERM.
 #include <grpcpp/grpcpp.h>
+#include <sys/stat.h>
 
 #include <atomic>
 #include <chrono>
@@ -38,7 +39,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
-#include <sys/stat.h>
 #include <memory>
 #include <sstream>
 #include <stdexcept>
@@ -49,8 +49,8 @@
 #include "ombra/search/session.hpp"
 #include "ombra/server/auth.hpp"
 #include "ombra/server/limits.hpp"
-#include "ombra/server/policy.hpp"
 #include "ombra/server/metrics.hpp"
+#include "ombra/server/policy.hpp"
 #include "ombra/storage/store.hpp"
 #include "rest_server.hpp"
 #include "service.hpp"
@@ -190,7 +190,8 @@ int main(int argc, char** argv) {
     else if (a == "--max-collections")
       limits.max_collections = num(1, 10000000);
     else if (a == "--max-cluster-count")
-      limits.max_cluster_count = static_cast<std::uint32_t>(num(1, ombra::server::kMaxClusterCount));
+      limits.max_cluster_count =
+          static_cast<std::uint32_t>(num(1, ombra::server::kMaxClusterCount));
     else if (a == "--max-blobs")
       limits.max_blobs_per_collection = num(0, std::uint64_t{1} << 40);
     else if (a == "--max-blob-mb")
@@ -333,14 +334,14 @@ int main(int argc, char** argv) {
       return p && p->ring_dim == ring && p->batch_size == batch && p->depth == depth &&
              close(p->first_mod_bits, first_bits) && close(p->scale_bits, scale_bits);
     };
-    store.set_shape_provider([](const std::string& preset, std::uint32_t* ring,
-                                std::uint32_t* slots) {
-      const auto* p = ombra::server::find_preset(preset);
-      if (!p) return false;
-      *ring = static_cast<std::uint32_t>(p->ring_dim);
-      *slots = static_cast<std::uint32_t>(p->batch_size);
-      return true;
-    });
+    store.set_shape_provider(
+        [](const std::string& preset, std::uint32_t* ring, std::uint32_t* slots) {
+          const auto* p = ombra::server::find_preset(preset);
+          if (!p) return false;
+          *ring = static_cast<std::uint32_t>(p->ring_dim);
+          *slots = static_cast<std::uint32_t>(p->batch_size);
+          return true;
+        });
     ombra::search::SearchEngine engine(store, cfg);
     ombra::server::Metrics metrics;
     ombra::server::OmbraService service(store, engine, keys.get(), metrics, limits);
@@ -426,7 +427,8 @@ int main(int argc, char** argv) {
           keys->reload(ombra::server::ApiKeyStore::path_in(data_dir));
           std::fprintf(stderr, "[ombra.server] reloaded API keys count=%zu\n", keys->size());
         } catch (const std::exception& e) {
-          std::fprintf(stderr, "[ombra.server] API key reload failed, keeping the loaded keys: %s\n",
+          std::fprintf(stderr,
+                       "[ombra.server] API key reload failed, keeping the loaded keys: %s\n",
                        e.what());
         }
       }

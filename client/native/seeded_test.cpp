@@ -18,8 +18,8 @@
 #include <string>
 #include <vector>
 
-#include "seeded_ciphertext_openfhe.hpp"
 #include "ombra/core/security_floor_context.hpp"
+#include "seeded_ciphertext_openfhe.hpp"
 
 using namespace lbcrypto;
 using namespace ombra::native;

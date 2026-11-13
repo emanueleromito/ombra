@@ -92,12 +92,16 @@ int main() {
       f(p);
       return seeded_column(core::write_seeded_payload(p));
     };
-    CHECK_THROWS(s.insert("docs", 0, {"x"}, {mod([](core::SeededPayload& p) { p.key_tag = "other"; })}));
+    CHECK_THROWS(
+        s.insert("docs", 0, {"x"}, {mod([](core::SeededPayload& p) { p.key_tag = "other"; })}));
     CHECK_THROWS(s.insert("docs", 0, {"x"}, {mod([](core::SeededPayload& p) { p.level = 1; })}));
-    CHECK_THROWS(s.insert("docs", 0, {"x"}, {mod([](core::SeededPayload& p) { p.noise_scale_deg = 2; })}));
+    CHECK_THROWS(
+        s.insert("docs", 0, {"x"}, {mod([](core::SeededPayload& p) { p.noise_scale_deg = 2; })}));
     CHECK_THROWS(s.insert("docs", 0, {"x"}, {mod([](core::SeededPayload& p) { p.slots = 2; })}));
-    CHECK_THROWS(s.insert("docs", 0, {"x"}, {mod([](core::SeededPayload& p) { p.c0[0] = p.moduli[0]; })}));
-    CHECK_THROWS(s.insert("docs", 0, {"x"}, {seeded_column(core::write_seeded_payload(payload(16, 3)))}));
+    CHECK_THROWS(
+        s.insert("docs", 0, {"x"}, {mod([](core::SeededPayload& p) { p.c0[0] = p.moduli[0]; })}));
+    CHECK_THROWS(
+        s.insert("docs", 0, {"x"}, {seeded_column(core::write_seeded_payload(payload(16, 3)))}));
     s.set_shape_provider(nullptr);
   }
 
