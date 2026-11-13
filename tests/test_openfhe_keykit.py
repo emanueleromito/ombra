@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -51,7 +52,12 @@ def test_save_load_roundtrip(tmp_path) -> None:
     env.write_bytes(kit.encrypt_column(vals))
     out = subprocess.run(  # noqa: S603
         [sys.executable, "-c", CHILD, str(path), str(env)],
-        env={"PYTHONPATH": CLIENT, "PATH": "/usr/bin:/bin"},
+        env={
+            "PYTHONPATH": CLIENT,
+            "PATH": "/usr/bin:/bin",
+            "OMBRA_ALLOW_WEAK_SCRYPT": "1",  # the test key file uses cheap scrypt
+            **{k: v for k, v in os.environ.items() if k == "LD_LIBRARY_PATH"},
+        },
         capture_output=True,
         text=True,
         check=True,

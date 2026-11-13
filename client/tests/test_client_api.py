@@ -44,7 +44,7 @@ def test_secure_by_default() -> None:
     pytest.importorskip("grpc")
     pytest.importorskip("grpc_tools")
     pytest.importorskip("openfhe")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="only sent over TLS"):
         Client("localhost:1", api_key="x", insecure=True)
 
 

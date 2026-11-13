@@ -44,7 +44,7 @@ def main() -> None:
             key_file=Path(t) / "bench.key",
             passphrase="bench",  # noqa: S106
             preset=a.preset,
-            scrypt_params=(2**4, 8, 1),
+            scrypt_params=(2**14, 8, 1),
         )
         create_s = time.perf_counter() - t0
         info = client.get_collection("bench")

@@ -20,11 +20,25 @@ from ombra._core import ClientCore, CollectionInfo, SearchHit
 
 
 def _grpc_transport(
-    address: str, api_key: str | None, root_certificates: bytes | None, insecure: bool
+    address: str,
+    api_key: str | None,
+    root_certificates: bytes | None,
+    insecure: bool,
+    timeout: float | None = None,
+    stream_timeout: float | None = None,
 ) -> Any:
-    from ombra._transport import GrpcTransport
+    from ombra import _transport
 
-    return GrpcTransport(address, api_key, root_certificates, insecure)
+    return _transport.GrpcTransport(
+        address,
+        api_key,
+        root_certificates,
+        insecure,
+        timeout=_transport.DEFAULT_TIMEOUT if timeout is None else timeout,
+        stream_timeout=(
+            _transport.DEFAULT_STREAM_TIMEOUT if stream_timeout is None else stream_timeout
+        ),
+    )
 
 
 def _local_transport(path: str | Path) -> Any:
@@ -43,9 +57,16 @@ class Client:
         api_key: str | None = None,
         root_certificates: bytes | None = None,
         insecure: bool = False,
+        timeout: float | None = None,
+        stream_timeout: float | None = None,
     ) -> None:
-        """Connect to a server. TLS is used unless `insecure=True` (for a local test server)."""
-        self._core = ClientCore(_grpc_transport(address, api_key, root_certificates, insecure))
+        """Connect to a server. TLS is used unless `insecure=True` (loopback test servers only;
+        a warning is raised for any other host). `timeout` (default 120 s) is the deadline of a
+        single-answer call, `stream_timeout` (default 1800 s) that of a call that streams data or
+        searches."""
+        self._core = ClientCore(
+            _grpc_transport(address, api_key, root_certificates, insecure, timeout, stream_timeout)
+        )
 
     @classmethod
     def local(cls, path: str | Path) -> Client:
@@ -154,9 +175,16 @@ class AsyncClient:
         api_key: str | None = None,
         root_certificates: bytes | None = None,
         insecure: bool = False,
+        timeout: float | None = None,
+        stream_timeout: float | None = None,
     ) -> None:
-        """Connect to a server. TLS is used unless `insecure=True` (for a local test server)."""
-        self._core = ClientCore(_grpc_transport(address, api_key, root_certificates, insecure))
+        """Connect to a server. TLS is used unless `insecure=True` (loopback test servers only;
+        a warning is raised for any other host). `timeout` (default 120 s) is the deadline of a
+        single-answer call, `stream_timeout` (default 1800 s) that of a call that streams data or
+        searches."""
+        self._core = ClientCore(
+            _grpc_transport(address, api_key, root_certificates, insecure, timeout, stream_timeout)
+        )
 
     @classmethod
     def local(cls, path: str | Path) -> AsyncClient:

@@ -141,7 +141,7 @@ def _decrypt_round(col: Any, envelopes: list[bytes], counts: list[int], workers:
             p = Path(t) / f"b{i}.bin"
             p.write_bytes(env.payload)
             files.append(p)
-        return col._pool.decrypt(files, counts, col.slots)
+        return col._pool.decrypt(files, counts, col.slots, kit.expected)
 
 
 def run_search(
@@ -155,7 +155,7 @@ def run_search(
     max_probe_factor: int = 8,
     rerank_factor: int = 3,
     workers: int = 1,
-    seed: int | None = None,
+    _rng: random.Random | None = None,
 ) -> SearchResult:
     """Search `col` for the k nearest vectors that pass `filter`.
 
@@ -198,8 +198,9 @@ def run_search(
     )
     for b in listing.blocks:
         sizes.setdefault(b.cluster_id, []).append(b.n_vectors)  # catalog order = result order
-    # decoys must be unpredictable; a seed is for tests only
-    rng = secrets.SystemRandom() if seed is None else random.Random(seed)  # noqa: S311
+    # Decoys and the request order must be unpredictable. `_rng` is a private hook for tests only;
+    # Collection.search refuses it (audit A-42).
+    rng = secrets.SystemRandom() if _rng is None else _rng
 
     start = pb.SearchStart(
         collection=col.name,
@@ -221,6 +222,10 @@ def run_search(
         if pad_to is not None and len(asked) < pad_to:  # Decoy: fixed requested count
             left = [c for c in range(total) if c not in asked_all and c not in set(asked)]
             asked += rng.sample(left, min(pad_to - len(asked), len(left)))
+        if pad_to is not None:
+            # Decoy: real clusters (score order) and decoys are mixed, or the position of a request
+            # would tell the server which are real (audit A-13).
+            rng.shuffle(asked)
         asked_all.update(asked)
         rounds += 1
         for part in _chunks(asked):
@@ -228,6 +233,8 @@ def run_search(
             msgs = [stream.next().scores for _ in part]
             envs, counts, owners = [], [], []
             for m in msgs:
+                if m.cluster_id not in part:
+                    raise RuntimeError("server answered a cluster that was not asked")
                 blocks = sizes.get(m.cluster_id, [])
                 if len(m.score_blocks) != len(blocks) or len(m.ids) != sum(blocks):
                     raise RuntimeError("block layout changed during the search")
@@ -251,6 +258,8 @@ def run_search(
     fell_back = False
     try:
         centers = stream.next().centers
+        if centers.center_count != total or len(centers.score_blocks) != 1:
+            raise RuntimeError("center scores do not match the collection")
         cs = col.kit.decrypt_column(bytes(centers.score_blocks[0]))[: centers.center_count]
         order = [int(i) for i in np.argsort(-cs, kind="stable")]
         first = max(1, math.ceil(math.sqrt(total))) if n_probe is None else max(1, n_probe)

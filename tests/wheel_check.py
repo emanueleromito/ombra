@@ -52,7 +52,7 @@ def main() -> None:
                 key_file=tmp / "tiny.key",
                 passphrase="pw",  # noqa: S106
                 preset="fast",
-                scrypt_params=(2**4, 8, 1),
+                scrypt_params=(2**14, 8, 1),
             )
             mods = client._core._t.modules_loaded()
             assert mods == {"openfhe_loaded": False, "native_loaded": True}, mods

@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Round counts and cluster requests of run_search per security level (no OpenFHE, fake server)."""
 
+import random
 from types import SimpleNamespace
 
 import numpy as np
@@ -77,7 +78,7 @@ def _run(level, flt, per_cluster=5, seed=1):
     requests: list[list[int]] = []
     col = _fake(level, per_cluster, requests)
     q = np.array([1.0, 0, 0, 0])
-    res = search.run_search(col, q, 3, filter=flt, level=level, seed=seed)
+    res = search.run_search(col, q, 3, filter=flt, level=level, _rng=random.Random(seed))  # noqa: S311
     return res, requests
 
 
@@ -118,3 +119,50 @@ def test_strict_covers_every_cluster_exactly_once():
 def test_fast_unfiltered_keeps_single_round():
     res, req = _run("fast", None)
     assert res.rounds == 1 and len(req) == 1
+
+
+def test_decoy_requests_are_shuffled_with_real_clusters_not_always_first():
+    firsts_real = []
+    for seed in range(30):
+        res, req = _run("decoy", None, seed=seed)
+        firsts_real.append(req[0][0] in set(res.probed))
+    assert not all(firsts_real)  # chance of 30 real-first requests: 2**-30
+    assert any(firsts_real)
+
+
+def test_public_search_refuses_a_seed():
+    from ombra.collection import Collection
+
+    col = Collection.__new__(Collection)
+    for opt in ({"seed": 1}, {"_rng": random.Random(1)}):  # noqa: S311
+        with pytest.raises(TypeError):
+            col.search(np.zeros(4), 3, **opt)
+
+
+def test_server_center_count_and_cluster_ids_are_checked():
+    requests: list[list[int]] = []
+    col = _fake("fast", 5, requests)
+    good = col.stub.Search
+
+    def lying_count(it):
+        for m in good(it):
+            if m.kind == "centers":
+                m.centers.center_count = C * 1000
+            yield m
+
+    col.stub.Search = lying_count
+    with pytest.raises(RuntimeError, match="center scores"):
+        search.run_search(col, np.array([1.0, 0, 0, 0]), 3, level="fast")
+
+    col = _fake("fast", 5, requests)
+    good = col.stub.Search
+
+    def lying_cluster(it):
+        for m in good(it):
+            if m.kind == "scores":
+                m.scores.cluster_id = 10_000
+            yield m
+
+    col.stub.Search = lying_cluster
+    with pytest.raises(RuntimeError, match="not asked"):
+        search.run_search(col, np.array([1.0, 0, 0, 0]), 3, level="fast")

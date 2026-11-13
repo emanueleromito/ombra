@@ -119,3 +119,25 @@ def test_round_trip_matches_numpy(ofhe, setup):
     max_err = float(np.max(np.abs(got - expected)))
     print(f"round trip max abs error: {max_err:.3e}")
     assert max_err <= ROUND_TRIP_TOLERANCE, f"max error {max_err:.3e} > {ROUND_TRIP_TOLERANCE}"
+
+
+@pytest.mark.parametrize("preset", ["m0_depth2", "m0_compact_n8192"])
+def test_decryption_mode_is_pinned_and_decryptions_differ(ofhe, preset):
+    """Decision 0017 (audit A-10): data type and noise mode are set by name, and OpenFHE's
+    fixed-noise decryption makes two decryptions of one ciphertext differ."""
+    params, cc = ombra_params.make_context(preset)
+    assert params.GetCKKSDataType() == ofhe.CKKSDataType.REAL
+    assert params.GetDecryptionNoiseMode() == ofhe.DecryptionNoiseMode.FIXED_NOISE_DECRYPT
+    assert params.GetExecutionMode() == ofhe.ExecutionMode.EXEC_EVALUATION
+    keys = cc.KeyGen()
+    vals = _normalized(np.random.default_rng(SEED), 64)
+    ct = cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(vals.tolist()))
+
+    def dec():
+        pt = cc.Decrypt(ct, keys.secretKey)
+        pt.SetLength(64)
+        return np.asarray(pt.GetRealPackedValue())
+
+    a, b = dec(), dec()
+    assert not np.array_equal(a, b)  # fresh decryption noise on every call
+    assert np.max(np.abs(a - vals)) < 1e-3 and np.max(np.abs(b - vals)) < 1e-3

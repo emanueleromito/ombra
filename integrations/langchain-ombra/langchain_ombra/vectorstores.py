@@ -65,7 +65,9 @@ class OmbraVectorStore(VectorStore):
         self._name = collection_name
         self._embedding = embedding
         self._key_file = Path(key_file)
-        self.__passphrase = passphrase  # never part of repr or of any error message
+        # Held only until the key file has been read or written, then dropped (audit A-50).
+        # Never part of repr or of any error message.
+        self.__passphrase: str | None = passphrase
         self._filter_fields = dict(filter_fields or {})
         self._preset = preset
         self._security_level = security_level
@@ -79,6 +81,8 @@ class OmbraVectorStore(VectorStore):
                 filter_fields=list(self._filter_fields) or None,
             )
             self._exists = True
+        if self._exists:
+            self.__passphrase = None
 
     def __repr__(self) -> str:
         return f"OmbraVectorStore(collection={self._name!r})"
@@ -141,19 +145,28 @@ class OmbraVectorStore(VectorStore):
                     "the key file exists but the collection does not; refusing to overwrite a "
                     "key. Use another key_file, or restore the collection."
                 )
-            self._client.create_collection(
-                self._name,
-                vectors,
-                final_ids,
-                key_file=self._key_file,
-                passphrase=self.__passphrase,
-                preset=self._preset,
-                metadata=metas,
-                filter_fields=self._filter_fields or None,
-                security_level=self._security_level,
-                scrypt_params=self._scrypt_params,
-            )
+            if self.__passphrase is None:
+                raise RuntimeError("the store has no passphrase left to create the collection")
+            try:
+                self._client.create_collection(
+                    self._name,
+                    vectors,
+                    final_ids,
+                    key_file=self._key_file,
+                    passphrase=self.__passphrase,
+                    preset=self._preset,
+                    metadata=metas,
+                    filter_fields=self._filter_fields or None,
+                    security_level=self._security_level,
+                    scrypt_params=self._scrypt_params,
+                )
+            except BaseException:
+                # The key file was written before the server saw anything and the collection was
+                # not created: a leftover file would block the retry. It did not exist before.
+                self._key_file.unlink(missing_ok=True)
+                raise
             self._exists = True
+            self.__passphrase = None
             return final_ids
         self._client.insert(self._name, vectors, final_ids, metas)
         return final_ids

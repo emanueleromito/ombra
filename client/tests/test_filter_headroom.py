@@ -64,3 +64,11 @@ def test_filtered_score_headroom(preset: str) -> None:
         assert 2 ** best.get(level, -1) >= 2 * limit, (preset, level, best)
     f_max = int((limit - 1) // LAMBDA) - 1  # a tombstoned slot reaches 1 + LAMBDA * (F + 1)
     print(f"preset={preset} max_value={limit} lambda={LAMBDA} F_max={f_max}")
+    # the client's own function must give this F_max (capped by the proto limit): audit A-59
+    from types import SimpleNamespace
+
+    from ombra import presets
+
+    derived = SimpleNamespace(values=ombra_params.get_preset(preset))
+    assert presets.filter_field_limit(derived) == min(presets.MAX_FILTER_FIELDS, f_max)
+    assert 2 ** (derived.values["first_mod_size"] - derived.values["scaling_mod_size"] - 4) == limit

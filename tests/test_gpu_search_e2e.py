@@ -138,7 +138,7 @@ def test_insert_search_delete(tmp_path, backend) -> None:
         for q in queries:
             want = _plain(x, fields, live, q)
             _check(col.search(q, K, n_probe=2), want)  # fast (the collection's level)
-            res = col.search(q, K, level="decoy", n_probe=2, seed=1)
+            res = col.search(q, K, level="decoy", n_probe=2)
             _check(res, want)
             assert res.rounds == 2  # Decoy: two rounds, filtered or not
             res = col.search(q, K, level="strict")

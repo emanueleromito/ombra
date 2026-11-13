@@ -24,7 +24,7 @@ with tempfile.TemporaryDirectory() as t:
         key_file=Path(t) / "tiny.key",
         passphrase="pw",  # noqa: S106
         preset="fast",
-        scrypt_params=(2**4, 8, 1),
+        scrypt_params=(2**14, 8, 1),
     )
     t1 = time.time()
     hits = client.search("tiny", x[5], k=3)

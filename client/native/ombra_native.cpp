@@ -429,7 +429,9 @@ class Seeder {
 }  // namespace
 
 PYBIND11_MODULE(_native, m) {
-  m.doc() = "OpenFHE CPU work of the Ombra local-mode server (never holds a secret key)";
+  m.doc() =
+      "OpenFHE CPU work of the Ombra client: Seeder holds the secret key in worker processes "
+      "(memory only); the local-mode server part never does";
   py::register_exception<KeyTagError>(m, "KeyTagError", PyExc_ValueError);
   m.def("openfhe_version", [] { return GetOPENFHEVersion(); });
   py::class_<Leaves, std::shared_ptr<Leaves>>(m, "Leaves")
