@@ -3,7 +3,9 @@
 # choosing the branch) and every night on the default branch. Never on pull requests: Modal costs
 # money and a PR from a fork must not get the tokens. Run it on a branch before merging any change
 # to core/, tests/, client/ or the Modal files, since those can weaken an oracle.
-# MODAL_TOKEN_ID and MODAL_TOKEN_SECRET are repository secrets.
+# MODAL_TOKEN_ID and MODAL_TOKEN_SECRET are secrets of the "modal" environment, which should have
+# required reviewers (manual runs wait for approval). The tokens are set on the one step that runs
+# Modal, not on the job, so "pip install" and the other steps never see them.
 name: GPU tests
 
 on:
@@ -19,23 +21,25 @@ jobs:
     name: GPU oracles
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    environment: modal
     concurrency:
       group: gpu-${{ github.ref }}
       cancel-in-progress: true
-    env:
-      MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
-      MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - run: |
-          if [ -z "$MODAL_TOKEN_ID" ] || [ -z "$MODAL_TOKEN_SECRET" ]; then
-            echo "::error::MODAL_TOKEN_ID and MODAL_TOKEN_SECRET are not set for this run."
-            exit 1
-          fi
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: "3.12"
       - run: python -m pip install --quiet modal==1.6.3
-      - run: make test-gpu
+      - name: Run the GPU tests on Modal
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+        run: |
+          if [ -z "$MODAL_TOKEN_ID" ] || [ -z "$MODAL_TOKEN_SECRET" ]; then
+            echo "::error::MODAL_TOKEN_ID and MODAL_TOKEN_SECRET are not set for this run."
+            exit 1
+          fi
+          make test-gpu
