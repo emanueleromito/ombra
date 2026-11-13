@@ -3,8 +3,10 @@
 
 #include <dirent.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
+#include <cctype>
 #include <cerrno>
 #include <chrono>
 #include <cstdio>
@@ -23,8 +25,10 @@ namespace {
 namespace core = ombra::core;
 
 void make_dir(const std::string& p) {
-  if (::mkdir(p.c_str(), 0755) != 0 && errno != EEXIST)
+  // 0700: ciphertexts, keys, ids and collection names are not for other local users (audit A-22).
+  if (::mkdir(p.c_str(), 0700) != 0 && errno != EEXIST)
     throw std::runtime_error("cannot create directory " + p);
+  ::chmod(p.c_str(), 0700);  // tighten a directory made by an older version; best effort
 }
 
 std::vector<std::string> list_dir(const std::string& p) {
@@ -58,21 +62,47 @@ double ms_since(std::chrono::steady_clock::time_point t0) {
   return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
 }
 
+// "s" + 16 hex digits + ".oseg", exactly what hex_name('s', id, ".oseg") makes.
+bool is_segment_name(const std::string& n) {
+  if (n.size() != 22 || n[0] != 's' || n.compare(17, 5, ".oseg") != 0) return false;
+  for (std::size_t i = 1; i <= 16; ++i)
+    if (!std::isxdigit(static_cast<unsigned char>(n[i])) || std::isupper(static_cast<unsigned char>(n[i])))
+      return false;
+  return true;
+}
+
 }  // namespace
 
 Store::Store(std::string root, std::string openfhe_version)
     : root_(std::move(root)), ofhe_(std::move(openfhe_version)) {
   make_dir(root_);
+  // The catalog database and its journal are created by SQLite with the process umask.
+  const mode_t old_umask = ::umask(077);
   make_dir(segments_dir());
   make_dir(root_ + "/keys");
   make_dir(blob_dir());
   catalog_ = std::make_unique<Catalog>(root_ + "/catalog.db");
   wal_ = std::make_unique<Wal>(wal_path());
+  ::umask(old_umask);
+  ::chmod((root_ + "/catalog.db").c_str(), 0600);
   recover();
 }
 
 std::string Store::segment_path(const std::string& name) const {
   return segments_dir() + "/" + name;
+}
+
+ColumnExpect Store::expect_for(const CollectionSpec& spec) const {
+  ColumnExpect e;
+  e.key_tag = spec.key_tag;
+  if (shape_) {
+    std::uint32_t ring = 0, slots = 0;
+    if (shape_(spec.preset, &ring, &slots)) {
+      e.ring_dim = ring;
+      e.slots = slots;
+    }
+  }
+  return e;
 }
 
 void Store::create_collection(const CollectionSpec& spec) {
@@ -221,7 +251,7 @@ std::string Store::replace_segments(const std::string& collection,
     throw BlockMismatch("ids are not exactly the live ids of the old blocks");
   std::size_t bytes = 0;
   for (const auto& c : neu.column_envelopes) {
-    check_column_envelope(c.data(), c.size(), spec.preset, ofhe_);
+    check_column_for_insert(c.data(), c.size(), spec.preset, ofhe_, expect_for(spec));
     bytes += c.size();
   }
 
@@ -270,7 +300,7 @@ std::string Store::insert(const std::string& collection, std::uint32_t cluster,
       throw std::runtime_error("insert: duplicate id");
   std::size_t bytes = 0;
   for (const auto& c : cols) {
-    check_column_envelope(c.data(), c.size(), spec.preset, ofhe_);
+    check_column_for_insert(c.data(), c.size(), spec.preset, ofhe_, expect_for(spec));
     bytes += c.size();
   }
 
@@ -482,6 +512,11 @@ void Store::recover() {
   std::set<std::string> committed;
   for (const auto& r : recs)
     if (r.type == WalType::InsertCommit) committed.insert(r.segment);
+
+  // Names from the log reach unlink(): accept only the names this store generates (audit A-56).
+  for (const auto& r : recs)
+    if (r.type != WalType::Delete && !is_segment_name(r.segment))
+      throw std::runtime_error("wal: record with an invalid segment name; refusing to start");
 
   for (const auto& r : recs) {
     if (r.type == WalType::Delete) {

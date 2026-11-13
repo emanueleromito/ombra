@@ -2,6 +2,7 @@
 #include "ombra/storage/wal.hpp"
 
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include "ombra/storage/fsutil.hpp"
@@ -52,6 +53,35 @@ int main() {
     ::close(fd);
     Wal w(p);
     CHECK(w.recover().size() == 2);
+  }
+  // Corruption in the middle (a valid record follows a damaged one) is refused, not cut away
+  // (audit A-52), and the file is left as it was.
+  {
+    Wal w(p);
+    w.reset();
+    w.append(a);
+    w.append(b);
+    w.append(c);
+  }
+  {
+    auto bytes = read_file(p);
+    int fd = ::open(p.c_str(), O_WRONLY);
+    std::uint8_t x = static_cast<std::uint8_t>(bytes[6 + 9] ^ 0xFF);  // inside the first record
+    CHECK(::pwrite(fd, &x, 1, 6 + 9) == 1);
+    ::close(fd);
+    Wal w(p);
+    CHECK_THROWS(w.recover());
+    CHECK(read_file(p).size() == bytes.size());
+    x = bytes[6 + 9];
+    fd = ::open(p.c_str(), O_WRONLY);
+    CHECK(::pwrite(fd, &x, 1, 6 + 9) == 1);
+    ::close(fd);
+    CHECK(Wal(p).recover().size() == 3);
+  }
+  // The log file is private (audit A-22).
+  {
+    struct stat st {};
+    CHECK(::stat(p.c_str(), &st) == 0 && (st.st_mode & 077) == 0);
   }
   // Checkpoint.
   {

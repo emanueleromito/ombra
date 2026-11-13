@@ -17,6 +17,7 @@ static core::SeededPayload payload(std::uint32_t n = 8, std::uint16_t t = 2) {
   p.ring_dim = n;
   p.towers = t;
   p.slots = 4;
+  p.noise_scale_deg = 1;
   p.scaling_factor = 1099511627776.0;
   p.key_tag = "tag-synthetic";
   for (std::uint16_t i = 0; i < t; ++i) p.moduli.push_back(1000003ull + 2 * i);
@@ -77,6 +78,28 @@ int main() {
     CHECK_THROWS(s.insert("docs", 0, {"x"}, {c}));
   }
   CHECK_THROWS(s.insert("docs", 0, {"x"}, {seeded_column(good, "m0_depth2")}));
+
+  // Header fields are compared with the collection at insert (audit A-71): key tag, ring
+  // dimension and slots (when the preset shape is known), level, noise degree, word range.
+  {
+    s.set_shape_provider([](const std::string&, std::uint32_t* ring, std::uint32_t* slots) {
+      *ring = 8;
+      *slots = 4;
+      return true;
+    });
+    auto mod = [&](auto f) {
+      auto p = payload();
+      f(p);
+      return seeded_column(core::write_seeded_payload(p));
+    };
+    CHECK_THROWS(s.insert("docs", 0, {"x"}, {mod([](core::SeededPayload& p) { p.key_tag = "other"; })}));
+    CHECK_THROWS(s.insert("docs", 0, {"x"}, {mod([](core::SeededPayload& p) { p.level = 1; })}));
+    CHECK_THROWS(s.insert("docs", 0, {"x"}, {mod([](core::SeededPayload& p) { p.noise_scale_deg = 2; })}));
+    CHECK_THROWS(s.insert("docs", 0, {"x"}, {mod([](core::SeededPayload& p) { p.slots = 2; })}));
+    CHECK_THROWS(s.insert("docs", 0, {"x"}, {mod([](core::SeededPayload& p) { p.c0[0] = p.moduli[0]; })}));
+    CHECK_THROWS(s.insert("docs", 0, {"x"}, {seeded_column(core::write_seeded_payload(payload(16, 3)))}));
+    s.set_shape_provider(nullptr);
+  }
 
   // Insert and replace accept kind 4 and kind 2 together; the stored bytes are unchanged.
   const std::string seg = s.insert("docs", 0, {"a", "b"}, {seeded_column(), column(1)});

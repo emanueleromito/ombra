@@ -6,6 +6,7 @@
 #include <unistd.h>
 
 #include <cerrno>
+#include <cstdio>
 #include <cstring>
 #include <stdexcept>
 
@@ -87,7 +88,7 @@ void write_all(int fd, const std::uint8_t* d, std::size_t n, const std::string& 
 }  // namespace
 
 Wal::Wal(std::string path) : path_(std::move(path)) {
-  fd_ = ::open(path_.c_str(), O_RDWR | O_CREAT, 0644);
+  fd_ = ::open(path_.c_str(), O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0600);
   if (fd_ < 0) fail("open", path_);
   struct stat st {};
   if (::fstat(fd_, &st) != 0) fail("stat", path_);
@@ -119,6 +120,19 @@ Wal::~Wal() {
   if (fd_ >= 0) ::close(fd_);
 }
 
+namespace {
+// True if a complete, CRC-valid, decodable frame starts at `pos`.
+bool valid_frame_at(const std::vector<std::uint8_t>& b, std::size_t pos) {
+  if (b.size() - pos < 8) return false;
+  auto len = get_le(b.data() + pos, 4);
+  auto crc = static_cast<std::uint32_t>(get_le(b.data() + pos + 4, 4));
+  if (len == 0 || len > kMaxRecord || b.size() - pos - 8 < len) return false;
+  const std::uint8_t* body = b.data() + pos + 8;
+  WalRecord r;
+  return crc32(body, len) == crc && decode_body(body, len, &r);
+}
+}  // namespace
+
 std::vector<WalRecord> Wal::recover(std::size_t* dropped) {
   auto b = read_file(path_);
   std::vector<WalRecord> out;
@@ -135,6 +149,14 @@ std::vector<WalRecord> Wal::recover(std::size_t* dropped) {
     pos += 8 + len;
   }
   if (pos < b.size()) {
+    // A torn tail has nothing valid after it. A valid frame after a bad one means the middle of the
+    // log is damaged: cutting there would silently lose acknowledged deletes and inserts, so refuse
+    // to start (audit A-52). The log is left untouched for inspection.
+    for (std::size_t q = pos + 1; q + 8 < b.size(); ++q)
+      if (valid_frame_at(b, q))
+        throw std::runtime_error(
+            "wal: corruption before the end of the log (valid records follow a damaged one); "
+            "refusing to truncate");
     if (dropped) *dropped = b.size() - pos;
     if (::ftruncate(fd_, static_cast<off_t>(pos)) != 0) fail("truncate", path_);
     if (::fsync(fd_) != 0) fail("fsync", path_);
@@ -150,8 +172,17 @@ void Wal::append(const WalRecord& r) {
   frame.insert(frame.end(), body.begin(), body.end());
   off_t end = ::lseek(fd_, 0, SEEK_END);
   if (end < 0) fail("seek", path_);
-  write_all(fd_, frame.data(), frame.size(), path_);
-  if (::fsync(fd_) != 0) fail("fsync", path_);
+  // A failed write or fsync must not leave a partial frame in front of later records: cut the log
+  // back to where it was (audit A-52), then report the original error.
+  try {
+    write_all(fd_, frame.data(), frame.size(), path_);
+    if (::fsync(fd_) != 0) fail("fsync", path_);
+  } catch (...) {
+    if (::ftruncate(fd_, end) != 0) {
+      std::fprintf(stderr, "[ombra.storage] wal: cannot truncate after a failed append\n");
+    }
+    throw;
+  }
 }
 
 void Wal::reset() {

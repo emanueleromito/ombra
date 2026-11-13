@@ -36,6 +36,21 @@ void check_column_envelope(const std::uint8_t* data, std::size_t size,
                            const std::string& expected_preset,
                            const std::string& expected_openfhe_version);
 
+// What a seeded column must match at insert (audit A-71): the collection's key tag and, when the
+// server knows the preset, its ring dimension and slot count. Level 0, noise degree 1, a finite
+// scale and reduced words are always required. No OpenFHE needed.
+struct ColumnExpect {
+  std::string key_tag;
+  std::uint32_t ring_dim = 0;  // 0: not checked
+  std::uint32_t slots = 0;     // 0: not checked
+};
+
+// check_column_envelope plus, for a seeded column, the full header comparison with `expect`.
+void check_column_for_insert(const std::uint8_t* data, std::size_t size,
+                             const std::string& expected_preset,
+                             const std::string& expected_openfhe_version,
+                             const ColumnExpect& expect);
+
 std::vector<std::uint8_t> encode_segment(const SegmentData& s);
 
 // Durable write (temp, fsync, rename, fsync dir). Crash points fire inside.
