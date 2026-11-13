@@ -1,6 +1,6 @@
 # 0024. GPU families beyond Ampere (update to 0008)
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-11-13
 
 ## Context
@@ -16,7 +16,7 @@ Decision 0008 compiles for `sm_80` and `sm_86` only and says Ada, Hopper and Bla
 
 ## Decision
 
-Proposed: **C.** Build `sm_75`, `sm_80`, `sm_86`, `sm_89`, `sm_90` by default, with two support levels:
+**C.** Build `sm_75`, `sm_80`, `sm_86`, `sm_89`, `sm_90` by default, with two support levels:
 
 | Level | Cards | Meaning |
 | --- | --- | --- |
@@ -24,12 +24,12 @@ Proposed: **C.** Build `sm_75`, `sm_80`, `sm_86`, `sm_89`, `sm_90` by default, w
 | Supported | L40S, H100/H200, L4 | Full GPU test suite on one Ada and one Hopper card before each release |
 | Works, not a target | T4 | Built and tested before a release; no latency target |
 
-Until this is accepted the defaults stay Ampere only; the wider build is available through `make prebuild` and `make on-gpu GPU=...` (`modal_app.py`, `ALL_CUDA_ARCHS`).
+Accepted by the user on 2026-11-13: the default build (`CMakeLists.txt`, `Makefile`, `modal_app.py`) now compiles the five architectures. `make prebuild` and `make on-gpu GPU=...` run the same binaries on any listed card.
 
 ## Consequences
 
-- Hard rule 7 in `CLAUDE.md` and the "Ampere only" rule in `core/CLAUDE.md` would read "the five architectures of 0024"; "Ampere features are fine to use" becomes "use nothing a listed architecture lacks" (today's kernels already comply: 16 KB of shared memory per block, no architecture-specific intrinsics).
+- Hard rule 7 in `CLAUDE.md` and the "Ampere only" rule in `core/CLAUDE.md` now read "the five architectures of 0024"; "Ampere features are fine to use" becomes "use nothing a listed architecture lacks" (today's kernels already comply: 16 KB of shared memory per block, no architecture-specific intrinsics).
 - A kernel that wants an Ampere-or-later feature needs a fallback for `sm_75`, or Turing leaves the list.
 - Release testing grows by three short GPU runs (about 3 minutes each on prebuilt binaries; about USD 0.50 in total at today's Modal prices).
-- `CMAKE_CUDA_ARCHITECTURES` default, `CUDA_ARCHS` in the Makefile and in `modal_app.py` change from `80;86` to `75;80;86;89;90` when accepted.
+- `CMAKE_CUDA_ARCHITECTURES` default, `CUDA_ARCHS` in the Makefile and in `modal_app.py` changed from `80;86` to `75;80;86;89;90`.
 - Blackwell stays open; it needs its own decision with the image change.

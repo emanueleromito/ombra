@@ -1,6 +1,6 @@
 # 0023. Seeded stored ciphertexts
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-11-13
 
 ## Context
@@ -56,6 +56,6 @@ Readers refuse an unknown payload version or generator, a size that does not mat
 - Loading a block no longer runs OpenFHE's deserializer per column (3.3 ms each at `m0_depth2`, experiment 0005); it runs BLAKE2xb instead. To be measured.
 - GPU memory, search latency and scores are unchanged: the device holds the same words as before.
 - The client's compiled module handles the secret key (it already runs in the client's process; the server still never sees it, hard rule 2).
-- Rule 3 in `CLAUDE.md` should name this exception once the decision is accepted; an agent does not edit that file.
+- Rule 3 in `CLAUDE.md` names this exception (added when the user accepted the decision on 2026-11-13).
 - Seed reuse is a break, so the seed source and its test are part of the crypto review surface.
 - Follow-ups not decided here: regenerating on the GPU (option B above), and packing the 50 to 60-bit words of `c0'` instead of storing 64 bits each (about 17% more).

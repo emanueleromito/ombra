@@ -20,7 +20,7 @@ core/
 - **Match OpenFHE's representation.** Same ring dimension, RNS moduli order, NTT form and scaling. When in doubt, read OpenFHE's source; do not guess.
 - **No secret key here.** Core code never touches the secret key. Tests may create keys through OpenFHE to produce test ciphertexts, and must not pass them into core APIs.
 - **Parameters only from `params/`.** Never hard-code ring sizes or moduli in kernels or tests.
-- **Ampere only:** `sm_80`, `sm_86`. Ampere features (async copies, larger shared memory) are fine to use.
+- **Architectures (decision 0024):** `sm_75`, `sm_80`, `sm_86`, `sm_89`, `sm_90`. Use nothing a listed architecture lacks; a kernel that wants an Ampere-or-later feature needs a fallback for `sm_75`.
 - **Check every CUDA call** with the project error macro; check kernel launch errors in debug builds.
 - **Document each kernel:** a comment above it with what it computes, the expected grid/block shape and memory assumptions.
 - **Performance changes need numbers.** A PR that claims a speedup includes a before/after `make bench` result.

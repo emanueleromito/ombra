@@ -16,7 +16,7 @@ Client (your environment)              Server (Docker, one or more machines)
   key file (secret key never leaves)
 ```
 
-**First version targets NVIDIA Ampere only** (`sm_80` A100, `sm_86` A10). Other generations come later.
+**Builds target five NVIDIA architectures** (decision 0024): `sm_75` (T4), `sm_80` (A100), `sm_86` (A10), `sm_89` (L4, L40S) and `sm_90` (H100, H200). A10 and A100 stay the reference cards; Blackwell comes later.
 
 ## FHE library and scheme
 
@@ -122,7 +122,7 @@ The Python client does more than in a normal vector DB, because the secret key l
 
 The server ships as two Docker images on a public registry (GitHub Container Registry or Docker Hub), and the client ships as Python wheels on PyPI.
 
-- **GPU image:** one image with compiled code for the supported GPU generations, plus generic code the driver compiles for future GPUs. First version: Ampere only (`sm_80`, `sm_86`); Ada, Hopper and Blackwell are added later.
+- **GPU image:** one image with compiled code for the supported GPU generations, plus generic code the driver compiles for future GPUs. Today: Turing, Ampere, Ada and Hopper (`sm_75`, `sm_80`, `sm_86`, `sm_89`, `sm_90`, decision 0024); Blackwell is added later.
 - **CPU image:** for laptops, testing and evaluation.
 - **Single machine:** a `docker compose` file starts the server with one command.
 - **Multiple machines:** a Helm chart deploys the router and the nodes on Kubernetes, using the NVIDIA GPU Operator for GPU access.

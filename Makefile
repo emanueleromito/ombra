@@ -3,7 +3,7 @@
 
 PYTHON      ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 BUILD_DIR   ?= build
-CUDA_ARCHS  ?= 80;86
+CUDA_ARCHS  ?= 75;80;86;89;90
 TASK        ?= all
 BUILD_TYPE  ?= Release
 GPU         ?= a10

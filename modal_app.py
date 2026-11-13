@@ -27,8 +27,8 @@ PYTHON_VERSION = "3.11"
 OPENFHE_TAG = "v1.6.1"
 OPENFHE_PYTHON_TAG = "v1.6.1.0"
 
-# Ampere only for now.
-CUDA_ARCHS = "80;86"
+# Decision 0024: Turing, Ampere, Ada, Hopper.
+CUDA_ARCHS = "75;80;86;89;90"
 
 REPO_DIR = "/root/ombra"
 BUILD_DIR = "/root/ombra-build"
@@ -100,7 +100,7 @@ def _run(cmd: list[str], cwd: str = REPO_DIR, ok_codes: tuple[int, ...] = (0,)) 
 
 def _build(build_type: str, targets: tuple[str, ...] = (), archs: str = CUDA_ARCHS) -> None:
     """Configure and build; `targets` limits the build to those CMake targets (default: all).
-    `archs` is the CUDA architecture list (default: Ampere only, decision 0008)."""
+    `archs` is the CUDA architecture list (default: the five architectures of decision 0024)."""
     _run(
         [
             "cmake",

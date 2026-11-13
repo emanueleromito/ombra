@@ -1,6 +1,6 @@
 # 0008. GPU families beyond Ampere
 
-- **Outcome:** adopted as an option (all four new cards pass every oracle test); default build list proposed in decision 0024
+- **Outcome:** adopted as an option (all four new cards pass every oracle test); default build list set by decision 0024 (accepted)
 - **Date:** 2026-11-13
 - **Area:** GPU families
 

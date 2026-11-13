@@ -13,7 +13,7 @@ Not a plan task: the experiments behind PR "performance, memory, GPU families, s
 | Local mode: fused score, monomial in evaluation form | Search at 10k vectors, d = 384: 2.08 to 1.42 s (implementer's run); score alone 4.8x to 5.8x, expansion 1.07x to 1.25x | research 0003, 0004 |
 | Expansion writes its leaves in place | Handoff 3.8 / 7.2 / 12.5 ms to 0 (d = 384 / 768 / 1536); server 1.09x to 1.14x; 1.2 GB less device memory at d = 1536 | research 0007 |
 | Lazy Karatsuba search kernel | Rejected: 0.90x to 0.98x; the kernel reads 820 to 970 GB/s and is memory-bound | research 0006 |
-| Seeded stored ciphertexts (decision 0023, proposed) | Stored column 0.4995x; collection data 938 to 559 MB; same top-k | research 0011 |
-| Turing, Ada, Hopper | 146 GPU tests pass on T4, L4, L40S, H200; expansion d = 768: 177 / 114 / 38 / 19 ms against 74 (A10) and 36 (A100) | research 0008, decision 0024 (proposed) |
+| Seeded stored ciphertexts (decision 0023, accepted) | Stored column 0.4995x; collection data 938 to 559 MB; same top-k | research 0011 |
+| Turing, Ada, Hopper | 146 GPU tests pass on T4, L4, L40S, H200; expansion d = 768: 177 / 114 / 38 / 19 ms against 74 (A10) and 36 (A100) | research 0008, decision 0024 (accepted) |
 
 Modal spend for all of it: about USD 3 of the 10 allowed.
