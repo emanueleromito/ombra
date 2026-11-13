@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Seeded stored ciphertext, payload of envelope kind 4 (docs/decisions/0023). Header only, NO
 // OpenFHE: the server's storage layer includes it. Little-endian layout:
 //   2 payload version (u16, 1) | 2 generator (u16, 1 = BLAKE2xb, see seeded_ciphertext_prg.hpp)
