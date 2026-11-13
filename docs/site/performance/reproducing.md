@@ -27,6 +27,7 @@ Expect small differences. The same kernel took up to 26% longer in one run than 
 | Object sizes, keys, vectors per GPU | `modal run modal_app.py::test_openfhe --pytest-args "-s -k test_openfhe_sizes"` | CPU only |
 | Local mode search and create time | `python tests/bench_local_mode.py --d <d>`, pinned with `taskset -c <cpus>` | a Ryzen 5 5600H laptop |
 | Filtered recall and latency on real text | `core/bench/filtered_recall.py`, `modal run modal_app.py::filtered_recall` | A100 |
+| The same on an A10 (banking77 only) | `make prebuild`, then `modal run modal_app.py::on_gpu --gpu a10 --cmd "pip install --quiet sentence-transformers ;; OMBRA_GPU_BUDGET_MB=16000 OMBRA_HOST_BUDGET_MB=8000 python core/bench/filtered_recall.py --out /data/results --datasets /data/datasets/filtered-recall --dataset banking77 --queries 200 --preset fast"` | A10 24 GB |
 | Recall of a preset against plaintext | `modal run modal_app.py::recall --preset <preset>` | A100 |
 
 `m0_depth2` is the Balanced preset and `m0_compact_n8192` is Fast; the benchmark scripts use these names, which come from `core/params/ckks_presets.json`. The Python client has its own recall check, `ombra-recall`, which compares plaintext and encrypted recall on your own data.
