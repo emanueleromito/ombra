@@ -2,18 +2,32 @@
 
 Ombra is available under the [PolyForm Noncommercial License 1.0.0](LICENSE) or a commercial license. See [License](#license) for which one applies to you.
 
-A vector database where your vectors and your search queries stay encrypted with fully homomorphic encryption (FHE). The server stores and searches only ciphertexts, so it never sees your data or what you search for.
+Ombra is a vector database where your vectors, your queries and the scores stay encrypted with fully homomorphic encryption (FHE). The server stores and searches ciphertexts only, so it never sees your data or what you search for.
 
-> **Status:** early design and prototyping. Nothing here is usable yet.
+You keep the secret key in a Python client. The client encrypts vectors and queries, the server computes similarity on the ciphertexts with CUDA kernels on an NVIDIA Ampere GPU, and the client decrypts the scores and picks the top results. Results are exact, because the client re-ranks the candidates itself. The cryptography is CKKS, and OpenFHE does key generation, encryption and decryption.
 
-## How it works
+An encrypted search is slower than a plain one and ciphertexts are much larger than vectors. The docs say by how much.
 
-- A **Python client** holds the secret key. It encrypts vectors and queries, decrypts results and picks the top-k.
-- A **server** (Docker image, GPU or CPU) stores ciphertexts and runs encrypted similarity search on GPUs with custom CUDA kernels.
-- Cryptography uses the **CKKS** scheme: OpenFHE for everything security-critical, our own CUDA kernels for the fast path.
-- Works with **your own embeddings** from any model, with **LangChain** and **LlamaIndex** integrations planned.
+## Try it
 
-See [docs/](docs/) for the product requirements, architecture and decisions.
+```bash
+pip install "ombra[local]" sentence-transformers
+python examples/local_search.py
+```
+
+Local mode runs a CPU server inside your process, so you need no GPU. It takes several seconds per search and is for trying Ombra and small collections. Wheels exist for Python 3.11 to 3.13 on Linux (x86_64, aarch64) and macOS 15 or newer (arm64, x86_64). There is no Windows build.
+
+For GPU speed, run the server with `docker compose up -d` on a host with an NVIDIA Ampere GPU, and connect with `Client("host:port", ...)`.
+
+## Documentation
+
+- [Getting started](docs/site/getting-started/install.md): install, quickstart, your first search, local mode or a server, examples
+- [Concepts](docs/site/concepts/homomorphic-encryption.md): what FHE and CKKS are, and who holds which key
+- [How it works](docs/site/how-it-works/encoding.md): encoding, query expansion, search, clusters, filters, deletes
+- [Security](docs/site/security/threat-model.md): the threat model and what the server learns
+- [Performance](docs/site/performance/latency-and-throughput.md): latency, throughput and storage
+
+The `examples/` folder has runnable scripts, and the LangChain adapter is in `integrations/langchain-ombra/`.
 
 ## Repository layout
 
@@ -22,13 +36,14 @@ See [docs/](docs/) for the product requirements, architecture and decisions.
 | `core/` | CUDA kernels and OpenFHE ciphertext format handling (C++/CUDA) |
 | `server/` | API, storage, clustering and GPU scheduling (C++) |
 | `client/` | Python client: keys, encryption, top-k, re-ranking |
-| `integrations/` | LangChain and LlamaIndex adapters |
+| `integrations/` | LangChain adapter |
+| `examples/` | Runnable scripts |
 | `tests/` | Cross-component and end-to-end tests |
-| `docs/` | Requirements, architecture, decisions and plan |
+| `docs/` | The documentation site (`docs/site/`) and internal notes |
 
 ## Development
 
-GPU work runs on [Modal](https://modal.com). Reference cards: NVIDIA Ampere (A10 for development, A100 for benchmarks); Turing, Ada and Hopper cards are built and tested too.
+GPU work runs on [Modal](https://modal.com). Reference cards: NVIDIA Ampere (A10 for development, A100 for benchmarks); Turing, Ada and Hopper cards are built and tested too. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ```bash
 make help        # list all commands
