@@ -125,7 +125,7 @@ int main(int argc, char** argv) {
   // Messages carry whole blocks (tens of MB at the larger preset). The C++ API has one receive
   // limit for the whole server, so it is the size of the largest legitimate message; it is applied
   // after authentication, and the ResourceQuota bounds all buffered messages together.
-  std::uint64_t max_message_mb = 256, memory_quota_mb = 2048, max_threads = 128;
+  std::uint64_t max_message_mb = 1024, memory_quota_mb = 4096, max_threads = 128;
   std::uint64_t session_budget_mb = 0, rest_workers = 4, rest_max_conns = 32;
   std::uint64_t max_blob_mb = 16384, max_key_upload_mb = 2048;
   std::uint64_t search_idle_s = 60, search_total_s = 600;
