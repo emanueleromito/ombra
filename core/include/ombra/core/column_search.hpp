@@ -15,12 +15,6 @@
 
 namespace ombra::core {
 
-// Which single-query kernel the search below runs: "lazy" (default) or "mont" (the Montgomery
-// kernel), chosen by the environment variable OMBRA_COLUMN_SEARCH_KERNEL=mont|lazy read once at
-// first use. Both give bit-identical results; the variable exists to benchmark one against the
-// other and to keep the old kernel under test. Throws std::invalid_argument for any other value.
-const char* column_search_kernel_name();
-
 struct ColumnSearchShape {
   std::size_t dims;        // d ciphertexts per block (and in the query)
   std::size_t blocks;      // stored blocks (each block = dims ciphertexts)

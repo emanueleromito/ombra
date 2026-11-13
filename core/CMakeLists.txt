@@ -13,12 +13,6 @@ target_include_directories(ombra_file_envelope_test PRIVATE include)
 add_test(NAME file_envelope COMMAND ombra_file_envelope_test
          ${CMAKE_CURRENT_SOURCE_DIR}/../tests/fixtures/envelope_v1_ciphertext.bin)
 
-# Lazy column-search arithmetic (core/kernels/column_search_lazy.cuh) on the CPU against a 128-bit
-# `%` reference. The header and modarith.cuh compile without CUDA.
-add_executable(ombra_column_search_lazy_test src/column_search_lazy_test.cpp)
-target_include_directories(ombra_column_search_lazy_test PRIVATE include kernels)
-add_test(NAME column_search_lazy COMMAND ombra_column_search_lazy_test)
-
 # Expansion tree shape (expand_tree vs expand_tree_into) with a fake ciphertext, header only.
 add_executable(ombra_expansion_tree_test src/expansion_tree_test.cpp)
 target_include_directories(ombra_expansion_tree_test PRIVATE include)

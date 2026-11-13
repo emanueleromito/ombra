@@ -3,9 +3,7 @@
 // Internal code returns Status; the public functions convert to exceptions at the boundary.
 
 #include <chrono>
-#include <cstdlib>
 #include <stdexcept>
-#include <string>
 
 #include "device_buffer.cuh"
 #include "kernel_launch.hpp"
@@ -43,25 +41,7 @@ void check_reduced(const u64* words, std::size_t count, const ColumnSearchShape&
   }
 }
 
-// OMBRA_COLUMN_SEARCH_KERNEL=mont|lazy picks the single-query kernel (default lazy). Read once, at
-// first use; an unknown value throws (every call, as the static is only set by a valid read).
-ColumnSearchKernel selected_kernel() {
-  static const ColumnSearchKernel kernel = [] {
-    const char* v = std::getenv("OMBRA_COLUMN_SEARCH_KERNEL");
-    if (v == nullptr || *v == '\0') return ColumnSearchKernel::kLazy;
-    const std::string name = v;
-    if (name == "lazy") return ColumnSearchKernel::kLazy;
-    if (name == "mont") return ColumnSearchKernel::kMontgomery;
-    throw std::invalid_argument("column_search: OMBRA_COLUMN_SEARCH_KERNEL must be mont or lazy");
-  }();
-  return kernel;
-}
-
 }  // namespace
-
-const char* column_search_kernel_name() {
-  return selected_kernel() == ColumnSearchKernel::kLazy ? "lazy" : "mont";
-}
 
 struct ColumnSearchDevice::Impl {
   ColumnSearchShape shape;
@@ -104,8 +84,8 @@ struct ColumnSearchDevice::Impl {
   Status run_kernel(double& seconds) {
     const ColumnSearchDims d{shape.dims, shape.blocks, shape.num_towers, shape.ring_dim};
     OMBRA_CUDA_CHECK(cudaEventRecord(start, nullptr));
-    OMBRA_CUDA_CHECK(launch_column_search(stored.get(), query.get(), out.get(), tc.get(), d,
-                                          nullptr, selected_kernel()));
+    OMBRA_CUDA_CHECK(
+        launch_column_search(stored.get(), query.get(), out.get(), tc.get(), d, nullptr));
     OMBRA_CUDA_CHECK(cudaEventRecord(stop, nullptr));
     OMBRA_CUDA_CHECK(cudaEventSynchronize(stop));  // wait for completion before timing is read
     OMBRA_CUDA_CHECK_LAUNCH();
@@ -127,8 +107,6 @@ ColumnSearchDevice::ColumnSearchDevice(const ColumnSearchShape& shape,
                                        const std::vector<std::uint64_t>& moduli)
     : impl_(std::make_unique<Impl>()) {
   validate_shape(shape, moduli);
-  (void)
-      selected_kernel();  // an invalid OMBRA_COLUMN_SEARCH_KERNEL fails here, not at the first run
   const std::vector<TowerConst> consts = make_tower_consts(moduli);
   impl_->shape = shape;
   impl_->moduli = moduli;
@@ -203,7 +181,6 @@ ColumnSearchLauncher::ColumnSearchLauncher(const ColumnSearchShape& shape,
   ColumnSearchShape one = shape;
   one.blocks = 1;
   validate_shape(one, moduli);
-  (void)selected_kernel();
   impl_->shape = one;
   const std::vector<TowerConst> consts = make_tower_consts(moduli);
   const auto init = [&]() -> Status {
@@ -227,7 +204,7 @@ void ColumnSearchLauncher::launch(const std::uint64_t* stored_dev, const std::ui
   const ColumnSearchDims d{s.dims, 1, s.num_towers, s.ring_dim};
   const auto go = [&]() -> Status {
     OMBRA_CUDA_CHECK(launch_column_search(stored_dev, query_dev, out_dev, impl_->tc.get(), d,
-                                          static_cast<cudaStream_t>(stream), selected_kernel()));
+                                          static_cast<cudaStream_t>(stream)));
     return {};
   };
   go().throw_if_error();

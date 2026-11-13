@@ -138,7 +138,6 @@ int main(int argc, char** argv) {
     std::ofstream out(argv[7]);
     out.precision(9);
     out << "{\n"
-        << "  \"kernel\": \"" << ombra::core::column_search_kernel_name() << "\",\n"
         << "  \"dims\": " << dims << ",\n"
         << "  \"blocks\": " << blocks << ",\n"
         << "  \"vectors_per_block\": " << slots << ",\n"

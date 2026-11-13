@@ -54,13 +54,10 @@ def _normalized_rows(rng: np.random.Generator, rows: int, cols: int) -> np.ndarr
 
 # (dims, blocks): the required d = 16 single fully packed block, plus 5 blocks of d = 4 so the
 # kernel's partially filled block tile (blocks not a multiple of 4) is exercised too.
-# Both single-query kernels are compared with OpenFHE: the lazy 128-bit kernel (the default) and
-# the Montgomery kernel it replaced (OMBRA_COLUMN_SEARCH_KERNEL, read by the host wrapper).
-@pytest.mark.parametrize("kernel", ["lazy", "mont"])
 @pytest.mark.parametrize(("dims", "blocks"), [(16, 1), (4, 5)])
 @pytest.mark.parametrize("preset", PRESETS)
 def test_gpu_column_search_matches_openfhe(
-    tmp_path: Path, dims: int, blocks: int, preset: str, kernel: str
+    tmp_path: Path, dims: int, blocks: int, preset: str
 ) -> None:
     import openfhe as ofhe
 
@@ -94,13 +91,11 @@ def test_gpu_column_search_matches_openfhe(
         capture_output=True,
         text=True,
         timeout=600,
-        env={**os.environ, "OMBRA_COLUMN_SEARCH_KERNEL": kernel},
     )
     # Exit code 0 means every RNS word, modulus and metadata field matched OpenFHE exactly.
     assert proc.returncode == 0, f"driver failed (exit {proc.returncode}): {proc.stderr}"
     assert "column search exact RNS match: PASS" in proc.stdout
-    assert f"column search kernel: {kernel}" in proc.stdout
-    print(f"{kernel} d={dims} blocks={blocks}: exact RNS match with OpenFHE: PASS")
+    print(f"d={dims} blocks={blocks}: exact RNS match with OpenFHE: PASS")
 
     def decrypt(name: str) -> np.ndarray:
         ct, ok = ofhe.DeserializeCiphertext(str(tmp_path / name), ofhe.BINARY)
