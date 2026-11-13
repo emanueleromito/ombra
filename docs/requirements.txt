@@ -1,0 +1,12 @@
+# Packages that build the public docs site (mkdocs.yml, pages in docs/site/).
+# mkdocs-material: the site theme; it also brings mkdocs and pymdown-extensions (math, Mermaid).
+mkdocs-material==9.8.1
+# mkdocs-macros-plugin: puts values from the code in pages ({{ preset("fast", "ring_dim") }}),
+# through docs/macros.py, so no constant is typed by hand.
+mkdocs-macros-plugin==1.5.0
+# mkdocstrings[python]: the Python API reference, generated from the docstrings in client/ombra/.
+mkdocstrings[python]==1.0.8
+mkdocstrings-python==2.0.11
+# cryptography: lets the macros import ombra.documents and ombra.keyfile, so pages read the blob and
+# key-file format constants (sizes, KDF cost) from the code.
+cryptography==50.0.2

@@ -9,9 +9,14 @@ pyarrow==17.0.0
 grpcio
 grpcio-tools
 protobuf
-cryptography
+cryptography==50.0.2
 langchain-core
 langchain-tests
 ruff
 # Pinned: the version of clang-format changes what `make lint` accepts. Ubuntu 24.04 ships 18.
 clang-format==18.1.8
+# The docs build (tests/test_docs_*.py run under `make test`). Same pins as docs/requirements.txt.
+mkdocs-material==9.8.1
+mkdocs-macros-plugin==1.5.0
+mkdocstrings[python]==1.0.8
+mkdocstrings-python==2.0.11

@@ -1,0 +1,18 @@
+/* "Deep dive" admonition: marks a page or section a reader can skip. Use !!! deep-dive "Title". */
+:root {
+  --md-admonition-icon--deep-dive: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20m1 15h-2v-6h2zm0-8h-2V7h2z"/></svg>');
+}
+.md-typeset .admonition.deep-dive,
+.md-typeset details.deep-dive {
+  border-color: #6a5acd;
+}
+.md-typeset .deep-dive > .admonition-title,
+.md-typeset .deep-dive > summary {
+  background-color: rgba(106, 90, 205, 0.1);
+}
+.md-typeset .deep-dive > .admonition-title::before,
+.md-typeset .deep-dive > summary::before {
+  background-color: #6a5acd;
+  -webkit-mask-image: var(--md-admonition-icon--deep-dive);
+  mask-image: var(--md-admonition-icon--deep-dive);
+}
