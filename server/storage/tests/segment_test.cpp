@@ -51,7 +51,7 @@ int main() {
 
   // A column with an unknown envelope version, inside a valid container (CRC correct).
   auto bad = column(3);
-  bad[4] = 2;
+  bad[4] = 3;
   SegmentData sd2{0, {"x"}, {column(1), bad}};
   write_segment(p, sd2);
   CHECK_THROWS(read_segment(p, kPreset, kOfhe));

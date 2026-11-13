@@ -34,6 +34,7 @@ docs/plan/results/raw/
 *.ombra
 *.bin
 !tests/fixtures/envelope_v1_ciphertext.bin
+!tests/fixtures/envelope_v2_seeded.bin
 
 # ---------------------------------------------------------------
 # C++ / CUDA / CMake
