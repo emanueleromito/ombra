@@ -49,9 +49,9 @@ exist twice during the handoff; four twiddle tables and one key per tree level s
 | Fused, lazy, Karatsuba score on the CPU | local-mode score 5x | 0003 | adopted |
 | Monomial in evaluation form on the CPU | local-mode expansion 1.07x to 1.25x | 0004 | adopted |
 | Template reader for ciphertexts | minus 3.3 ms per query and per block | 0005, 0009 | proposed |
-| Lazy Karatsuba search kernel on the GPU | search kernel, to be measured | 0006 | needs a Modal run |
-| Expansion writes leaves in place | minus 3.6 to 12.2 ms, minus 1.2 GB at d = 1536 | 0007 | needs a Modal run |
-| GPU families beyond Ampere | T4, L4, L40S, H100 | 0008 | needs a Modal run |
+| Lazy Karatsuba search kernel on the GPU | none: 2% to 10% slower | 0006 | rejected: the kernel is memory-bound |
+| Expansion writes leaves in place | server 1.07x to 1.19x, minus 1.2 GB at d = 1536 | 0007 | adopted |
+| GPU families beyond Ampere | T4, L4, L40S, H200 all exact | 0008 | adopted as an option; decision 0024 proposed |
 | Hand-written CPU key switch | local-mode expansion 2x or more | 0010 | not run: large; proposed as a task |
 | Lazy inner product in the key switch | at most 5% of expansion | none | not run: the inner product is 23% of a split and mostly gathers, not arithmetic |
 | Harvey lazy butterflies in the NTT | under 10% of the NTT | none | not run: on a GPU the 64-bit high multiply dominates a butterfly, not the corrections |
@@ -59,5 +59,5 @@ exist twice during the handoff; four twiddle tables and one key per tree level s
 | Staying in the extended basis across tree levels (lazy ModDown) | fewer NTTs per split | none | rejected without a run: the leaves would no longer equal OpenFHE's word for word |
 | Server drops the result to one tower | download halved, block 11.7 to 9.0 ms | 0001 | needs approval: changes what the server returns and uses the spare level |
 | Depth-1 preset (two Q towers) | about one third less memory, storage and compute | none | needs approval: preset and level budget (0019 leaves the second level unused) |
-| Seeded ciphertexts | storage and upload halved | T0.11 write-up | needs approval: format, and hard rule 3 |
+| Seeded ciphertexts | stored columns 0.50x | 0011 | adopted after the user approved it (decision 0023, proposed) |
 | 32-bit RNS words | NTT about 2x | none | needs approval: other moduli, so new presets |

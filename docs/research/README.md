@@ -36,7 +36,7 @@ experiments that compare candidates.
 | [0005](0005-ciphertext-deserialize/README.md) | Cost of deserializing a ciphertext | server and client CPU | baseline; 3.3 ms of fixed cost per ciphertext |
 | [0006](0006-gpu-lazy-search-kernel/README.md) | GPU search kernel: lazy accumulation, Karatsuba cross term | GPU kernel | rejected: 2% to 10% slower; the kernel is memory-bound |
 | [0007](0007-expansion-leaf-sink/README.md) | Expansion writes its leaves in place (no handoff) | GPU host, memory | adopted: server 1.07x to 1.19x, 1.2 GB less at d = 1536 |
-| 0008 | GPU families: T4, L4, L40S, H100 | GPU families | not run yet (Modal) |
+| [0008](0008-gpu-families/README.md) | GPU families: T4, L4, L40S, H200 against A10 and A100 | GPU families | adopted as an option: exact on all; default list proposed in decision 0024 |
 | 0009 | Template reader for ciphertexts | server and client CPU | proposed, not built |
 | 0010 | Hand-written CPU key switch for local mode | client CPU | not run: proposed as a task |
 | [0011](0011-seeded-stored-ciphertexts/README.md) | Seeded stored ciphertexts (decision 0023) | disk, upload | adopted pending 0023: stored columns 0.50x, collection data 0.60x |
