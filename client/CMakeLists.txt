@@ -41,4 +41,11 @@ if(OpenMP_CXX_FOUND)
   target_link_libraries(_native PRIVATE OpenMP::OpenMP_CXX)
 endif()
 set_target_properties(_native PROPERTIES INSTALL_RPATH "${OpenFHE_LIBDIR}" BUILD_WITH_INSTALL_RPATH ON)
+# pybind11 hides symbols by default. On macOS that gives _native its own copies of the statics and
+# type info that OpenFHE's headers define, so a ciphertext read here does not match the context
+# held by libOPENFHEpke ("not generated with the same crypto context"). openfhe-python is built
+# with default visibility on macOS for the same reason (packaging/ombra-openfhe/CMakeLists.txt).
+if(APPLE)
+  set_target_properties(_native PROPERTIES CXX_VISIBILITY_PRESET default VISIBILITY_INLINES_HIDDEN OFF)
+endif()
 install(TARGETS _native DESTINATION ombra)
