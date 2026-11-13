@@ -141,7 +141,7 @@ def _decrypt_round(col: Any, envelopes: list[bytes], counts: list[int], workers:
             p = Path(t) / f"b{i}.bin"
             p.write_bytes(env.payload)
             files.append(p)
-        return col._pool.decrypt(files, counts, col.slots)
+        return col._pool.decrypt(files, counts, col.slots, kit.expected)
 
 
 def run_search(

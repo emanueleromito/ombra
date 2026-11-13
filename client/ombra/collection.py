@@ -29,10 +29,8 @@ from __future__ import annotations
 import os
 import re
 import struct
-import tempfile
 from collections.abc import Sequence
 from dataclasses import dataclass
-from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
@@ -40,7 +38,7 @@ import numpy as np
 
 from ombra import _seeding, presets
 from ombra import query as oq
-from ombra._decrypt import decrypt_values
+from ombra._decrypt import ExpectedShapes, check_ciphertext, decrypt_values
 from ombra.blobstore import KIND_DOCUMENT, KIND_RECORD, BlobStore, BlobStoreError, GrpcBlobStore
 from ombra.clustering import assign, cluster_vectors
 from ombra.documents import DocumentCodec
@@ -103,9 +101,9 @@ class KeyKit:
             cc.Enable(feature)
         self.cc = cc
         self._seed_pool: _seeding.SeedPool | None = None
+        self._expected: ExpectedShapes | None = None
         self._keys = cc.KeyGen() if secret_blob is None else self._restore(secret_blob)
         cc.EvalMultKeyGen(self._keys.secretKey)
-        cc.ClearEvalAutomorphismKeys()  # the key store is static: hold exactly this layout's keys
         cc.EvalAutomorphismKeyGen(
             self._keys.secretKey, oq.automorphism_indices(cc.GetRingDimension(), n_leaves)
         )
@@ -118,8 +116,8 @@ class KeyKit:
     def _secret_blob(self) -> bytes:
         import openfhe as ofhe
 
-        sk = self._via_file(lambda p: ofhe.SerializeToFile(p, self._keys.secretKey, ofhe.BINARY))
-        pk = self._via_file(lambda p: ofhe.SerializeToFile(p, self._keys.publicKey, ofhe.BINARY))
+        sk = ofhe.Serialize(self._keys.secretKey, ofhe.BINARY)  # in memory, never a temp file
+        pk = ofhe.Serialize(self._keys.publicKey, ofhe.BINARY)
         return self._BLOB_MAGIC + struct.pack("<HI", self._BLOB_VERSION, len(sk)) + sk + pk
 
     def _restore(self, blob: bytes) -> Any:
@@ -134,17 +132,14 @@ class KeyKit:
         sk_raw, pk_raw = blob[head.size : head.size + n], blob[head.size + n :]
 
         def load(raw: bytes, fn: Any) -> Any:
-            with tempfile.TemporaryDirectory() as t:
-                p = Path(t) / "k.bin"
-                p.write_bytes(raw)
-                obj, ok = fn(str(p), ofhe.BINARY)
-            if not ok:
-                raise ValueError("key could not be deserialized")
-            return obj
+            try:
+                return fn(raw, ofhe.BINARY)  # in memory, never a temp file
+            except Exception as exc:
+                raise ValueError("key could not be deserialized") from exc
 
         return SimpleNamespace(
-            secretKey=load(sk_raw, ofhe.DeserializePrivateKey),
-            publicKey=load(pk_raw, ofhe.DeserializePublicKey),
+            secretKey=load(sk_raw, ofhe.DeserializePrivateKeyString),
+            publicKey=load(pk_raw, ofhe.DeserializePublicKeyString),
         )
 
     def save(
@@ -182,7 +177,7 @@ class KeyKit:
 
         slots = oq.symmetric_slots(oq.prescale_query(ext), self.cc.GetRingDimension())
         ct = self.cc.Encrypt(self._keys.publicKey, self.cc.MakeCKKSPackedPlaintext(slots.tolist()))
-        raw = self._via_file(lambda p: ofhe.SerializeToFile(p, ct, ofhe.BINARY))
+        raw = ofhe.Serialize(ct, ofhe.BINARY)
         return write_envelope(Kind.CIPHERTEXT, self.derived.preset, self.openfhe_version, raw)
 
     def __repr__(self) -> str:
@@ -192,33 +187,21 @@ class KeyKit:
     def public_key(self) -> Any:
         return self._keys.publicKey
 
-    @staticmethod
-    def _via_file(write: Any) -> bytes:
-        with tempfile.TemporaryDirectory() as t:
-            p = Path(t) / "x.bin"
-            if not write(str(p)):
-                raise RuntimeError("OpenFHE serialization failed")
-            return p.read_bytes()
-
     def key_files(self, pb: Any) -> dict[int, bytes]:
         """Public key files in versioned envelopes, by KeyKind. Nothing secret."""
         import openfhe as ofhe
 
         d, v = self.derived.preset, self.openfhe_version
         raw = {
-            pb.KEY_KIND_CONTEXT: (
-                Kind.CONTEXT,
-                self._via_file(lambda p: ofhe.SerializeToFile(p, self.cc, ofhe.BINARY)),
-            ),
+            pb.KEY_KIND_CONTEXT: (Kind.CONTEXT, ofhe.Serialize(self.cc, ofhe.BINARY)),
             pb.KEY_KIND_EVAL_MULT: (
                 Kind.PUBLIC_EVAL_KEY,
-                self._via_file(
-                    lambda p: ofhe.CryptoContext.SerializeEvalMultKey(p, ofhe.BINARY, self.key_tag)
-                ),
+                ofhe.SerializeEvalMultKeyString(ofhe.BINARY, self.key_tag),
             ),
+            # by key tag: another key set in this process does not end up in the upload (A-43)
             pb.KEY_KIND_AUTOMORPHISM: (
                 Kind.PUBLIC_EVAL_KEY,
-                self._via_file(lambda p: self.cc.SerializeEvalAutomorphismKey(p, ofhe.BINARY)),
+                ofhe.SerializeEvalAutomorphismKeyString(ofhe.BINARY, self.key_tag),
             ),
         }
         return {k: write_envelope(kind, d, v, b) for k, (kind, b) in raw.items()}
@@ -261,16 +244,33 @@ class KeyKit:
             ct = self.cc.Encrypt(
                 self._keys.publicKey, self.cc.MakeCKKSPackedPlaintext([float(x) for x in col])
             )
-            raw = self._via_file(lambda p, ct=ct: ofhe.SerializeToFile(p, ct, ofhe.BINARY))
-            out.append(write_envelope(Kind.CIPHERTEXT, d, v, raw))
+            out.append(write_envelope(Kind.CIPHERTEXT, d, v, ofhe.Serialize(ct, ofhe.BINARY)))
         return out
+
+    @property
+    def expected(self) -> ExpectedShapes:
+        """Shapes a server ciphertext may have (see ombra._decrypt); built once."""
+        if self._expected is None:
+            self._expected = ExpectedShapes.of_context(self.cc, self._keys.publicKey)
+        return self._expected
+
+    def _load_ciphertext(self, payload: bytes) -> Any:
+        """Deserialize a server ciphertext in memory and refuse it unless it has the shape this
+        collection produces (key tag, two components, level, scale, tower count)."""
+        import openfhe as ofhe
+
+        try:
+            ct = ofhe.DeserializeCiphertextString(payload, ofhe.BINARY)
+        except Exception as exc:
+            raise ValueError("ciphertext could not be deserialized") from exc
+        check_ciphertext(self.expected, ct, len(payload))
+        return ct
 
     def decrypt_column(self, envelope: bytes) -> np.ndarray:
         """Decrypt a stored-column envelope (kind 2 or 4) to its `slots` values."""
         return self.decrypt_columns([envelope])[0]
 
     def decrypt_columns(self, envelopes: Sequence[bytes]) -> list[np.ndarray]:
-        import openfhe as ofhe
 
         envs = [
             read_column_envelope(e, self.derived.preset, self.openfhe_version) for e in envelopes
@@ -286,12 +286,7 @@ class KeyKit:
         for i, e in enumerate(envs):
             if e.kind != Kind.CIPHERTEXT:
                 continue
-            with tempfile.TemporaryDirectory() as t:
-                p = Path(t) / "ct.bin"
-                p.write_bytes(e.payload)
-                ct, ok = ofhe.DeserializeCiphertext(str(p), ofhe.BINARY)
-            if not ok:
-                raise ValueError("ciphertext could not be deserialized")
+            ct = self._load_ciphertext(e.payload)
             out[i] = decrypt_values(self.cc, self._keys.secretKey, ct, self.slots)
         return [o for o in out if o is not None]
 
