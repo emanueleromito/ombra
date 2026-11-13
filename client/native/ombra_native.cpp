@@ -299,10 +299,17 @@ class Engine {
   ombra::native::MonomialCache mono_cache_;  // X^-2^l in evaluation form, per tree level
 };
 
-// 32 bytes from the operating system's CSPRNG: getrandom(2), looped over short reads and EINTR.
-// Any other result is an error; the caller never gets a partly filled seed.
+// 32 bytes from the operating system's CSPRNG. Any failure is an error; the caller never gets a
+// partly filled seed. macOS has no getrandom(2): getentropy(2) fills the whole buffer or fails.
 std::array<std::uint8_t, 32> fresh_seed_bytes() {
   std::array<std::uint8_t, 32> seed{};
+#if defined(__APPLE__)
+  if (getentropy(seed.data(), seed.size()) != 0) {
+    throw std::runtime_error("getentropy failed: " + std::string(std::strerror(errno)));
+  }
+  return seed;
+#else
+  // getrandom(2), looped over short reads and EINTR.
   std::size_t got = 0;
   while (got < seed.size()) {
     const ssize_t n = getrandom(seed.data() + got, seed.size() - got, 0);
@@ -314,6 +321,7 @@ std::array<std::uint8_t, 32> fresh_seed_bytes() {
     got += static_cast<std::size_t>(n);
   }
   return seed;
+#endif
 }
 
 // Test hook: exactly 32 bytes from a file (a short read or an unreadable file raises).
