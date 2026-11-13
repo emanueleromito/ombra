@@ -6,9 +6,9 @@ Items are in two groups. "Next" is work that has started or is small and agreed.
 
 ## Next
 
-**Limits on uploads before the server reads them.** The server accepts messages of up to 1 GiB. For a single request, gRPC reads the whole message before the server checks the API key, so a caller without a key can make the server hold a lot of memory. We plan a small receive limit for ordinary calls, kept apart from the limit for streaming calls, and a key check before the body is read. Today: run the server on a network where only your own clients can connect.
+**A smaller receive limit for single requests.** The server has one receive limit for every call, 256 MiB by default (`--max-message-mb`). Uploads of keys and blocks need that much, but most single requests are small. We plan a small limit for those, kept apart from the limit for streaming uploads. Today: the server refuses a call without a valid API key before it reaches the handler, and a memory quota caps what all calls hold together. Lower `--max-message-mb` if your collections are small.
 
-**Checks on uploaded contexts and columns.** The server rebuilds the encryption context from bytes the client sends. It checks the file header first and the security floor afterwards, and it does not compare the context with the collection's preset. A holder of a write key can also store a column that makes later searches of its cluster fail. We plan to check the size, the security floor and the preset before the server builds the context, and to check each column when it is inserted. Today: give write keys only to clients you trust.
+**Checks on uploaded contexts before they are read.** The server rebuilds the encryption context from bytes the client sends. It checks the size and the file header first, then lets OpenFHE read the bytes, and only then checks the security floor and compares the context with the collection's preset. We plan to check the floor and the preset from the raw bytes, before OpenFHE reads them. Today: give API keys only to clients you trust.
 
 **Shorter global locks in the storage layer.** The server holds some store locks while it writes to disk, so one slow writer can delay every other request. We plan to release them before the disk work. Today: this costs speed under many concurrent writers. It does not affect results.
 
@@ -34,11 +34,11 @@ Items are in two groups. "Next" is work that has started or is small and agreed.
 
 **Other operations features.** Mutual TLS as an alternative to API keys, API keys limited to one collection, a Helm chart for Kubernetes, backup to object storage such as S3, and a scheduler that runs several queries in one pass over the stored data. Today: see [Backups](operations/backups.md) for how to back up the data directory.
 
-**More platforms.** Windows client wheels and support for Blackwell GPUs. Today the client has no Windows build, and the server needs an Ampere GPU.
+**More platforms.** Windows client wheels and support for Blackwell GPUs. Today the client has no Windows build, and the server is built for Turing, Ampere, Ada and Hopper GPUs only.
 
 ### Features
 
-**Range filters.** Filters work on integer fields. Ranges over dates or numbers need encrypted comparisons, which we have not built. Today: turn a range into buckets, for example one field per month, and filter on the bucket.
+**Range filters.** Filters work on integer fields. Ranges over dates or numbers need encrypted comparisons, which we have not built. Today: turn a range into buckets, for example a field whose value is the month, and filter on the bucket.
 
 **A "precise" preset.** A preset with higher precision. The name exists, but the client and the server refuse it. Today: use the presets listed in [Presets](reference/presets.md).
 
