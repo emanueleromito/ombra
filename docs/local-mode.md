@@ -8,26 +8,30 @@ server refuses (key tag, preset, sizes, F_max, block layouts, blob buckets).
 
 ## Requirements
 
-- CPython 3.12 on x86-64 Linux (the `openfhe` wheel on PyPI is built for it), libstdc++ from
-  GCC 13 or newer (Ubuntu 24.04) and `libgomp1`.
+- CPython 3.11, 3.12 or 3.13 on Linux (x86-64 or aarch64) or macOS (arm64 or x86-64). The
+  `ombra` wheel carries the compiled expansion and the OpenFHE libraries, so it needs no compiler.
+- openfhe-python 1.6.1 for keys and encryption. `pip install "ombra[local]"` installs it as
+  `ombra-openfhe`, our build of openfhe-python 1.6.1.0 with OpenFHE inside, for the same
+  platforms as the `ombra` wheel. It has the same import name (`openfhe`) as the `openfhe`
+  package on PyPI, so the two conflict: install only `ombra-openfhe`, and uninstall `openfhe`
+  first if you have it.
 - No GPU.
 
-## Speed limits (measured on Modal, 4 vCPU, "fast" preset, d = 384)
+## Speed limits (d = 768, "fast" preset, 10,000 vectors, 4 logical CPUs of a Ryzen 5 5600H)
 
 | What | Time |
 | --- | --- |
-| create a collection of 12 vectors (keys, encryption, upload) | 5.4 s |
-| one search, 1 cluster | 19.7 s |
-| the end-to-end search test (about 40 searches, 150 vectors, 6 clusters) | 351 s |
+| create the collection (keys, encryption, upload) | 35 s |
+| one search, 2 clusters | 2.8 s |
 
-A search costs about 10 key switches per query entry (d + filter values = 387 entries), plus
-one ciphertext product per entry and block. The GPU server needs about two key switches per
-entry. Local mode is for trying Ombra, tests and small collections (some thousands of vectors),
-not for production. The "balanced" preset (ring 16384) is about 4 times slower.
+Details and the command are in `docs/plan/results/2026-11-12-t4.1-local-mode-wheel.md`. Local mode
+is for trying Ombra, tests and small collections, not for production. The "balanced" preset
+(ring 16384) is about 4 times slower.
 
-## Why the expansion differs from the GPU server
+## The expansion
 
-openfhe-python cannot multiply a ciphertext exactly by X^-k, which the server's expansion tree
-needs. Local mode gets the same entries with a real plaintext product and a subgroup trace over
-the same automorphism keys (see the module docstring); results agree to about 1e-6 and the
-top-k after exact re-ranking is identical (the end-to-end test runs on both backends).
+Local mode runs the server's exact expansion tree (`core/include/ombra/core/expansion_tree.hpp`
+with the CPU operations of `core/src/openfhe_expand_ops.hpp`) in `ombra._native`, a C++ OpenFHE
+extension in the wheel. It uses the same levels as the GPU server, and the score blocks come back
+at the same ciphertext level (`tests/wheel_check.py` checks it on every wheel, and
+`tests/test_gpu_local_parity.py` compares the top-k with the server's).

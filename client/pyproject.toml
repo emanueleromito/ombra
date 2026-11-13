@@ -8,18 +8,71 @@ version = "0.1.0"
 license = "PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial"
 license-files = ["LICENSE"]
 description = "Client for Ombra, a vector database with fully homomorphic encryption"
-requires-python = ">=3.12,<3.13"  # local mode is built for 3.12 only until wheels for other versions ship
+requires-python = ">=3.11"
 dependencies = ["numpy", "cryptography", "faiss-cpu"]
 
 [project.scripts]
 ombra-recall = "ombra.recall:main"
 
 [project.optional-dependencies]
-local = ["openfhe==1.6.1.0.24.4", "protobuf", "grpcio-tools"]
-grpc = ["openfhe==1.6.1.0.24.4", "grpcio", "grpcio-tools"]
+# ombra-openfhe is openfhe-python 1.6.1.0 with OpenFHE inside, built for every platform of the
+# wheels (packaging/ombra-openfhe/). It has the same import name as the `openfhe` package on PyPI,
+# which is a CPython 3.12 x86-64 Linux build only: do not install both.
+local = ["ombra-openfhe==1.6.1.0", "protobuf", "grpcio-tools"]
+grpc = ["ombra-openfhe==1.6.1.0", "grpcio", "grpcio-tools"]
 langchain = ["langchain-core"]
 
 [tool.scikit-build]
 wheel.packages = ["ombra"]
 cmake.build-type = "Release"
 minimum-version = "build-system.requires"
+
+# Wheels (.github/workflows/wheels.yml). Run from the repository root: `cibuildwheel client`. The
+# build needs core/ next to client/, so the whole repository is the project and client/ the package.
+[tool.cibuildwheel]
+build = "cp311-* cp312-* cp313-*"
+skip = "*-musllinux_*"
+build-verbosity = 1
+# The smoke test runs a tiny encrypted search in local mode and checks that the compiled expansion
+# is in use and that the result level equals the server's.
+test-requires = ["protobuf", "grpcio-tools"]
+test-command = "python {project}/tests/wheel_check.py"
+# The check uses synthetic data only, so the local server child may print its tracebacks.
+test-environment = { OMBRA_LOCAL_DEBUG = "1" }
+# The client process imports openfhe-python for keys and encryption (the child process of local
+# mode never does). It is the ombra-openfhe wheel built by the same workflow, in openfhe-wheels/.
+before-test = "pip install --find-links {project}/openfhe-wheels ombra-openfhe==1.6.1.0"
+
+[tool.cibuildwheel.linux]
+manylinux-x86_64-image = "manylinux_2_28"
+manylinux-aarch64-image = "manylinux_2_28"
+before-all = "bash ci/wheel/build_openfhe.sh /usr/local"
+# auditwheel finds OpenFHE through the RPATH of _native and copies it, libgomp included.
+repair-wheel-command = "LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH auditwheel repair -w {dest_dir} {wheel}"
+
+[tool.cibuildwheel.macos]
+# OpenMP: the extension and OpenFHE use it, and Apple clang ships no libomp, so Homebrew's libomp is
+# used. Without it local mode would run on one thread. The wheel bundles neither OpenFHE nor
+# libomp: _native loads the copies in the ombra-openfhe wheel, because two libomp copies in one
+# process abort (see ci/wheel/repair_macos.py). Its build targets the runner's macOS, so the
+# deployment target is the runner's.
+before-all = "bash ci/wheel/build_openfhe.sh $HOME/ombra-openfhe"
+repair-wheel-command = "python ci/wheel/repair_macos.py {wheel} {dest_dir} $HOME/ombra-openfhe/lib $(brew --prefix libomp)/lib"
+
+[tool.cibuildwheel.macos.environment]
+# Homebrew libomp is keg-only (not on the default include or linker path). The native code
+# includes omp.h, and OpenFHE links -lomp by name.
+CPATH = "$(brew --prefix libomp)/include"
+LIBRARY_PATH = "$(brew --prefix libomp)/lib"
+LDFLAGS = "-L$(brew --prefix libomp)/lib"
+MACOSX_DEPLOYMENT_TARGET = "15.0"
+CMAKE_PREFIX_PATH = "$HOME/ombra-openfhe"
+OMBRA_REQUIRE_NATIVE = "1"
+
+[[tool.cibuildwheel.overrides]]
+select = "*-macosx_x86_64"
+inherit.environment = "append"
+environment.MACOSX_DEPLOYMENT_TARGET = "15.0"
+
+[tool.cibuildwheel.linux.environment]
+OMBRA_REQUIRE_NATIVE = "1"

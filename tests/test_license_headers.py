@@ -67,6 +67,12 @@ def test_packaged_license_files_match_the_root_ones():
             assert copy.read_bytes() == (ROOT / "LICENSE").read_bytes(), f"{copy} differs from root"
 
 
-def test_ci_image_carries_the_license_label():
-    text = (ROOT / "ci" / "Dockerfile").read_text(encoding="utf-8")
-    assert f'LABEL org.opencontainers.image.licenses="{EXPRESSION}"' in text
+def test_images_carry_the_source_and_license_labels():
+    dockerfiles = [ROOT / "ci" / "Dockerfile", *sorted((ROOT / "docker").glob("Dockerfile*"))]
+    assert len(dockerfiles) >= 3, "ci image and the two release images are expected"
+    for path in dockerfiles:
+        text = path.read_text(encoding="utf-8")
+        assert f'LABEL org.opencontainers.image.licenses="{EXPRESSION}"' in text, path
+        assert (
+            'LABEL org.opencontainers.image.source="https://github.com/erailabs/ombra"' in text
+        ), path

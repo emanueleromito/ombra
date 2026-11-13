@@ -116,20 +116,26 @@ The code is the same; only the client object changes. Replace `Client.local(...)
 `insecure=True`, which is for test servers on a loopback address. The API key is an access token
 for the server; it is not your secret key and is not related to it.
 
-The server image is not released yet. Until then you build `ombra_server` from this repository
-with `make build` (it needs CUDA and an Ampere GPU, `sm_80` or `sm_86`). The options are listed
-at the top of `server/grpc/src/ombra_server.cpp`, and `docs/architecture.md` describes the
-design. In short:
+The server runs from a Docker image. It needs an NVIDIA GPU (Ampere: A100, A10, RTX 30xx) and the
+NVIDIA container toolkit. From a checkout of this repository:
 
 ```bash
-ombra_server --create-api-key --scope admin --data-dir ./server-data   # prints a token, once
-ombra_server --data-dir ./server-data --listen 0.0.0.0:50051 \
-    --tls-cert server.crt --tls-key server.key
+docker compose up -d
+docker compose exec ombra cat /data/admin_api_key          # the admin API key
+docker compose cp ombra:/data/tls/server.crt ./server.crt   # the certificate, for the client
 ```
 
+The first start makes a self-signed certificate (valid for `localhost` and `127.0.0.1`) and one
+admin API key. Both stay in the `ombra-data` volume with your collections. A machine without a
+GPU cannot run the server; use local mode there. You can also build `ombra_server` yourself with
+`make build`. Its options are listed at the top of `server/grpc/src/ombra_server.cpp`, and
+`docs/architecture.md` describes the design.
+
 The server refuses to start without TLS and without an API key unless you pass `--insecure` or
-`--no-auth`, and those two are limited to loopback addresses. Then save this as
-`server_search.py` and run it with the server address and the certificate (or its CA):
+`--no-auth`, and those two are limited to loopback addresses. Save this as `server_search.py`,
+set `OMBRA_API_KEY` to the token from the log and `OMBRA_PASSPHRASE` to a passphrase for your key
+file, and run it with the server address and the certificate (or its CA), for example
+`python server_search.py localhost:50051 server.crt`:
 
 ```python
 """The same search against an Ombra server: python server_search.py HOST:PORT CA_CERT"""
