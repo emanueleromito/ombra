@@ -22,7 +22,8 @@ def main() -> None:
     ]
     topics = [0, 0, 1, 1, 2, 2]  # one integer per text; the filter compares against it
     ids = [str(uuid.uuid4()) for _ in texts]  # random ids: the server sees ids in the clear
-    info = {i: (t, topic) for i, t, topic in zip(ids, texts, topics)}  # id -> (text, topic)
+    # id -> (text, topic)
+    info = {i: (t, topic) for i, t, topic in zip(ids, texts, topics, strict=True)}
 
     model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 

@@ -43,7 +43,7 @@ def main() -> None:
         "The central bank raised its policy rate.",
     ]
     ids = [str(uuid.uuid4()) for _ in texts]  # random ids: the server sees ids in the clear
-    text_of = dict(zip(ids, texts))
+    text_of = dict(zip(ids, texts, strict=True))
 
     model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
     vectors = model.encode(texts, normalize_embeddings=True).tolist()

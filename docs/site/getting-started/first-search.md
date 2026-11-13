@@ -17,7 +17,7 @@ Every vector needs an id. The server stores ids in plain text and sees them on e
 
 ```python
 ids = [str(uuid.uuid4()) for _ in texts]  # random ids: the server sees ids in the clear
-text_of = dict(zip(ids, texts))
+text_of = dict(zip(ids, texts, strict=True))
 ```
 
 A collection is a set of vectors that you search together. Creating one does four things on your machine: it generates the keys, groups the vectors into clusters, encrypts them, and uploads the ciphertexts and the public evaluation keys. The secret key is written to the key file and never leaves it.
