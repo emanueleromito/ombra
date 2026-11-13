@@ -17,7 +17,7 @@ For GPU speed, run the server with `docker compose up -d` on a host with a [supp
 
 ## Status
 
-Version 0.1.0. One server on one machine, with the Python client and a LangChain adapter. The server is single-tenant: an API key has a scope (read, write or admin) but no collection, so any read key reads every collection on that server. Not built yet: several nodes, a plaintext-database mode, range filters, key rotation and a LlamaIndex adapter.
+Version 0.1.0. One server on one machine, with the Python client and a LangChain adapter. The server is single-tenant: an API key has a scope (read, write or admin) but no collection, so any read key reads every collection on that server. Not built yet: several nodes, a plaintext-database mode, range filters, key rotation and a LlamaIndex adapter. The [roadmap](docs/site/roadmap.md) lists what is planned.
 
 ## Security
 

@@ -98,4 +98,5 @@ nav:
       - operations/backups.md
       - operations/monitoring.md
       - operations/upgrades.md
+  - Roadmap: roadmap.md
   - Contributing: contributing-docs.md
