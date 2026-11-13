@@ -87,6 +87,13 @@ def make_ckks_params(preset: dict[str, Any]) -> Any:
     params.SetBatchSize(preset["batch_size"])
     params.SetScalingTechnique(getattr(ofhe.ScalingTechnique, preset["scaling_technique"]))
     params.SetKeySwitchTechnique(getattr(ofhe.KeySwitchTechnique, preset["key_switch_technique"]))
+    # Pinned explicitly (decision 0017, audit A-10): real-valued CKKS, OpenFHE's fixed-noise
+    # decryption (not noise flooding) and normal evaluation. These are OpenFHE's defaults today;
+    # naming them keeps a library update from changing them silently. tests/test_ckks_baseline.py
+    # checks both the values and that two decryptions of one ciphertext differ.
+    params.SetCKKSDataType(ofhe.CKKSDataType.REAL)
+    params.SetDecryptionNoiseMode(ofhe.DecryptionNoiseMode.FIXED_NOISE_DECRYPT)
+    params.SetExecutionMode(ofhe.ExecutionMode.EXEC_EVALUATION)
     # Optional: number of key-switching digits (HYBRID). Without it OpenFHE picks its default.
     # The digit count sets the size of the special modulus P, hence log2(QP).
     if "num_large_digits" in preset:
