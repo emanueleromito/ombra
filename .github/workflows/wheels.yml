@@ -46,6 +46,8 @@ jobs:
           - {name: "macOS x86_64", os: macos-15-intel, archs: x86_64}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - uses: pypa/cibuildwheel@f9b966cfadf4109556cadc5bb39ddb72d0ce664e # v4.3.5
         with:
           package-dir: packaging/ombra-openfhe
@@ -73,6 +75,8 @@ jobs:
           - {name: "macOS x86_64", os: macos-15-intel, archs: x86_64}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: wheels-ombra-openfhe-${{ matrix.os }}-${{ matrix.archs }}

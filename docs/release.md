@@ -25,16 +25,19 @@ Versions: `ombra`, `langchain-ombra`, the CMake project and `ombra_server --vers
 2. Run the workflow by hand first: Actions, Release, Run workflow, with `dry_run` on. It publishes
    to TestPyPI and pushes the images as `dryrun-<commit>`.
 3. Tag the release commit on `main` with `v<version>` and push the tag. The workflow refuses a tag
-   that does not match the version in `client/pyproject.toml`.
+   that does not match the version in `client/pyproject.toml`, a tag whose commit is not on `main`,
+   and any real release (`dry_run` off) that is not started from a `v*` tag. Both the image push
+   and the PyPI upload then wait for your approval, in that order.
 
 ## One-time setup
 
 Do this once, before the first run. No API token is stored anywhere: PyPI trusts the workflow
 through OpenID Connect.
 
-**GitHub environments.** In the repository settings, create two environments, `pypi` and
-`testpypi`. On `pypi`, add yourself as a required reviewer, so a tag push waits for your approval
-before it uploads.
+**GitHub environments.** In the repository settings, create four environments: `pypi`, `testpypi`,
+`ghcr-release` and `ghcr-dryrun`. On `pypi` and `ghcr-release`, add yourself as a required reviewer
+and restrict deployment to `v*` tags, so a tag push waits for your approval before it uploads wheels
+or pushes the release image tags. Also add a tag ruleset that protects `v*`.
 
 **Trusted publishers.** A project that does not exist yet is registered as a "pending publisher".
 Do this on both https://pypi.org/manage/account/publishing/ and
