@@ -27,9 +27,14 @@ struct ColumnSearchDims {
   u64 num_towers;  // RNS towers per polynomial
   u64 ring_dim;    // N
 };
+// Which single-query kernel computes the search; both give bit-identical output.
+//   kMontgomery: 4 Montgomery products and 3 modular additions per (dimension, block) (T1.4).
+//   kLazy:       raw 128-bit sums with a Karatsuba cross term, reduced every few dimensions.
+enum class ColumnSearchKernel { kMontgomery, kLazy };
 cudaError_t launch_column_search(const u64* stored, const u64* query, u64* out,
                                  const TowerConst* tc, const ColumnSearchDims& dims,
-                                 cudaStream_t stream);
+                                 cudaStream_t stream,
+                                 ColumnSearchKernel kernel = ColumnSearchKernel::kLazy);
 
 // Batched search: `num_queries` queries over the same stored blocks. queries are
 // [q][dim][comp][P], out is [q][block][comp 0..2][P]; see the comment in column_search.cu.

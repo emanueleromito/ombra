@@ -17,8 +17,10 @@
 //                                the real uploaded block, the others are device-to-device copies of
 //                                it (synthetic stand-in for the chosen clusters; kernel timing does
 //                                not depend on the values) -> "CASE ..." (memory plan, H2D time)
-//   QUERY <query.bin>            expansion -> device-to-device handoff -> stage 1 (centers), writes
-//                                s1_result.bin -> "S1 ..."; then waits for the next command
+//   QUERY <query.bin>            expansion (leaves written straight into stage 1's query buffer;
+//                                OMBRA_LEAF_HANDOFF=copy: old expand-then-copy) -> stage 1
+//                                (centers), writes s1_result.bin -> "S1 ..."; then waits for the
+//                                next command
 //   GO                           stage 2 over the resident blocks, writes s2_result_<b>.bin for
 //                                each distinct resident block -> "S2 ..."
 //   QUIT
@@ -32,6 +34,7 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <exception>
 #include <fstream>
 #include <iostream>
@@ -134,6 +137,19 @@ int main(int argc, char** argv) {
     }
     const std::size_t ring = cc->GetRingDimension();
 
+    // OMBRA_LEAF_HANDOFF=copy keeps the old expand-then-copy path (to measure before/after in one
+    // run); unset or "direct" writes the leaves straight into the query buffer. Anything else is
+    // an error.
+    bool copy_handoff = false;
+    if (const char* mode = std::getenv("OMBRA_LEAF_HANDOFF")) {
+      const std::string m = mode;
+      if (m == "copy") {
+        copy_handoff = true;
+      } else if (m != "direct") {
+        throw std::invalid_argument("OMBRA_LEAF_HANDOFF must be copy or direct");
+      }
+    }
+
     // Stored block 0 (kept flattened on the host for the per-case upload) and the centers block.
     std::vector<Ct> stored_cols = load_columns(dir, "stored", d);
     const Ct stored_sample = stored_cols[0];
@@ -171,32 +187,73 @@ int main(int argc, char** argv) {
       deser_s = seconds_since(t0);
       if (!gx) gx = std::make_unique<ombra::core::GpuExpansion>(cc, q, akeys, d);
 
-      t0 = Clock::now();
-      const ombra::core::GpuCt root = gx->upload(q);
-      std::vector<ombra::core::GpuCt> lv = ombra::core::expand_tree(root, d, ring, *gx);
-      gx->synchronize();
-      exp_s = seconds_since(t0);
+      const auto lf = ombra::core::flatten_one(stored_sample);
+      const CtMeta meta{lf.level, lf.noise_scale_deg, lf.scaling_factor};
+      const std::size_t leaf_words = gx->device().ct_bytes() / sizeof(u64);
 
-      if (!leaves_checked) {  // the leaves must carry the stored columns' metadata and moduli
-        const auto leaf = ombra::core::flatten_one(gx->download(lv[0]));
+      if (copy_handoff) {
+        // Old path: leaves exist as pool ciphertexts, then are copied into the search's buffers.
+        t0 = Clock::now();
+        const ombra::core::GpuCt root = gx->upload(q);
+        std::vector<ombra::core::GpuCt> lv = ombra::core::expand_tree(root, d, ring, *gx);
+        gx->synchronize();
+        exp_s = seconds_since(t0);
+
+        if (!leaves_checked) {  // the leaves must carry the stored columns' metadata and moduli
+          const auto leaf = ombra::core::flatten_one(gx->download(lv[0]));
+          const auto col = ombra::core::flatten_one(stored_sample);
+          if (leaf.level != col.level || leaf.noise_scale_deg != col.noise_scale_deg ||
+              leaf.scaling_factor != col.scaling_factor || leaf.moduli != col.moduli) {
+            throw std::runtime_error("expanded leaves and stored columns differ in metadata");
+          }
+          leaves_checked = true;
+        }
+        std::vector<const u64*> ptrs;
+        ptrs.reserve(d);
+        for (const auto& l : lv) ptrs.push_back(gx->device().device_ptr(l.dev));
+
+        t0 = Clock::now();
+        stage1.set_query_from_device(ptrs, meta);
+        if (stage2) stage2->set_query_from_device(ptrs, meta);
+        gx->synchronize();
+        hand_s = seconds_since(t0);
+        return;
+      }
+
+      // New path: the last tree level writes the leaves straight into stage 1's query buffer.
+      if (!leaves_checked) {  // the leaves carry the sample's metadata; check it and the moduli
+        const auto leaf = gx->leaf_meta();
         const auto col = ombra::core::flatten_one(stored_sample);
+        const auto& mod = gx->tables().moduli;
         if (leaf.level != col.level || leaf.noise_scale_deg != col.noise_scale_deg ||
-            leaf.scaling_factor != col.scaling_factor || leaf.moduli != col.moduli) {
+            leaf.scaling_factor != col.scaling_factor ||
+            col.moduli != std::vector<u64>(mod.begin(), mod.begin() + gx->tables().num_q)) {
           throw std::runtime_error("expanded leaves and stored columns differ in metadata");
         }
         leaves_checked = true;
       }
-      const auto lf = ombra::core::flatten_one(stored_sample);
-      const CtMeta meta{lf.level, lf.noise_scale_deg, lf.scaling_factor};
-      std::vector<const u64*> ptrs;
-      ptrs.reserve(d);
-      for (const auto& l : lv) ptrs.push_back(gx->device().device_ptr(l.dev));
+      t0 = Clock::now();
+      const ombra::core::GpuCt root = gx->upload(q);
+      ombra::core::expand_tree_into(
+          root, d, ring, *gx,
+          ombra::core::GpuExpansion::LeafBuffer{stage1.query_device(), leaf_words, d});
+      gx->synchronize();
+      exp_s = seconds_since(t0);
 
       t0 = Clock::now();
-      stage1.set_query_from_device(ptrs, meta);
-      if (stage2) stage2->set_query_from_device(ptrs, meta);
+      stage1.set_query_meta(meta);  // nothing to move: the leaves are already in place
       gx->synchronize();
       hand_s = seconds_since(t0);
+      // Stage 2 stands for the same server with more blocks, which would share this one query
+      // buffer; the benchmark keeps a separate stage object, so it copies the query once (not
+      // timed: it is an artifact of the two-object setup, not work a server does).
+      if (stage2) {
+        std::vector<const u64*> ptrs;
+        ptrs.reserve(d);
+        for (std::size_t j = 0; j < d; ++j) ptrs.push_back(stage1.query_device() + j * leaf_words);
+        stage2->set_query_from_device(ptrs, meta);
+        gx->synchronize();
+      }
     };
 
     reply("READY" + kv("d", static_cast<double>(d)) + kv("block_bytes", block_bytes) +

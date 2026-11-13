@@ -22,6 +22,7 @@
 #include "ciphertext-ser.h"
 #include "cryptocontext-ser.h"
 #include "ombra/core/ciphertext_ops.hpp"
+#include "ombra/core/column_search.hpp"
 #include "ombra/core/oracle_compare.hpp"
 #include "ombra/core/security_floor_context.hpp"
 #include "openfhe.h"
@@ -79,6 +80,8 @@ int main(int argc, char** argv) {
     }
 
     const auto gpu = ombra::core::gpu_eval_column_search(stored, query);
+    // OMBRA_COLUMN_SEARCH_KERNEL=mont|lazy picks the kernel; the test checks both.
+    std::printf("column search kernel: %s\n", ombra::core::column_search_kernel_name());
 
     bool ok = true;
     for (std::size_t b = 0; b < blocks; ++b) {

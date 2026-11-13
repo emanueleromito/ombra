@@ -456,11 +456,27 @@ struct ExpansionDevice::Impl {
     return it->second;
   }
 
-  // One chunk of a level: nodes [first, first + b) of `in`.
+  // One chunk of a level on raw pointers: hin.size() nodes. heven[k] is always written; hodd[k]
+  // is written iff it is non-null (the combine kernel skips a null per-node odd pointer; with
+  // any_odd false the odd array is not even uploaded). mono is read only if any_odd. Outputs must
+  // not alias the inputs. Shared by the pooled path (split_chunk) and the direct path.
+  Status split_ptrs(const std::vector<const u64*>& hin, const std::vector<u64*>& heven,
+                    const std::vector<u64*>& hodd, bool any_odd, const KeyDev& key,
+                    const u64* mono) {
+    const std::size_t b = hin.size();
+    OMBRA_TRY(ensure_scratch(b));
+    OMBRA_TRY(set_ptrs(hin, heven, any_odd ? hodd : std::vector<u64*>{}));
+    OMBRA_TRY(digits((u32)b));
+    OMBRA_TRY(inner((u32)b, key));
+    OMBRA_TRY(mod_down_combine((u32)b, mono, any_odd));
+    OMBRA_CUDA_CHECK_LAUNCH();
+    return {};
+  }
+
+  // One chunk of a level: nodes [first, first + b) of `in`; the outputs come from the pool.
   Status split_chunk(const std::vector<CtHandle>& in, std::size_t first, std::size_t b,
                      const KeyDev& key, const u64* mono, const std::vector<char>& want_odd,
                      std::vector<std::pair<CtHandle, CtHandle>>& out) {
-    OMBRA_TRY(ensure_scratch(b));
     std::vector<const u64*> hin(b);
     std::vector<u64*> heven(b), hodd(b, nullptr);
     bool any_odd = false;
@@ -476,12 +492,7 @@ struct ExpansionDevice::Impl {
       heven[k] = even->data();
       out[first + k] = {std::move(even), std::move(odd)};
     }
-    OMBRA_TRY(set_ptrs(hin, heven, any_odd ? hodd : std::vector<u64*>{}));
-    OMBRA_TRY(digits((u32)b));
-    OMBRA_TRY(inner((u32)b, key));
-    OMBRA_TRY(mod_down_combine((u32)b, mono, any_odd));
-    OMBRA_CUDA_CHECK_LAUNCH();
-    return {};
+    return split_ptrs(hin, heven, hodd, any_odd, key, mono);
   }
 };
 
@@ -736,6 +747,46 @@ std::vector<std::pair<CtHandle, CtHandle>> ExpansionDevice::split_level(
   };
   go().throw_if_error();
   return out;
+}
+
+void ExpansionDevice::split_level_into(const std::vector<CtHandle>& nodes, std::uint32_t galois,
+                                       std::size_t level, const std::vector<char>& want_odd,
+                                       const std::vector<std::uint64_t*>& even_dst,
+                                       const std::vector<std::uint64_t*>& odd_dst) {
+  Impl& s = *impl_;
+  require(nodes.size() == want_odd.size() && nodes.size() == even_dst.size() &&
+              nodes.size() == odd_dst.size(),
+          "split_level_into sizes");
+  for (std::size_t k = 0; k < nodes.size(); ++k) {
+    require(nodes[k] != nullptr, "split_level_into: null node");
+    require(even_dst[k] != nullptr, "split_level_into: null even destination");
+    require((want_odd[k] != 0) == (odd_dst[k] != nullptr),
+            "split_level_into: odd destination must be set exactly where the odd child is wanted");
+  }
+  const KeyDev& key = s.key_for(galois);
+  const u64* mono = nullptr;
+  if (std::any_of(want_odd.begin(), want_odd.end(), [](char w) { return w != 0; })) {
+    const auto it = s.monos.find(level);
+    require(it != s.monos.end(), "no monomial for this level");
+    mono = it->second.get();
+  }
+  const auto go = [&]() -> Status {
+    for (std::size_t first = 0; first < nodes.size(); first += s.max_batch) {
+      const std::size_t b = std::min(s.max_batch, nodes.size() - first);
+      std::vector<const u64*> hin(b);
+      std::vector<u64*> heven(b), hodd(b, nullptr);
+      bool any_odd = false;
+      for (std::size_t k = 0; k < b; ++k) {
+        hin[k] = nodes[first + k]->data();
+        heven[k] = even_dst[first + k];
+        hodd[k] = odd_dst[first + k];
+        any_odd = any_odd || hodd[k] != nullptr;
+      }
+      OMBRA_TRY(s.split_ptrs(hin, heven, hodd, any_odd, key, mono));
+    }
+    return {};
+  };
+  go().throw_if_error();
 }
 
 std::pair<CtHandle, CtHandle> ExpansionDevice::split(const CtHandle& c, std::uint32_t galois,

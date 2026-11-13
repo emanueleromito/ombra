@@ -101,6 +101,7 @@ def test_gpu_expansion_matches_openfhe(tmp_path: Path, d: int, preset: str) -> N
     msg = f"driver failed (exit {proc.returncode}): {proc.stdout}{proc.stderr}"
     assert proc.returncode == 0, msg
     assert "GPU expansion exact RNS match with OpenFHE: PASS" in proc.stdout
+    assert f"stage 5 expansion into buffer: PASS ({d} leaves)" in proc.stdout
     assert "FAIL" not in proc.stdout
     match = re.search(r"cpu_seconds=([0-9.]+) gpu_seconds=([0-9.]+)", proc.stdout)
     assert match is not None, "driver summary line missing"

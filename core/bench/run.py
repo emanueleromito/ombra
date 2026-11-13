@@ -152,14 +152,22 @@ def run_column_search(
                 str(part),
             ]
             print("$", " ".join(cmd), flush=True)
-            subprocess.run(cmd, check=True)  # noqa: S603
-            entry = json.loads(part.read_text())
-            gpu_name = entry.pop("gpu_name")
-            results.append(entry)
-            print(
-                f"d={d} blocks={n_blocks} vectors/s={entry['vectors_per_second']:.3e}",
-                flush=True,
-            )
+            rows = {}
+            for kernel in ("mont", "lazy"):  # old Montgomery kernel, then the lazy 128-bit one
+                env = {**os.environ, "OMBRA_COLUMN_SEARCH_KERNEL": kernel}
+                subprocess.run(cmd, check=True, env=env)  # noqa: S603
+                entry = json.loads(part.read_text())
+                gpu_name = entry.pop("gpu_name")
+                rows[kernel] = entry
+                results.append(entry)
+                print(
+                    f"d={d} blocks={n_blocks} kernel={kernel} "
+                    f"vectors/s={entry['vectors_per_second']:.3e}",
+                    flush=True,
+                )
+            speedup = rows["mont"]["kernel_seconds_median"] / rows["lazy"]["kernel_seconds_median"]
+            rows["lazy"]["speedup_vs_mont"] = speedup
+            print(f"d={d} lazy speedup over mont: {speedup:.3f}x", flush=True)
 
     record = {
         "task": "column-search",

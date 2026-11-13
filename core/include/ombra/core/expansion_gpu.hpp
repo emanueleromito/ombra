@@ -60,6 +60,29 @@ class GpuExpansion {
                                                    std::size_t shift,
                                                    const std::vector<char>& want_odd);
 
+  // Destination of expand_tree_into: leaf j is written to base + j * leaf_words, for j < leaves.
+  // `base` is a device pointer; leaf_words must be the words of one ciphertext (2 * num_q * N).
+  struct LeafBuffer {
+    std::uint64_t* base = nullptr;
+    std::size_t leaf_words = 0;
+    std::size_t leaves = 0;
+  };
+  // Metadata every expansion leaf carries (the split never changes it): that of the `sample`
+  // ciphertext, i.e. what download() puts on a leaf. Moduli are tables().moduli[0 .. num_q).
+  struct LeafMeta {
+    std::size_t level = 0;
+    std::size_t noise_scale_deg = 0;
+    double scaling_factor = 0;
+  };
+  LeafMeta leaf_meta() const;
+
+  // Optional last-level operation of expand_tree_into: like split_level, but the even child of
+  // nodes[k] is written to leaf residues[k] and, if want_odd[k], the odd child to leaf
+  // residues[k] + shift, directly in `sink`. Asynchronous (synchronize() before reading).
+  void split_level_into(const std::vector<GpuCt>& nodes, std::size_t level, std::uint32_t galois,
+                        std::size_t shift, const std::vector<char>& want_odd,
+                        const std::vector<std::size_t>& residues, const LeafBuffer& sink);
+
   ExpansionDevice& device() { return device_; }
   const ExpansionTables& tables() const { return tables_; }
   std::size_t key_count() const { return key_count_; }

@@ -5,7 +5,15 @@
 // every tower has its own modulus q < 2^60 taken from the ciphertext, never hard-coded here.
 #pragma once
 
+// The unit test of the lazy column-search arithmetic (core/src/column_search_lazy_test.cpp)
+// includes this header in a CPU-only build, where no CUDA toolkit exists: the qualifiers then
+// become empty.
+#if defined(__CUDACC__) || __has_include(<cuda_runtime.h>)
 #include <cuda_runtime.h>
+#else
+#define __host__
+#define __device__
+#endif
 
 #include <cstdint>
 #include <stdexcept>
@@ -51,13 +59,19 @@ __host__ __device__ inline u64 mul_mod(u64 a, u64 b, const TowerConst& c) {
 // low halves are equal). hi(t) < q because t < q * R, and hi(m * q) < q because m < R, so the
 // difference lies in (-q, q) and one conditional add of q gives the unique residue in [0, q) of t *
 // R^-1. Cost: 2 full 64x64 products (a*b: lo and hi; m*q: hi only) and one low product, against 5
-// products plus two conditional subtractions for Barrett.
-__host__ __device__ inline u64 mont_mul(u64 a, u64 b, const TowerConst& c) {
-  const u128 t = (u128)a * b;
+// products plus two conditional subtractions for Barrett. mont_redc is the reduction half alone: t
+// * R^-1 mod q for ANY t < q * 2^64 (the proof above only used t < q * R, not that t is a product
+// of two words). The lazy column search sums many products in 128 bits and reduces the sum once
+// with it.
+__host__ __device__ inline u64 mont_redc(u128 t, const TowerConst& c) {
   const u64 m = (u64)t * c.qinv;
   const u64 hi = (u64)(t >> 64);
   const u64 mq = (u64)(((u128)m * c.q) >> 64);
   return hi >= mq ? hi - mq : hi + c.q - mq;
+}
+
+__host__ __device__ inline u64 mont_mul(u64 a, u64 b, const TowerConst& c) {
+  return mont_redc((u128)a * b, c);
 }
 
 // Sum-of-products convention used by the search kernels: they accumulate
