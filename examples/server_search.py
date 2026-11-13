@@ -3,6 +3,7 @@
 
 import os
 import sys
+import uuid
 from pathlib import Path
 
 from ombra import Client
@@ -16,6 +17,8 @@ def main() -> None:
         "Interest rates rose again this quarter.",
         "The central bank raised its policy rate.",
     ]
+    ids = [str(uuid.uuid4()) for _ in texts]  # random ids: the server sees ids in the clear
+    text_of = dict(zip(ids, texts, strict=True))
 
     model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
     vectors = model.encode(texts, normalize_embeddings=True).tolist()
@@ -28,14 +31,14 @@ def main() -> None:
     client.create_collection(
         "notes",
         vectors,
-        ids=[str(i) for i in range(len(texts))],
+        ids=ids,
         key_file="notes.key",  # holds the secret key: back it up, never share it
         passphrase=os.environ["OMBRA_PASSPHRASE"],
     )
 
     query = model.encode(["What did the central bank do?"], normalize_embeddings=True)[0].tolist()
     for hit in client.search("notes", query, k=2):
-        print(f"{hit.score:.3f}  {texts[int(hit.id)]}")
+        print(f"{hit.score:.3f}  {text_of[hit.id]}")
     client.close()
 
 

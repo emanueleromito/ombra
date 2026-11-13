@@ -89,6 +89,12 @@ def test_images_carry_the_source_and_license_labels():
         ), path
 
 
+def test_license_texts_carry_no_placeholder():
+    for name in ("LICENSE", "README.md", "SECURITY.md"):
+        text = (ROOT / name).read_text(encoding="utf-8")
+        assert "PLACEHOLDER" not in text, f"{name} still has a placeholder"
+
+
 def test_packaged_third_party_licenses_match_the_root_ones():
     # client/licenses/ is a subset of licenses/ with the same file names; keep the texts equal.
     root = ROOT / "licenses"

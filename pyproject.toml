@@ -14,10 +14,10 @@ ignore = ["S101"]  # assert is fine in tests
 "tests/test_gpu_*.py" = ["S603", "S607"]  # tests run built drivers and openssl with fixed arguments
 "integrations/*/tests/*.py" = ["S106"]  # synthetic passphrases in tests
 "integrations/*/examples/*.py" = ["S106"]  # the example uses a placeholder passphrase
-"docs/quickstart/*.py" = ["S106"]  # the sample uses a placeholder passphrase
 # Experiment scripts: timing closures run inside their loop (B023), fixed commands (S603, S607),
 # and the rerun command in a docstring may be long (E501).
 "docs/research/**/*.py" = ["B023", "S603", "S607", "E501", "UP031", "B905"]
+"examples/*.py" = ["S106"]  # the examples use a placeholder passphrase
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "client", "core", "integrations", "docs"]

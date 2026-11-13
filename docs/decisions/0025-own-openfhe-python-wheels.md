@@ -1,4 +1,4 @@
-# 0023. We build and publish our own openfhe-python wheels (ombra-openfhe)
+# 0025. We build and publish our own openfhe-python wheels (ombra-openfhe)
 
 - **Status:** proposed (the user chose option A on 2026-11-12; waiting for acceptance)
 - **Date:** 2026-11-12

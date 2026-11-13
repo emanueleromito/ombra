@@ -28,5 +28,7 @@ One short file per design decision, so the reasoning survives. New decisions cop
 | [0022](0022-local-mode-cpp-expansion.md) | Local mode uses the server's C++ expansion | accepted |
 | [0023](0023-seeded-stored-ciphertexts.md) | Seeded stored ciphertexts: half the disk and upload, with a narrow exception to hard rule 3 | accepted |
 | [0024](0024-gpu-families-beyond-ampere.md) | GPU families beyond Ampere: build for Turing, Ada and Hopper too (update to 0008) | accepted |
+| [0025](0025-own-openfhe-python-wheels.md) | We build and publish our own openfhe-python wheels (`ombra-openfhe`) | proposed |
+| [0026](0026-kmeans-in-a-child-process.md) | Run faiss k-means in a child process | proposed |
 
 Smaller decisions (key management, threat model, accuracy, deletes, migrations, key rotation, parameter presets, format versioning, storage, API, client packaging) are recorded directly in [product-requirements.md](../product-requirements.md) and [architecture.md](../architecture.md).

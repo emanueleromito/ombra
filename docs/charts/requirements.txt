@@ -1,0 +1,3 @@
+# matplotlib draws the benchmark charts: pip install -r docs/charts/requirements.txt, then run make_charts.py.
+# Kept apart from docs/requirements.txt, which must match the CI image; the site build does not need it.
+matplotlib==3.11.2

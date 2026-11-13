@@ -1,0 +1,25 @@
+d,n_vectors,searched_pct,preset,total_ms,server_ms,source
+384,100000,5,balanced,TBD,TBD,pending a new run on the current code
+384,100000,5,fast,TBD,TBD,pending a new run on the current code
+384,100000,20,balanced,TBD,TBD,pending a new run on the current code
+384,100000,20,fast,TBD,TBD,pending a new run on the current code
+384,1000000,5,balanced,TBD,TBD,pending a new run on the current code
+384,1000000,5,fast,TBD,TBD,pending a new run on the current code
+384,1000000,20,balanced,TBD,TBD,pending a new run on the current code
+384,1000000,20,fast,TBD,TBD,pending a new run on the current code
+768,100000,5,balanced,TBD,TBD,pending a new run on the current code
+768,100000,5,fast,TBD,TBD,pending a new run on the current code
+768,100000,20,balanced,TBD,TBD,pending a new run on the current code
+768,100000,20,fast,TBD,TBD,pending a new run on the current code
+768,1000000,5,balanced,TBD,TBD,pending a new run on the current code
+768,1000000,5,fast,TBD,TBD,pending a new run on the current code
+768,1000000,20,balanced,TBD,TBD,pending a new run on the current code
+768,1000000,20,fast,TBD,TBD,pending a new run on the current code
+1536,100000,5,balanced,TBD,TBD,pending a new run on the current code
+1536,100000,5,fast,TBD,TBD,pending a new run on the current code
+1536,100000,20,balanced,TBD,TBD,pending a new run on the current code
+1536,100000,20,fast,TBD,TBD,pending a new run on the current code
+1536,1000000,5,balanced,TBD,TBD,pending a new run on the current code
+1536,1000000,5,fast,TBD,TBD,pending a new run on the current code
+1536,1000000,20,balanced,TBD,TBD,pending a new run on the current code
+1536,1000000,20,fast,TBD,TBD,pending a new run on the current code

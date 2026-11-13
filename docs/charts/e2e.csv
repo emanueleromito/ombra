@@ -1,0 +1,9 @@
+preset,n_vectors,filter,total_p50_ms,total_p95_ms,source
+balanced,100k,none,TBD,TBD,pending a new run on the current code
+balanced,100k,2 fields,TBD,TBD,pending a new run on the current code
+balanced,1M,none,TBD,TBD,pending a new run on the current code
+balanced,1M,2 fields,TBD,TBD,pending a new run on the current code
+fast,100k,none,TBD,TBD,pending a new run on the current code
+fast,100k,2 fields,TBD,TBD,pending a new run on the current code
+fast,1M,none,TBD,TBD,pending a new run on the current code
+fast,1M,2 fields,TBD,TBD,pending a new run on the current code

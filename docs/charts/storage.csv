@@ -1,0 +1,10 @@
+d,mode,bytes_per_million,source
+384,encrypted,18578045952,"computed: 123 blocks x d columns x stored column size (393,336 B seeded, 787,423 B unseeded)"
+384,encrypted_unseeded,37191563136,"computed: 123 blocks x d columns x stored column size (393,336 B seeded, 787,423 B unseeded)"
+384,float32,1536000000,"computed: 4 bytes x d x 1,000,000"
+768,encrypted,37156091904,"computed: 123 blocks x d columns x stored column size (393,336 B seeded, 787,423 B unseeded)"
+768,encrypted_unseeded,74383126272,"computed: 123 blocks x d columns x stored column size (393,336 B seeded, 787,423 B unseeded)"
+768,float32,3072000000,"computed: 4 bytes x d x 1,000,000"
+1536,encrypted,74312183808,"computed: 123 blocks x d columns x stored column size (393,336 B seeded, 787,423 B unseeded)"
+1536,encrypted_unseeded,148766252544,"computed: 123 blocks x d columns x stored column size (393,336 B seeded, 787,423 B unseeded)"
+1536,float32,6144000000,"computed: 4 bytes x d x 1,000,000"
