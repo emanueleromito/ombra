@@ -590,6 +590,19 @@ def _run_case(
         for _ in range(WARMUP):
             run.query("bench", queries[0].astype(np.float64), variants["no_filter"])
             run.query("bench", queries[0].astype(np.float64), variants["filter"])
+        # The warm-up above touches only the clusters of one query. Load every cluster once, so
+        # the timed queries measure a warm cache, and record how long the first touch of each
+        # cluster took (its blocks come from disk): that is the cold-cache cost per cluster.
+        qb0 = cl.encrypt_query(cl.ext_query(queries[0].astype(np.float64), CARDS, [None, None]))
+        first_touch = []
+        for c in range(n_clusters):
+            stream, _ = cl.open_search("bench", qb0, sum(CARDS))
+            try:
+                _, _, t_last, _ = run.fetch(stream, [c])
+            finally:
+                stream.close()
+            first_touch.append(t_last)
+        result["first_touch_per_cluster_s"] = first_touch
         result["variants"] = {}
         for vname, wants in variants.items():
             allowed = np.ones(n, bool) if vname == "no_filter" else match
@@ -621,6 +634,7 @@ def _run_case(
             result["variants"][vname] = {
                 "latency_s": {s: _summ([r[s] for r in recs]) for s in steps},
                 "stage2_first_message_s": _summ([r["stage2_first_message"] for r in recs]),
+                "stage2_per_query_s": [r["stage2"] for r in recs],
                 "round2_extra_s": _summ(
                     [
                         r["round2"]["stage2"] + r["round2"]["decrypt"] + r["round2"]["topk"]

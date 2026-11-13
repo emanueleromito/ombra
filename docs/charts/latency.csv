@@ -1,25 +1,25 @@
 d,n_vectors,searched_pct,preset,total_ms,server_ms,source
-384,100000,5,balanced,TBD,TBD,pending a new run on the current code
-384,100000,5,fast,TBD,TBD,pending a new run on the current code
-384,100000,20,balanced,TBD,TBD,pending a new run on the current code
-384,100000,20,fast,TBD,TBD,pending a new run on the current code
-384,1000000,5,balanced,TBD,TBD,pending a new run on the current code
-384,1000000,5,fast,TBD,TBD,pending a new run on the current code
-384,1000000,20,balanced,TBD,TBD,pending a new run on the current code
-384,1000000,20,fast,TBD,TBD,pending a new run on the current code
-768,100000,5,balanced,TBD,TBD,pending a new run on the current code
-768,100000,5,fast,TBD,TBD,pending a new run on the current code
-768,100000,20,balanced,TBD,TBD,pending a new run on the current code
-768,100000,20,fast,TBD,TBD,pending a new run on the current code
-768,1000000,5,balanced,TBD,TBD,pending a new run on the current code
-768,1000000,5,fast,TBD,TBD,pending a new run on the current code
-768,1000000,20,balanced,TBD,TBD,pending a new run on the current code
-768,1000000,20,fast,TBD,TBD,pending a new run on the current code
-1536,100000,5,balanced,TBD,TBD,pending a new run on the current code
-1536,100000,5,fast,TBD,TBD,pending a new run on the current code
-1536,100000,20,balanced,TBD,TBD,pending a new run on the current code
-1536,100000,20,fast,TBD,TBD,pending a new run on the current code
-1536,1000000,5,balanced,TBD,TBD,pending a new run on the current code
-1536,1000000,5,fast,TBD,TBD,pending a new run on the current code
-1536,1000000,20,balanced,TBD,TBD,pending a new run on the current code
-1536,1000000,20,fast,TBD,TBD,pending a new run on the current code
+384,100000,5,balanced,63.2,32.6,A100 40 GB e2e-latency run 2026-11-13 (core/bench/e2e.py; 20 queries; medians)
+384,100000,5,fast,31.5,16.2,A100 40 GB e2e-latency run 2026-11-13 (core/bench/e2e.py; 20 queries; medians)
+384,100000,20,balanced,88.2,36.9,A100 40 GB e2e-latency run 2026-11-13 (core/bench/e2e.py; 20 queries; medians)
+384,100000,20,fast,42.8,16.7,A100 40 GB e2e-latency run 2026-11-13 (core/bench/e2e.py; 20 queries; medians)
+384,1000000,5,balanced,132.3,39.3,A100 40 GB e2e-latency run 2026-11-13 (core/bench/e2e.py; 20 queries; medians)
+384,1000000,5,fast,74.6,20.4,A100 40 GB e2e-latency run 2026-11-13 (core/bench/e2e.py; 20 queries; medians)
+384,1000000,20,balanced,327.8,48.5,A100 40 GB e2e-latency run 2026-11-13 (core/bench/e2e.py; 20 queries; medians)
+384,1000000,20,fast,211.4,30.1,A100 40 GB e2e-latency run 2026-11-13 (core/bench/e2e.py; 20 queries; medians)
+768,100000,5,balanced,80.4,49.6,A100 40 GB e2e-latency run 2026-11-13 (core/bench/e2e.py; 20 queries; medians)
+768,100000,5,fast,39.6,24.1,A100 40 GB e2e-latency run 2026-11-13 (core/bench/e2e.py; 20 queries; medians)
+768,100000,20,balanced,103.0,51.6,A100 40 GB e2e-latency run 2026-11-13 (core/bench/e2e.py; 20 queries; medians)
+768,100000,20,fast,52.0,25.9,A100 40 GB e2e-latency run 2026-11-13 (core/bench/e2e.py; 20 queries; medians)
+768,1000000,5,balanced,147.0,54.4,A100 40 GB e2e-latency run 2026-11-13 (core/bench/e2e.py; 20 queries; medians)
+768,1000000,5,fast,82.8,28.4,A100 40 GB e2e-latency run 2026-11-13 (core/bench/e2e.py; 20 queries; medians)
+768,1000000,20,balanced,359.1,80.1,A100 40 GB e2e-latency run 2026-11-13 (core/bench/e2e.py; 20 queries; medians)
+768,1000000,20,fast,232.8,50.4,A100 40 GB e2e-latency run 2026-11-13 (core/bench/e2e.py; 20 queries; medians)
+1536,100000,5,balanced,118.1,87.2,A100 40 GB e2e-latency run 2026-11-13 (core/bench/e2e.py; 20 queries; medians)
+1536,100000,5,fast,59.0,43.1,A100 40 GB e2e-latency run 2026-11-13 (core/bench/e2e.py; 20 queries; medians)
+1536,100000,20,balanced,142.7,91.0,A100 40 GB e2e-latency run 2026-11-13 (core/bench/e2e.py; 20 queries; medians)
+1536,100000,20,fast,72.8,46.3,A100 40 GB e2e-latency run 2026-11-13 (core/bench/e2e.py; 20 queries; medians)
+1536,1000000,5,balanced,189.1,96.2,A100 40 GB e2e-latency run 2026-11-13 (core/bench/e2e.py; 20 queries; medians)
+1536,1000000,5,fast,104.9,50.5,A100 40 GB e2e-latency run 2026-11-13 (core/bench/e2e.py; 20 queries; medians)
+1536,1000000,20,balanced,401.9,122.3,A100 40 GB e2e-latency run 2026-11-13 (core/bench/e2e.py; 20 queries; medians)
+1536,1000000,20,fast,262.1,80.6,A100 40 GB e2e-latency run 2026-11-13 (core/bench/e2e.py; 20 queries; medians)
