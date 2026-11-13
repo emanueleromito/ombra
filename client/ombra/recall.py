@@ -90,7 +90,7 @@ def measure(
                 security_level=security_level,
                 metadata=meta,
                 filter_fields={"f": n_values} if fields is not None else None,
-                scrypt_params=(2**4, 8, 1),
+                scrypt_params=(2**14, 8, 1),
             )
             col, _ = client._core._get("recall")
             labels = assign(vectors, col.centers)
