@@ -4,10 +4,21 @@
 #include <stdexcept>
 
 #include "ombra/core/file_envelope.hpp"
+#include "ombra/core/seeded_ciphertext.hpp"
 #include "ombra/storage/failpoint.hpp"
 #include "ombra/storage/fsutil.hpp"
 
 namespace ombra::storage {
+
+void check_column_envelope(const std::uint8_t* data, std::size_t size,
+                           const std::string& expected_preset,
+                           const std::string& expected_openfhe_version) {
+  const auto env =
+      ombra::core::read_column_envelope(data, size, expected_preset, expected_openfhe_version);
+  // Kind 4: only the cheap structural check; the word range is checked when the block is loaded.
+  if (env.kind == ombra::core::EnvelopeKind::SeededCiphertext)
+    ombra::core::check_seeded_header(env.payload);
+}
 
 namespace {
 constexpr std::size_t kHeader = 10;
@@ -86,9 +97,9 @@ SegmentData read_segment(const std::string& path, const std::string& expected_pr
     auto len = get_le(p + pos, 8);
     pos += 8;
     need(len);
-    // Throws on unknown envelope version, wrong kind, wrong preset or OpenFHE version.
-    ombra::core::read_envelope(p + pos, len, ombra::core::EnvelopeKind::Ciphertext, expected_preset,
-                               expected_openfhe_version);
+    // Throws on unknown envelope version, wrong kind, wrong preset or OpenFHE version, or a
+    // malformed seeded payload.
+    check_column_envelope(p + pos, len, expected_preset, expected_openfhe_version);
     s.column_envelopes.emplace_back(p + pos, p + pos + len);
     pos += len;
   }

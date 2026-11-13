@@ -221,7 +221,7 @@ std::string Store::replace_segments(const std::string& collection,
     throw BlockMismatch("ids are not exactly the live ids of the old blocks");
   std::size_t bytes = 0;
   for (const auto& c : neu.column_envelopes) {
-    core::read_envelope(c, core::EnvelopeKind::Ciphertext, spec.preset, ofhe_);
+    check_column_envelope(c.data(), c.size(), spec.preset, ofhe_);
     bytes += c.size();
   }
 
@@ -270,7 +270,7 @@ std::string Store::insert(const std::string& collection, std::uint32_t cluster,
       throw std::runtime_error("insert: duplicate id");
   std::size_t bytes = 0;
   for (const auto& c : cols) {
-    core::read_envelope(c, core::EnvelopeKind::Ciphertext, spec.preset, ofhe_);
+    check_column_envelope(c.data(), c.size(), spec.preset, ofhe_);
     bytes += c.size();
   }
 
