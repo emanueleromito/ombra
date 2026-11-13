@@ -82,8 +82,8 @@ int main(int argc, char** argv) {
       if (hex.size() != 64) return 2;
       for (std::size_t i = 0; i < 32; ++i)
         seed[i] = static_cast<std::uint8_t>(std::stoul(hex.substr(2 * i, 2), nullptr, 16));
-      const auto w = ombra::core::expand_seed_tower(seed, std::stoul(argv[3]),
-                                                    std::stoull(argv[4]), std::stoull(argv[5]));
+      const auto w = ombra::core::expand_seed_tower(seed, std::stoul(argv[3]), std::stoull(argv[4]),
+                                                    std::stoull(argv[5]));
       for (auto x : w) std::printf("%llu\n", static_cast<unsigned long long>(x));
       return 0;
     }
@@ -130,15 +130,13 @@ int main(int argc, char** argv) {
       const DCRTPoly ph2 = ct2->GetElements()[0] + ct2->GetElements()[1] * sl;
       check(words_of(ph1) == words_of(ph2), "phase c0 + c1*s equal word for word" + r);
 
-      const bool meta = ct->GetLevel() == ct2->GetLevel() &&
-                        ct->GetNoiseScaleDeg() == ct2->GetNoiseScaleDeg() &&
-                        ct->GetScalingFactor() == ct2->GetScalingFactor() &&
-                        ct->GetSlots() == ct2->GetSlots() && ct->GetKeyTag() == ct2->GetKeyTag() &&
-                        ct->GetEncodingType() == ct2->GetEncodingType() &&
-                        ct2->GetElements().size() == 2 &&
-                        ct2->GetElements()[0].GetFormat() == Format::EVALUATION &&
-                        ct2->GetElements()[1].GetFormat() == Format::EVALUATION &&
-                        !ct->GetKeyTag().empty();
+      const bool meta =
+          ct->GetLevel() == ct2->GetLevel() && ct->GetNoiseScaleDeg() == ct2->GetNoiseScaleDeg() &&
+          ct->GetScalingFactor() == ct2->GetScalingFactor() && ct->GetSlots() == ct2->GetSlots() &&
+          ct->GetKeyTag() == ct2->GetKeyTag() && ct->GetEncodingType() == ct2->GetEncodingType() &&
+          ct2->GetElements().size() == 2 &&
+          ct2->GetElements()[0].GetFormat() == Format::EVALUATION &&
+          ct2->GetElements()[1].GetFormat() == Format::EVALUATION && !ct->GetKeyTag().empty();
       check(meta, "metadata equal (level, degree, scale, slots, key tag, encoding)" + r);
       check(words_of(ct->GetElements()[1]) != words_of(ct2->GetElements()[1]), "u != c1" + r);
       std::vector<std::uint64_t> u;
@@ -152,7 +150,8 @@ int main(int argc, char** argv) {
       const auto w1 = words_of(ct2->GetElements()[1]);
       want.insert(want.end(), w1.begin(), w1.end());
       check(sw == want, "seeded_words == words of the expanded ciphertext" + r);
-      check(bytes.size() < 8 * 2 * payload.towers * payload.ring_dim * 6 / 10 + 8 * payload.towers + 200,
+      check(bytes.size() <
+                8 * 2 * payload.towers * payload.ring_dim * 6 / 10 + 8 * payload.towers + 200,
             "payload is about half of the ciphertext" + r);
       for (const auto& o : seen) check(o != seed, "seed not reused" + r);
       seen.push_back(seed);

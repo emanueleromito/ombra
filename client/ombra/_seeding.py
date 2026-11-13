@@ -84,7 +84,9 @@ def _shutdown(pool: ProcessPoolExecutor) -> None:
 class SeedPool:
     """Spawned workers, each loaded once with the context and the key pair (see module doc)."""
 
-    def __init__(self, cc_bytes: bytes, pk_bytes: bytes, sk_bytes: bytes, workers: int | None = None):
+    def __init__(
+        self, cc_bytes: bytes, pk_bytes: bytes, sk_bytes: bytes, workers: int | None = None
+    ):
         import multiprocessing as mp
 
         n = workers or max(1, min(4, len(os.sched_getaffinity(0))))

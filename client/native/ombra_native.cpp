@@ -33,9 +33,9 @@
 #include <array>
 #include <cerrno>
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
-#include <cstdint>
 #include <exception>
 #include <map>
 #include <memory>
@@ -53,9 +53,9 @@
 #include "key/key-ser.h"
 #include "ombra/core/expansion_tree.hpp"
 #include "ombra/core/security_floor_context.hpp"
+#include "ombra/core/seeded_ciphertext.hpp"
 #include "openfhe.h"
 #include "openfhe_expand_ops.hpp"
-#include "ombra/core/seeded_ciphertext.hpp"
 #include "scheme/ckksrns/ckksrns-ser.h"
 #include "seeded_ciphertext_openfhe.hpp"
 

@@ -38,8 +38,7 @@ from typing import Any
 
 import numpy as np
 
-from ombra import presets
-from ombra import _seeding
+from ombra import _seeding, presets
 from ombra import query as oq
 from ombra._decrypt import decrypt_values
 from ombra.blobstore import KIND_DOCUMENT, KIND_RECORD, BlobStore, BlobStoreError, GrpcBlobStore
