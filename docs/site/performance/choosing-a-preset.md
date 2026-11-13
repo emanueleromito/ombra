@@ -10,15 +10,14 @@ Both presets meet the 128-bit security level, and both gave the same recall as p
 | --- | --- | --- |
 | Ring dimension | {{ preset("balanced", "ring_dim") }} | {{ preset("fast", "ring_dim") }} |
 | Vectors per ciphertext | {{ preset("balanced", "batch_size") }} | {{ preset("fast", "batch_size") }} |
-| Query latency, A100, relative to Balanced | 1.00 | TBD |
+| Query latency, A100, relative to Balanced | 1.00 | 0.49 to 0.65 |
 | Query upload | 787,423 bytes | 394,207 bytes |
 | Evaluation keys | 28.8 to 34.1 MB | about 40% smaller |
 | Storage per vector | same | same |
 | Largest score error measured | 1.7e-8 | 9.0e-6 |
 | Recall gap to plaintext, worst case | 0.0000 | 0.0004 |
 
-!!! note "Numbers pending a new benchmark run on the current code."
-    The latency ratio is being remeasured. Earlier runs put Fast at roughly half to two thirds of Balanced's time.
+The latency ratio comes from one A100 run of 20 queries per cell, 384 to 1536 dimensions, 100,000 and 1,000,000 vectors, 5% and 20% searched.
 
 The recall gaps come from 1,000 queries on each of 3 datasets. Both presets have to stay within a recall gap of 0.005 to ship, and 0.0004 is well inside it. Fast's largest score error is about 500 times Balanced's.
 
@@ -31,7 +30,7 @@ Filter fields are limited per preset: Balanced carries up to {{ fmax("balanced")
 Ombra supports 384, 768 and 1536. Use the dimension your embedding model produces. If you can choose, a smaller one is cheaper on every axis:
 
 - Storage grows in step with it: 18.6 GB, 37.2 GB and 74.3 GB per million vectors with seeded ciphertexts, the default.
-- Latency grows slower than storage. The server's share on an A100 with 100,000 vectors and 5% searched is 25.0 ms at 384, 43.2 ms at 768 and 80.6 ms at 1536 on Balanced. Total time per query is TBD.
+- Latency grows slower than storage. On an A100 with 100,000 vectors and 5% searched, a Balanced query takes 63.2 ms at 384, 80.4 ms at 768 and 118.1 ms at 1536 in total, of which the server spends 32.6, 49.6 and 87.2 ms.
 - The number of vectors that fit in the memory of one A100 (40 GB) falls from 1,105,920 at 384 to 548,864 at 768 and 270,336 at 1536. Beyond that the server pages from disk, which is slow at large sizes.
 
 ## Collection size and hardware
