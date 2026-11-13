@@ -98,8 +98,9 @@ def _run(cmd: list[str], cwd: str = REPO_DIR, ok_codes: tuple[int, ...] = (0,)) 
         raise SystemExit(f"command failed with exit code {code}: {' '.join(cmd)}")
 
 
-def _build(build_type: str, targets: tuple[str, ...] = ()) -> None:
-    """Configure and build; `targets` limits the build to those CMake targets (default: all)."""
+def _build(build_type: str, targets: tuple[str, ...] = (), archs: str = CUDA_ARCHS) -> None:
+    """Configure and build; `targets` limits the build to those CMake targets (default: all).
+    `archs` is the CUDA architecture list (default: Ampere only, decision 0008)."""
     _run(
         [
             "cmake",
@@ -110,7 +111,7 @@ def _build(build_type: str, targets: tuple[str, ...] = ()) -> None:
             "-G",
             "Ninja",
             f"-DCMAKE_BUILD_TYPE={build_type}",
-            f"-DCMAKE_CUDA_ARCHITECTURES={CUDA_ARCHS}",
+            f"-DCMAKE_CUDA_ARCHITECTURES={archs}",
             "-DOMBRA_ENABLE_CUDA=ON",
         ]
     )
@@ -264,6 +265,95 @@ def bench_e2e(extra: str = "") -> None:
     cmd = ["python", str(script), "--task", "grpc-e2e", "--out", str(out_dir)]
     _run([*cmd, "--workers-grpc", "16", *extra.split()])
     volume.commit()
+
+
+# ---- GPU families beyond Ampere (research: docs/research/, proposal in docs/decisions/) -------
+# One build on CPUs, many runs on GPUs. `prebuild` compiles the tree once for every listed
+# architecture on a CPU-only container (nvcc needs no GPU) and stores the build directory in the
+# volume; `gpu_run` restores it on the GPU asked for and runs commands. A GPU container therefore
+# never spends its billed time compiling, and every family runs the same binaries.
+#   modal run modal_app.py::prebuild --build-type Release
+#   modal run modal_app.py::on_gpu --gpu l4 --cmd "python -m pytest -m gpu -q"
+GPU_FAMILIES = {
+    # name: (Modal GPU type, generation, compute capability)
+    "t4": ("T4", "Turing", 75),
+    "a10": ("A10", "Ampere", 86),
+    "a100": ("A100-40GB", "Ampere", 80),
+    "l4": ("L4", "Ada", 89),
+    "l40s": ("L40S", "Ada", 89),
+    "h100": ("H100", "Hopper", 90),
+}
+ALL_CUDA_ARCHS = ";".join(str(a) for a in sorted({v[2] for v in GPU_FAMILIES.values()}))
+BUILD_CACHE = f"{DATA_DIR}/build-cache"
+
+
+def _cache_tar(build_type: str) -> str:
+    return f"{BUILD_CACHE}/{build_type.lower()}.tar"
+
+
+@app.function(cpu=8.0, memory=16384, timeout=3600, volumes={DATA_DIR: volume})
+def prebuild(build_type: str = "Release", archs: str = ALL_CUDA_ARCHS, commit: str = "") -> None:
+    """Build everything on CPUs for `archs` and store the build directories in the volume.
+    `commit` (the caller's `git rev-parse --short HEAD`) is stored next to it: the image has no
+    .git, and a result must name the commit it was measured on."""
+    import os
+
+    _build(build_type, archs=archs)
+    _build_native()
+    os.makedirs(BUILD_CACHE, exist_ok=True)
+    natives = [str(p) for p in Path(f"{REPO_DIR}/client/ombra").glob("_native*.so")]
+    _run(["tar", "-cf", _cache_tar(build_type), BUILD_DIR, *natives], cwd="/")
+    Path(_cache_tar(build_type) + ".json").write_text(
+        f'{{"commit": "{commit}", "archs": "{archs}", "build_type": "{build_type}"}}\n'
+    )
+    _run(["ls", "-la", BUILD_CACHE])
+    volume.commit()
+
+
+@app.function(gpu="A10", cpu=4.0, memory=16384, timeout=3600, volumes={DATA_DIR: volume})
+def gpu_run(cmd: str, build_type: str = "Release", commit: str = "") -> None:
+    """Restore the `prebuild` output and run `cmd` in the repository. Commands are separated by
+    " ;; "; leading KEY=VALUE words of a command are its environment. The GPU type is chosen by
+    the caller (`on_gpu`), not here. Refuses a cached build made from another commit."""
+    import json
+    import os
+
+    meta = json.loads(Path(_cache_tar(build_type) + ".json").read_text())
+    if commit and meta["commit"] != commit:
+        raise SystemExit(f"cached build is from commit {meta['commit']!r}, asked for {commit!r}")
+    _run(["tar", "-xf", _cache_tar(build_type)], cwd="/")
+    _run(["nvidia-smi", "--query-gpu=name,memory.total,driver_version", "--format=csv,noheader"])
+    out_dir = Path(DATA_DIR) / "results"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        for one in cmd.split(" ;; "):
+            env = {
+                **os.environ,
+                "OMBRA_GIT_COMMIT": meta["commit"],
+                "OMBRA_BENCH_BIN_DIR": f"{BUILD_DIR}/core",
+                "OMBRA_RESULTS_DIR": str(out_dir),
+            }
+            words = one.split()
+            while words and "=" in words[0] and not words[0].startswith("-"):
+                key, _, value = words.pop(0).partition("=")
+                env[key] = value
+            print("$", " ".join(words), flush=True)
+            code = subprocess.run(words, cwd=REPO_DIR, env=env).returncode
+            if code != 0:
+                raise SystemExit(f"command failed with exit code {code}: {one}")
+    finally:
+        volume.commit()
+
+
+@app.local_entrypoint()
+def on_gpu(gpu: str = "a10", cmd: str = "nvidia-smi", build_type: str = "Release") -> None:
+    """Run `cmd` on one GPU family from the prebuilt binaries (see GPU_FAMILIES)."""
+    if gpu not in GPU_FAMILIES:
+        raise SystemExit(f"unknown gpu {gpu!r}; one of {sorted(GPU_FAMILIES)}")
+    commit = subprocess.run(
+        ["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True
+    ).stdout.strip()
+    gpu_run.with_options(gpu=GPU_FAMILIES[gpu][0]).remote(cmd, build_type, commit)
 
 
 def _cpu_run(cmd: str) -> None:

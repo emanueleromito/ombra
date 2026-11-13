@@ -5,9 +5,12 @@ PYTHON      ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 BUILD_DIR   ?= build
 CUDA_ARCHS  ?= 80;86
 TASK        ?= all
+BUILD_TYPE  ?= Release
+GPU         ?= a10
+CMD         ?= nvidia-smi
 
 .DEFAULT_GOAL := help
-.PHONY: help venv build build-cpu test test-gpu test-openfhe test-openfhe-local bench gpu-info results-pull fmt lint clean
+.PHONY: help venv build build-cpu test test-gpu test-openfhe test-openfhe-local bench gpu-info results-pull fmt lint clean prebuild on-gpu
 
 help: ## List commands
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-14s %s\n", $$1, $$2}'
@@ -47,6 +50,12 @@ test-openfhe-local: ## Run tests marked openfhe here, no Modal (needs OpenFHE 1.
 bench: ## Run benchmarks on Modal (A100); TASK=t0.4 to pick one
 bench: ## Run benchmarks on Modal (A100); TASK=column-search to pick one
 	modal run modal_app.py::bench --task $(TASK)
+
+prebuild: ## Build once on Modal CPUs for every GPU family (no GPU billed); BUILD_TYPE=Release|Debug
+	modal run modal_app.py::prebuild --build-type $(BUILD_TYPE) --commit $$(git rev-parse --short HEAD)
+
+on-gpu: ## Run CMD on one GPU family from the prebuilt binaries; GPU=t4|a10|a100|l4|l40s|h100
+	modal run modal_app.py::on_gpu --gpu $(GPU) --build-type $(BUILD_TYPE) --cmd "$(CMD)"
 
 gpu-info: ## Check GPU, CUDA and OpenFHE in the Modal image (A10)
 	modal run modal_app.py::gpu_info
