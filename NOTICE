@@ -1,7 +1,7 @@
 Ombra
 Copyright 2026 Emanuele Romito
 
-Ombra itself is source-available under the PolyForm Noncommercial License 1.0.0 (see LICENSE). It uses the third-party software below, each under its own license. The license texts are in each project's repository and in the packages that carry them.
+Ombra itself is source-available under the PolyForm Noncommercial License 1.0.0, or under a separate commercial license from the copyright holder (see LICENSE). It uses the third-party software below, each under its own license. The full license texts of the libraries that the wheels and images bundle are in the `licenses/` folder (index in licenses/README.md); the wheels carry them as license files and the images as /licenses.
 
 Compiled into or linked by the C++ and CUDA code (core/, server/):
 
@@ -12,6 +12,10 @@ Compiled into or linked by the C++ and CUDA code (core/, server/):
 | Protocol Buffers | BSD-3-Clause | https://github.com/protocolbuffers/protobuf |
 | OpenSSL 3.x | Apache-2.0 | https://github.com/openssl/openssl |
 | SQLite (amalgamation) | Public domain | https://www.sqlite.org |
+| cereal (headers inside OpenFHE) | BSD-3-Clause | https://github.com/openfheorg/cereal |
+| pybind11 (compiled into the Python extensions) | BSD-3-Clause | https://github.com/pybind/pybind11 |
+| LLVM OpenMP runtime libomp (macOS wheels) | Apache-2.0 WITH LLVM-exception | https://github.com/llvm/llvm-project |
+| GCC OpenMP runtime libgomp (Linux wheels and images) | GPL-3.0-or-later WITH GCC-exception-3.1 | https://gcc.gnu.org |
 
 Python runtime dependencies of the `ombra` client (client/pyproject.toml):
 
@@ -32,7 +36,6 @@ Build-time only (not shipped in the wheels as code):
 
 | Name | License | URL |
 | --- | --- | --- |
-| pybind11 | BSD-3-Clause | https://github.com/pybind/pybind11 |
 | scikit-build-core | Apache-2.0 | https://github.com/scikit-build/scikit-build-core |
 | hatchling | MIT | https://github.com/pypa/hatch |
 

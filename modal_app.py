@@ -22,7 +22,10 @@ from pathlib import Path
 import modal
 
 # Pinned versions. OpenFHE and openfhe-python must be a matching pair; change both together.
-CUDA_IMAGE = "nvidia/cuda:12.6.3-devel-ubuntu22.04@sha256:d49bb8a4ff97fb5fe477947a3f02aa8c0a53eae77e11f00ec28618a0bcaa2ad1"
+CUDA_IMAGE = (
+    "nvidia/cuda:12.6.3-devel-ubuntu22.04"
+    "@sha256:d49bb8a4ff97fb5fe477947a3f02aa8c0a53eae77e11f00ec28618a0bcaa2ad1"
+)
 PYTHON_VERSION = "3.11"
 OPENFHE_TAG = "v1.6.1"
 OPENFHE_PYTHON_TAG = "v1.6.1.0"
