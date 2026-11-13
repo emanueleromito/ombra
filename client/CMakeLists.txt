@@ -13,7 +13,7 @@ endif()
 # Headers shared with the server's core/ (the tree and the CPU operations), in the repository.
 set(OMBRA_CORE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core" CACHE PATH "core/ of the repository")
 
-find_package(OpenFHE QUIET)
+find_package(OpenFHE 1.6.1 EXACT QUIET)
 find_package(pybind11 CONFIG QUIET)
 if(NOT OpenFHE_FOUND OR NOT pybind11_FOUND OR NOT EXISTS "${OMBRA_CORE_DIR}/include/ombra/core/expansion_tree.hpp")
   if("$ENV{OMBRA_REQUIRE_NATIVE}" STREQUAL "1")

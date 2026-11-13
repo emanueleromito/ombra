@@ -63,13 +63,34 @@ EXCLUDED_PATTERNS = (
     "*.npy",
     "*.npz",
     "*.parquet",
+    "*.bin",
+    "*.sqlite",
 )
+
+# The only .bin files that are uploaded: the committed test fixtures (listed in .gitignore too).
+ALLOWED_BINARY = (
+    "tests/fixtures/envelope_v1_ciphertext.bin",
+    "tests/fixtures/envelope_v2_seeded.bin",
+)
+
+
+def _normalise(path: str) -> tuple[str, ...]:
+    parts = PurePosixPath(str(path).replace("\\", "/")).parts
+    return tuple(p for p in parts if p not in ("", "."))
+
+
+def is_unsafe(path: str) -> bool:
+    """True if a path (relative to any folder) matches a secret, build-output or data pattern.
+    For uploads of a single folder, where the top-level allowlist does not apply."""
+    parts = _normalise(path)
+    if "/".join(parts) in ALLOWED_BINARY:
+        return False
+    return any(fnmatch(p, pat) for p in parts for pat in SECRET_PATTERNS + EXCLUDED_PATTERNS)
 
 
 def is_excluded(path: str) -> bool:
     """True if `path` (relative to the repo root) must NOT be uploaded."""
-    parts = PurePosixPath(str(path).replace("\\", "/")).parts
-    parts = tuple(p for p in parts if p not in ("", "."))
+    parts = _normalise(path)
     if not parts or parts[0] not in ALLOWED_TOP_LEVEL:
         return True
-    return any(fnmatch(p, pat) for p in parts for pat in SECRET_PATTERNS + EXCLUDED_PATTERNS)
+    return is_unsafe(path)

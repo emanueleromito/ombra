@@ -37,9 +37,24 @@ jobs:
       dry_run: ${{ steps.v.outputs.dry_run }}
       owner: ${{ steps.v.outputs.owner }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+          fetch-depth: 0
+      # A real release is a v* tag on a commit that is on main. A manual run with dry_run off from
+      # a branch, or a tag on a side branch, stops here before anything is built or published.
+      - name: Check that this is a release of main
+        if: env.DRY_RUN != 'true'
+        run: |
+          if [ "${GITHUB_REF_TYPE}" != "tag" ] || [[ "${GITHUB_REF_NAME}" != v* ]]; then
+            echo "::error::A release must run from a v* tag, not ${GITHUB_REF_TYPE} ${GITHUB_REF_NAME}. Use dry_run for other refs."
+            exit 1
+          fi
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "${GITHUB_SHA}" origin/main; then
+            echo "::error::Tag ${GITHUB_REF_NAME} (${GITHUB_SHA}) is not on main."
+            exit 1
+          fi
       - id: v
         run: |
           version=$(python3 -c 'import tomllib; print(tomllib.load(open("client/pyproject.toml","rb"))["project"]["version"])')
@@ -70,16 +85,16 @@ jobs:
     needs: check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: "3.12"
       - run: |
-          python -m pip install build
+          python -m pip install build==1.6.1
           python -m build integrations/langchain-ombra --outdir dist-langchain
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: dist-langchain-ombra
           path: dist-langchain/*
@@ -90,6 +105,9 @@ jobs:
     needs: [check, wheels, langchain]
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    # A real release pushes the version and latest tags to GHCR, so it waits for the reviewers of
+    # the ghcr-release environment first. A dry run uses an environment without reviewers.
+    environment: ${{ needs.check.outputs.dry_run == 'true' && 'ghcr-dryrun' || 'ghcr-release' }}
     permissions:
       contents: read
       packages: write
@@ -97,7 +115,7 @@ jobs:
       VERSION: ${{ needs.check.outputs.version }}
       OWNER: ${{ needs.check.outputs.owner }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
 
@@ -123,27 +141,27 @@ jobs:
             } >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: docker/setup-qemu-action@v4
-      - uses: docker/setup-buildx-action@v4
-      - uses: docker/login-action@v4
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # Linux wheels of the three packages, for the CPU image to install without PyPI.
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: wheels-*-ubuntu-*
           path: wheelhouse
           merge-multiple: true
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: dist-langchain-ombra
           path: wheelhouse
 
       - name: GPU server image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
           file: docker/Dockerfile.server
@@ -154,7 +172,7 @@ jobs:
           cache-to: type=gha,scope=server,mode=max
 
       - name: CPU image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
           file: docker/Dockerfile.cpu
@@ -184,12 +202,12 @@ jobs:
     permissions:
       id-token: write  # trusted publishing
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: "{wheels-*,dist-langchain-ombra}"
           path: dist
           merge-multiple: true
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           packages-dir: dist
 
@@ -204,12 +222,12 @@ jobs:
     permissions:
       id-token: write  # trusted publishing
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: "{wheels-*,dist-langchain-ombra}"
           path: dist
           merge-multiple: true
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           packages-dir: dist
           repository-url: https://test.pypi.org/legacy/

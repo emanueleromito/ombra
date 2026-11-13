@@ -86,4 +86,4 @@ def test_ci_image_has_the_docs_packages():
         return {s for s in (x.split("#")[0].strip() for x in lines) if "==" in s}
 
     docs = pins("docs/requirements.txt")
-    assert docs <= pins("ci/requirements.txt"), "ci/requirements.txt must pin the docs packages"
+    assert docs <= pins("ci/requirements.in"), "ci/requirements.in must pin the docs packages"

@@ -99,3 +99,23 @@ def test_required_files_included(path: str) -> None:
 def test_allowlist_entries_exist() -> None:
     for entry in ALLOWED_TOP_LEVEL:
         assert (ROOT / entry).exists(), entry
+
+
+@pytest.mark.parametrize("path", ["tests/x.bin", "client/state.bin", "core/db.sqlite"])
+def test_binary_and_sqlite_excluded(path: str) -> None:
+    assert is_excluded(path)
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["tests/fixtures/envelope_v1_ciphertext.bin", "tests/fixtures/envelope_v2_seeded.bin"],
+)
+def test_known_fixtures_included(path: str) -> None:
+    assert not is_excluded(path)
+
+
+@pytest.mark.parametrize("path", ["ombra/.env", "keys/a", "ombra/k.pem", "ombra/a.sqlite"])
+def test_client_folder_secrets_unsafe(path: str) -> None:
+    from modal_upload import is_unsafe
+
+    assert is_unsafe(path)

@@ -9,7 +9,7 @@ description = "openfhe-python 1.6.1 with OpenFHE 1.6.1 bundled, built for the pl
 readme = "README.md"
 requires-python = ">=3.11"
 license-files = ["licenses/*"]
-dependencies = ["numpy"]
+dependencies = ["numpy>=1.26,<3"]
 
 [tool.scikit-build]
 cmake.build-type = "Release"
