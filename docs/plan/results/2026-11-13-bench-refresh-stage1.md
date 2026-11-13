@@ -34,7 +34,7 @@ Server times are about 7 ms higher at small sizes than research 0007 (10 queries
 | on disk (unseeded upload) | 5.70 GB, 57.0 KB/vector | 4.91 GB, 49.1 KB/vector |
 | query up / answer down | 787,464 B / 3.65 MB | 394,255 B / 2.01 MB |
 
-Recall gaps to plaintext 0.000 at 1, 2 and 4 probes (Balanced). Fast's no-filter p95: stage 2 first message p95 8.05 s for a few queries; not explained.
+Recall gaps to plaintext 0.000 at 1, 2 and 4 probes (Balanced). Fast's no-filter p95 of 8.1 s in the first run was the cold cache: the warm-up touched only 4 of Fast's 12 clusters (Balanced has 6). With the benchmark now loading every cluster first (same commit range plus that change), Fast gave no filter p50 59.8 / p95 61.9 ms, 2 fields 59.4 / 61.2 ms, ingest 57.0 s (1,755 vectors/s), and first-touch times per cluster of 0.01 s (already cached) or 4.4 to 9.1 s (read from disk, about 0.3 GB each). The docs use the second run for Fast.
 
 ## Local mode (tests/bench_local_mode.py, Fast, 10k vectors, 2 clusters)
 
