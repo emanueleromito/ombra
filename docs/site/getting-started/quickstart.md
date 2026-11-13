@@ -75,6 +75,10 @@ Creating the collection (keys, encryption, upload) takes most of the run time, a
 
 ## Things to know
 
+Ids are stored on the server in plain text, so the script uses random ones (`uuid.uuid4()`). Do not put names, e-mail addresses or file names in ids.
+
+The search level (`security_level` when you create a collection) decides which clusters a query asks the server for. The default is `fast`. `decoy` and `strict` hide more about the cluster choice, and they hide only that: after every search, at every level, the client fetches the best candidate records by id, and the server sees those ids. See [what the server learns](../security/what-the-server-learns.md).
+
 Vectors must have unit length, which `normalize_embeddings=True` does. The scores are cosine similarities, higher is better, and they are exact: the client decrypts the server's answer and re-ranks the candidates itself.
 
 The `if __name__ == "__main__":` guard is required, because local mode starts a child process.

@@ -70,5 +70,9 @@ If the estimated selectivity, $\sum_i E_i / \sum_i n_i$, is under 0.5%, Fast and
 
 In Fast, an unfiltered query normally makes one round and a filtered query two, so the server can tell them apart there. Decoy and Strict use two rounds for every query.
 
+## What the server sees of the filter
+
+The server does not see field values, names or which values a query allows. It does see the number of filter fields and the number of values of each field, exactly. A field with a distinctive number of values can say something about what it holds. Reducing that leak, for example by declaring a larger value count than you need so that fields look alike, is up to you: the client does not bucket the counts. In Fast, the round count also shows whether a query was filtered, as above.
+
 !!! deep-dive "Why not stop at k matches in round 1"
     The first version stopped as soon as the first round had $k$ matches. At around 1% selectivity this lost recall, because the matches found first were not the nearest ones. The planner now works from the statistics and always takes a second round. Its weak spot is the independence assumption above.

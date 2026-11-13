@@ -34,7 +34,7 @@ The price is recall. A true neighbour in a cluster ranked below the first $p$ is
 
 ## The three levels
 
-The level is set per collection and can be overridden per query. It decides how many rounds a query makes and how much the cluster lists tell the server. What the server can infer from them is on [what the server learns](../security/what-the-server-learns.md). This page stays with the mechanism.
+The level is set per collection and can be overridden per query. It decides how many rounds a query makes and how much the cluster lists tell the server. It covers only which clusters a query requests. After every search, at every level, the client fetches the record blobs of its best candidates by id, and the server knows the cluster of each id. That fetch reveals which records were candidates and how large k is, and no level hides it. What the server can infer from them is on [what the server learns](../security/what-the-server-learns.md). This page stays with the mechanism.
 
 **Fast** asks only for the clusters it wants. An unfiltered query makes one round of $p$ clusters. If fewer than $k$ vectors came back ($k$ is the number of results you asked for), it makes another round of $2p$ new clusters, then $4p$, and so on, until it has $k$ vectors or has asked for $8p$ clusters (`max_probe_factor`) or all of them. A filtered query always makes exactly two rounds, because the filter decides how many clusters it needs ([filters](filters.md)).
 
@@ -48,8 +48,7 @@ Example with $C = 100$ and $p = 10$: round 1 asks for $\min(100, 20) = 20$ clust
 
 A cluster is never asked for twice on one search. A repeat would show the server which of the earlier choices were decoys.
 
-!!! deep-dive "A known weakness of the current Decoy"
-    The client builds each round as the real clusters followed by the decoys and sends them in that order, without shuffling. The ids in a request are therefore not a uniform mix: the first ones are the real choices. A server that looks at the order inside a request can tell them apart. Shuffling is a small change that is not made yet. Today Decoy hides how many clusters are real and what the second round was for, but not which ones are real.
+The client shuffles the list of clusters of every request before it sends it, so the position of an id says nothing about whether it is real. A server still sees one set of clusters per query. Over many similar queries the real clusters repeat and the decoys change, so the real ones can be found by intersecting the sets. See [Out of scope](../security/out-of-scope.md).
 
 **Strict** scans every cluster on every query, in two rounds: the first half of the cluster ids, then the second half. Nothing in the request depends on the query, so the choice of clusters tells the server nothing. The cost is a full scan. With $C = 100$, Strict scores 100 clusters where a Fast first round scores 10, and the work grows linearly with the collection. Use it for small collections or when that is the requirement.
 

@@ -33,7 +33,7 @@ On start the server prints `ombra_server listening on HOST:PORT` to stdout, and 
 
 ### API keys
 
-An API key is an access token for the gRPC and HTTP ports. It is not an FHE key, and the server never sees the client's secret key. `--create-api-key` prints the token once. The file keeps only a salted SHA-256 hash, so a lost token cannot be recovered and you create a new one. The three scopes are described on the [gRPC API](grpc-api.md) page.
+An API key is an access token for the gRPC and HTTP ports. It is not an FHE key, and the server never sees the client's secret key. `--create-api-key` prints the token once. The file keeps only a salted SHA-256 hash, so a lost token cannot be recovered and you create a new one. The three scopes are described on the [gRPC API](grpc-api.md) page. A key has a scope but no collection: the server is single-tenant, so any read key reads every collection and any write key can change any of them.
 
 ```bash
 ombra_server --create-api-key --scope read --data-dir /data

@@ -72,4 +72,4 @@ This run is 1.12x to 1.64x slower than the T1.3 run. GPU steps are flat or faste
 1. **Client decrypt and top-k.** 63% to 78% of the total at 1M vectors, 20% searched (about 257 ms); it grows with the blocks chosen.
 2. **Expansion.** The largest server step when few blocks are searched: 62% to 74% of server time at 100k vectors, 5% searched. The search kernel is only 3.5% to 8.1% of the total at 1M vectors, 20% searched.
 3. **Record the host CPU in benchmarks,** so CPU steps can be compared between runs.
-4. **Close the open items:** the decisions above, the T1.19 settings, and the low findings. If the T1.19 check becomes required, the known `m0_compact_n8192` expansion flake (up to 1.47e-6 against 1e-6) can block merges, and needs resolving with 0012.
+4. **Close the open items:** the decisions above, the T1.19 settings, and the low findings. The `m0_compact_n8192` expansion noise (up to 1.47e-6 against 1e-6) is not a flake and is not open: decision 0012 accepts a preset by recall, so its tests use a 1e-5 bound on purpose, and the exact RNS comparison against OpenFHE still runs on every kernel.

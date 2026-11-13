@@ -19,6 +19,19 @@ Local mode runs a CPU server inside your process, so you need no GPU. It takes s
 
 For GPU speed, run the server with `docker compose up -d` on a host with a [supported NVIDIA GPU](docs/site/operations/gpus.md), and connect with `Client("host:port", ...)`.
 
+## Status
+
+Version 0.1.0. One server on one machine, with the Python client and a LangChain adapter. The server is single-tenant: an API key has a scope (read, write or admin) but no collection, so any read key reads every collection on that server. Not built yet: several nodes, a plaintext-database mode, range filters, key rotation and a LlamaIndex adapter.
+
+## Security
+
+- Every preset uses at least 128-bit security (`HEStd_128_classic`). The client and the server both refuse a parameter set below that.
+- The secret key stays in the client's key file, protected by a passphrase. The server receives only ciphertexts and public evaluation keys.
+- The threat model is an honest-but-curious server: it runs the software correctly but tries to learn what it can. A malicious server can return wrong results, and the client cannot tell.
+- The server still sees the number of vectors, the ids you choose (use random ones), which cluster each vector is in, the number and timing of queries, and, after each search, the ids of the records the client fetches. The Decoy and Strict levels hide only which clusters a query asks for.
+
+[What the server learns](docs/site/security/what-the-server-learns.md) has the full list. Report a vulnerability as described in [SECURITY.md](SECURITY.md).
+
 ## Documentation
 
 - [Getting started](docs/site/getting-started/install.md): install, quickstart, your first search, local mode or a server, examples

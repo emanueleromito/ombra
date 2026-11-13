@@ -29,7 +29,7 @@ We have not tested for or defended against timing, cache, power or memory-access
 
 ## Repeated queries
 
-Decoys hide the real clusters of one query. A server that watches many queries can compare them: the real clusters of related queries repeat while the random decoys change, so over time the real ones stand out. We have not measured how fast. Strict is the only level without this weakness, at the cost of scanning every cluster.
+Decoys hide the real clusters of one query, and the client shuffles each request so the order gives nothing away. A server that watches many queries can compare them: the real clusters of related queries repeat while the random decoys change, so over time the real ones stand out. We have not measured how fast. Strict is the only level without this weakness, at the cost of scanning every cluster.
 
 ## Compromised clients and keys
 

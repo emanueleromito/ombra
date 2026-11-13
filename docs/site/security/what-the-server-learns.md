@@ -6,15 +6,15 @@ The three levels are Fast, Decoy and Strict. Each collection has a default level
 
 ## In every mode
 
-The server never sees vectors, queries, scores, filter values, document text, metadata values or the secret key. It does see the following, whatever the level.
+The server never sees vectors, queries, scores, filter values, document text, metadata values or the secret key. A server that does not follow the protocol could return wrong scores, and the client would not notice, see [Out of scope](out-of-scope.md). Everything on this page assumes an honest-but-curious server. It does see the following, whatever the level.
 
 - **Vector ids.** You choose the ids and they are stored in plaintext. They arrive with each insert and delete, and they come back with every score the server returns. Use random ids.
-- **Cluster membership.** Each insert says which cluster a block belongs to, so the server knows which ids sit in the same cluster and how many vectors each cluster holds. It does not know what a cluster is about.
-- **Collection shape.** The preset, the vector dimension, the number of clusters, the number of blocks, the number of vectors (tombstoned ones included until they are compacted), and the filter layout: how many filter fields there are and how many values each has. It does not see what a field means, or its values.
+- **Cluster membership.** Each insert sends the cluster id of every vector in the clear, next to the vector's id. The server holds the full partition of ids into clusters and knows how many vectors each cluster holds. It does not know what a cluster is about, but it can link any id it sees later to its cluster.
+- **Collection shape.** The preset, the vector dimension, the number of clusters, the number of blocks, the number of vectors (tombstoned ones included until they are compacted), and the filter layout: how many filter fields there are and how many values each has (the cardinalities). It does not see what a field means, or its values. The cardinalities are exact. Bucketing them, for example by declaring a larger value count than you need, is up to you: the client does not do it.
 - **Deletes.** The ids you delete, and when. A deleted vector stays as a tombstone in its block, still scored and returned, until the block is dropped or repacked. The count of deleted vectors per block is visible. See [Deletes](../how-it-works/deletes.md).
 - **Blob sizes and ids.** Every record and document blob is padded to one of four sizes ({{ const("ombra.blobstore.BUCKET_SIZES")[0] }}, {{ const("ombra.blobstore.BUCKET_SIZES")[1] }}, {{ const("ombra.blobstore.BUCKET_SIZES")[2] }} or {{ const("ombra.blobstore.BUCKET_SIZES")[3] }} bytes). The server sees the size class, not the true length. A vector's record and document use the same id as the vector. The client also stores its per-cluster statistics as one sealed blob under a reserved id, which the server sees as a blob like any other.
 - **Query count and timing.** When each query arrives, how long each round takes, and how many bytes move.
-- **Candidate ids after the search.** To re-rank, the client fetches the record blobs of its best `rerank_factor * k` candidates (3 times k by default, never fewer than k). The server sees those ids. It cannot tell which of them end up in the final k, and it cannot read the vectors inside, but the ids are near neighbours of the query. A document fetched afterwards is one more blob request. These fetches happen in Strict too.
+- **Candidate ids after the search.** To re-rank, the client fetches the record blobs of its best `rerank_factor * k` candidates (3 times k by default, never fewer than k). The server sees those ids. It cannot tell which of them end up in the final k, and it cannot read the vectors inside, but the ids are near neighbours of the query. A document fetched afterwards is one more blob request. These fetches happen at every level, Decoy and Strict included. Because the server knows the cluster of each id, they reveal which records were candidates and, from their number, k. The levels hide only which clusters a query requested.
 - **Keys that are public by design.** The key tag, the crypto context and the evaluation keys (relinearization and automorphism keys), uploaded once per collection. The public encryption key stays on the client.
 - **Network metadata.** The client address, the API key and request sizes, as for any service.
 
@@ -37,19 +37,18 @@ Decoy does exactly two rounds for every query. Each round asks for a fixed numbe
 What the server learns on top of the common list:
 
 - **The number of rounds and clusters per round.** Always two rounds with fixed counts, so it cannot tell a filtered query from an unfiltered one, or a narrow query from a wide one.
-- **A set of clusters that contains the real ones.** By set membership alone, real and decoy clusters look the same.
+- **A set of clusters that contains the real ones.** Real and decoy clusters look the same, in set membership and in order.
 - **A full scan for a rare filter.** As in Fast. This scan has different request sizes from a normal Decoy query, so it stands out.
 
-!!! warning "Decoy does not hide the real clusters from a server that reads the order"
-    In the current client, each request lists the real clusters first, in score order, and appends the decoys after them. The server keeps that order. A server that looks at the order of the ids in a request can read off the real clusters, and Decoy gives no protection against it. Until the client shuffles the ids, treat Decoy as protection against a server that only looks at the set of clusters, and use Strict when the cluster choice must stay hidden.
+The client shuffles the cluster ids of each request before sending them, so the order inside a request does not separate real clusters from decoys.
 
-Even with a shuffle, decoys protect one query at a time. Over many queries on the same topic the real clusters repeat and the decoys do not, see [Out of scope](out-of-scope.md).
+Decoys protect one query at a time. Over many queries on the same topic the real clusters repeat and the decoys do not, see [Out of scope](out-of-scope.md).
 
 ## Strict
 
 Strict asks for every cluster in two rounds: the first half of the cluster ids, then the second half, in a fixed order that does not depend on the query. A filtered query looks the same as an unfiltered one, and so does a rare-filter query, because the full scan is already the normal plan.
 
-On top of the common list, the server learns nothing about the query from the cluster choice, because every query asks for everything.
+On top of the common list, the server learns nothing about the query from the cluster choice, because every query asks for everything. The fetch of candidate records after the search still shows which records were near the query.
 
 What Strict does not hide is the candidate ids fetched for re-ranking, the count and timing of queries, and the cost. A Strict query scores every vector, so it is the slowest level. See [Clusters and search levels](../how-it-works/clusters.md).
 
@@ -57,7 +56,7 @@ What Strict does not hide is the candidate ids fetched for re-ranking, the count
 
 | What the server sees | Fast | Decoy | Strict |
 | --- | --- | --- | --- |
-| Which clusters the query is closest to | yes, with rank order | yes, if it reads the id order (see the warning) | no |
+| Which clusters the query is closest to | yes, with rank order | yes, as a set that also holds decoys | no |
 | Number of rounds | 1 unfiltered, 2 filtered | always 2 | always 2 |
 | Whether a filter was used | yes, from the round count | no, unless the filter is rare | no |
 | Rare filter (under 0.5%) | visible as a full scan | visible as a full scan | not visible |
@@ -65,4 +64,4 @@ What Strict does not hide is the candidate ids fetched for re-ranking, the count
 | Vectors, queries, scores, filter values | no | no | no |
 
 !!! deep-dive "Where each item comes from"
-    The level logic is `run_search` in `client/ombra/search.py`. Its `run_round` pads Decoy rounds with `rng.sample` and appends the decoys after the real ids, `scan_all` splits a full scan with `strict_halves`, and `_rerank` fetches the record blobs. `decoy_round_sizes` and the filter-aware `ProbePlanner` are in `client/ombra/probe.py`. On the server, `server/grpc/src/service.cpp` answers the clusters of a request in the order it received them, and logs only counts, sizes and timings, never ids. The messages are in `client/ombra/resources/ombra.proto`: the filter layout travels as `FilterField` cardinalities, and the blob sizes are the `LIMIT_BLOB_BUCKET_*` values.
+    The level logic is `run_search` in `client/ombra/search.py`. Its `run_round` pads Decoy rounds with `rng.sample`, `scan_all` splits a full scan with `strict_halves`, and `_rerank` fetches the record blobs. `decoy_round_sizes` and the filter-aware `ProbePlanner` are in `client/ombra/probe.py`. On the server, `server/grpc/src/service.cpp` answers the clusters of a request in the order it received them, and logs only counts, sizes and timings, never ids. The messages are in `client/ombra/resources/ombra.proto`: the filter layout travels as `FilterField` cardinalities, and the blob sizes are the `LIMIT_BLOB_BUCKET_*` values.

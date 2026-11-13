@@ -50,11 +50,11 @@ These are not style preferences. Breaking one is a bug.
 
 1. **Security floor.** Never use FHE parameters below 128-bit security, in any code path, test or benchmark. Parameters come from presets; never hand-pick ring sizes or moduli outside `core/params` (when it exists).
 2. **The secret key stays on the client.** No server-side code may accept, store, log or derive the secret key. The server only receives ciphertexts and public evaluation keys.
-3. **OpenFHE is the oracle.** Key generation, encryption and decryption use OpenFHE only. One exception (decision 0023): on the client, Ombra replaces the random half of a stored ciphertext with a seeded one and corrects the other half, with an exact test against OpenFHE's ciphertext. Every CUDA kernel has a test that compares its output with OpenFHE's CPU result on the same inputs. No kernel is merged without one.
+3. **OpenFHE is the oracle.** Key generation, encryption and decryption use OpenFHE only. One exception (decision 0023, seeded stored ciphertexts): on the client, Ombra replaces the random half of a stored ciphertext with a seeded one and corrects the other half, with an exact test against OpenFHE's ciphertext. Every CUDA kernel has a test that compares its output with OpenFHE's CPU result on the same inputs. No kernel is merged without one.
 4. **No plaintext leaks.** Never log, print or write plaintext vectors, queries, documents, scores or keys outside tests that use synthetic data.
 5. **Crypto changes need tests first.** Do not change key handling, parameter selection or ciphertext layout without adding or updating tests in the same change.
 6. **Versioned formats.** Every ciphertext, key file and collection format carries a version header. Do not change a format without bumping its version.
-7. **Five GPU architectures (decision 0024).** Compile for `sm_75`, `sm_80`, `sm_86`, `sm_89` and `sm_90`. Do not add other architectures without a task asking for it.
+7. **Five GPU architectures (decision 0024, GPU families).** Compile for `sm_75`, `sm_80`, `sm_86`, `sm_89` and `sm_90`. Do not add other architectures without a task asking for it.
 8. **Wording.** Never call this project "open source". It is "source-available" (see `LICENSE`).
 
 ## Conventions

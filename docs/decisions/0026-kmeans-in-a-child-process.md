@@ -1,4 +1,4 @@
-# 0024. Run faiss k-means in a child process
+# 0026. Run faiss k-means in a child process
 
 - **Status:** proposed
 - **Date:** 2026-11-13
