@@ -15,7 +15,7 @@ import platform
 import re
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -51,14 +51,16 @@ def _openfhe_version() -> str:
 def environment() -> dict:
     """The setup record. `git_commit` is "unknown" where there is no .git (the Modal image);
     callers there pass the commit in through OMBRA_GIT_COMMIT."""
-    commit = os.environ.get("OMBRA_GIT_COMMIT") or _run(["git", "rev-parse", "--short", "HEAD"]).strip()
+    commit = (
+        os.environ.get("OMBRA_GIT_COMMIT") or _run(["git", "rev-parse", "--short", "HEAD"]).strip()
+    )
     dirty = bool(_run(["git", "status", "--porcelain", "--untracked-files=no"]).strip())
     gpu = _run(
         ["nvidia-smi", "--query-gpu=name,memory.total,driver_version", "--format=csv,noheader"]
     ).strip()
     nvcc = re.search(r"release ([\d.]+)", _run(["nvcc", "--version"]))
     return {
-        "utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "git_commit": commit or "unknown",
         "git_dirty": dirty,
         "cpu_model": _cpu_model(),

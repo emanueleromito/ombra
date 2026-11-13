@@ -49,8 +49,13 @@ def main() -> None:
             v = rng.uniform(-1, 1, n // 2).tolist()
             return cc.Encrypt(keys.publicKey, cc.MakeCKKSPackedPlaintext(v))
 
-        for kind, make in (("fresh", fresh), ("served", lambda: cc.Rescale(cc.EvalMult(fresh(), fresh())))):
-            blobs = [np.frombuffer(ofhe.Serialize(make(), ofhe.BINARY), dtype=np.uint8) for _ in range(6)]
+        for kind, make in (
+            ("fresh", fresh),
+            ("served", lambda: cc.Rescale(cc.EvalMult(fresh(), fresh()))),
+        ):
+            blobs = [
+                np.frombuffer(ofhe.Serialize(make(), ofhe.BINARY), dtype=np.uint8) for _ in range(6)
+            ]
             same_len = len({b.size for b in blobs}) == 1
             diff = np.zeros(blobs[0].size, dtype=bool)
             for b in blobs[1:]:

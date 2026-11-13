@@ -102,9 +102,7 @@ def profile(preset: str, reps: int, tmp: Path) -> dict:
         dec = cc.Decrypt(ct, keys.secretKey)
         dec.SetLength(slots)
         v["get_values"] = timed(lambda: dec.GetRealPackedValue(), reps)
-        v["to_numpy"] = timed(
-            lambda: np.asarray(dec.GetRealPackedValue(), dtype=np.float64), reps
-        )
+        v["to_numpy"] = timed(lambda: np.asarray(dec.GetRealPackedValue(), dtype=np.float64), reps)
 
         def whole() -> None:
             c, _ = ofhe.DeserializeCiphertext(str(f), ofhe.BINARY)
@@ -151,7 +149,10 @@ def main() -> None:
         rows = [profile(p, args.reps, Path(tmp)) for p in PRESETS]
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(
-        json.dumps({"experiment": "0001", "seed": SEED, "environment": environment(), "rows": rows}, indent=2)
+        json.dumps(
+            {"experiment": "0001", "seed": SEED, "environment": environment(), "rows": rows},
+            indent=2,
+        )
     )
     print(f"wrote {args.out}")
 
