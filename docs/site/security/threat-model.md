@@ -23,7 +23,7 @@ flowchart LR
         BL["Sealed record and document blobs<br/>(AES-256-GCM, fixed size buckets)"]
         CAT["Catalog and segment files"]
     end
-    Client -- "ciphertexts, public keys, ids" --> Server
+    Client -- "ciphertexts, evaluation keys, ids" --> Server
     Server -- "encrypted scores" --> Client
     Client -- "sealed blobs" --> BL
     BL -- "sealed blobs" --> Client
@@ -34,7 +34,7 @@ flowchart LR
 
 The client holds the secret key and every plaintext. It encrypts vectors and queries with the public key, decrypts the scores the server sends back, picks the top k, and re-ranks the best candidates with the exact vectors it gets from the blob store. Clustering also runs on the client, because the server cannot see the vectors. See [Keys](../concepts/keys.md) for what each key does.
 
-The server holds only what the client sends it: ciphertexts, the public key and evaluation keys, ids, and the layout of the collection. Its storage holds the encrypted blocks, the catalog, and the record and document blobs. The client seals records and documents with AES-256-GCM before upload, so the server stores them as opaque bytes of a fixed size class. See [Documents](../how-it-works/documents.md).
+The server holds only what the client sends it: ciphertexts, the crypto context and the evaluation keys, ids, and the layout of the collection. Its storage holds the encrypted blocks, the catalog, and the record and document blobs. The client seals records and documents with AES-256-GCM before upload, so the server stores them as opaque bytes of a fixed size class. See [Documents](../how-it-works/documents.md).
 
 ## What we assume
 
