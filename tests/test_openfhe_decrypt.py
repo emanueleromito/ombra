@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """PERF-A: decrypting after dropping to the first RNS tower equals the full decrypt."""
 
 from __future__ import annotations

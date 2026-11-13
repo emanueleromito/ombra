@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 import json, sys
 d=json.load(open(sys.argv[1]))
 for r in d['rows']:

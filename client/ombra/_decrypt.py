@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 """Shared block decryption for the client (PERF-A).
 
 A served score block has 2 RNS towers (level 1 of a depth-2 preset). OpenFHE decodes a
