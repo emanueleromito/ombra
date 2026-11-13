@@ -1,12 +1,12 @@
 # Docker and compose
 
-The server runs from a Docker image. You need Docker, an NVIDIA GPU of the Ampere generation (see [Supported GPUs](gpus.md)) and the NVIDIA container toolkit.
+The server runs from a Docker image. You need Docker, an NVIDIA GPU from the [supported list](gpus.md) and the NVIDIA container toolkit.
 
 ## Images
 
 | Image | What it is |
 | --- | --- |
-| `ghcr.io/erailabs/ombra-server` | The GPU server. Built for `sm_80` and `sm_86`, on the CUDA 12.6 runtime. Runs as the unprivileged user `ombra`. |
+| `ghcr.io/erailabs/ombra-server` | The GPU server. Built for the five architectures of [Supported GPUs](gpus.md), on the CUDA 12.6 runtime. Runs as the unprivileged user `ombra`. |
 | `ghcr.io/erailabs/ombra-cpu` | The Python client with local mode, for tests and development. It has no `ombra_server`: serving search over gRPC needs the GPU image. |
 
 ## Compose
@@ -98,4 +98,4 @@ Everything the server stores is in the `ombra-data` volume. `docker compose down
 docker build -f docker/Dockerfile.server -t ombra-server .
 ```
 
-The build compiles OpenFHE 1.6.1 and the CUDA code for `sm_80` and `sm_86`, and takes about an hour. `docker compose build` does the same through the `build:` entry of the compose file.
+The build compiles OpenFHE 1.6.1 and the CUDA code for the five architectures, and takes about an hour. `docker compose build` does the same through the `build:` entry of the compose file.

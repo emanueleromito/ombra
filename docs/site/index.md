@@ -8,7 +8,7 @@ You hold the secret key in a Python client. The client encrypts your vectors and
 
 Teams that want similarity search over embeddings (documents, chat history, customer records) without trusting the host with the plain data. The cost is speed and size: an encrypted search is slower than a plain one and ciphertexts are much larger than vectors. [Performance](performance/latency-and-throughput.md) has the numbers.
 
-Ombra works with embeddings from any model that gives 384, 768 or 1536 dimensions. It has filters on integer fields, inserts, deletes and a LangChain adapter. It needs an NVIDIA Ampere GPU for the server, and there is a slow CPU local mode for trying it.
+Ombra works with embeddings from any model that gives 384, 768 or 1536 dimensions. It has filters on integer fields, inserts, deletes and a LangChain adapter. It needs an NVIDIA GPU for the server, and there is a slow CPU local mode for trying it.
 
 ## Where to start
 

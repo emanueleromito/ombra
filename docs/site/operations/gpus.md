@@ -1,13 +1,15 @@
 # Supported GPUs
 
-The server needs an NVIDIA GPU of the Ampere generation. The image contains code for compute capability 8.0 and 8.6 (`sm_80` and `sm_86`) and nothing else.
+The server runs on NVIDIA GPUs of five architectures. The code is compiled for compute capabilities 7.5, 8.0, 8.6, 8.9 and 9.0. Every kernel is tested against OpenFHE on each of them.
 
-| Supported | Compute capability |
-| --- | --- |
-| A100, A30 | 8.0 |
-| A10, RTX 3060 to RTX 3090, RTX A-series workstation cards | 8.6 |
+| Card | Compute capability | Support |
+| --- | --- | --- |
+| A10 (development) and A100 (benchmarks) | 8.6 and 8.0 | Reference. The published numbers come from these. |
+| L4, L40S, RTX 40xx, H100, H200 | 8.9 and 9.0 | Supported. |
+| T4 | 7.5 | Works, with no latency target. It has 16 GB of memory and expansion is about five times slower than on an A100. |
+| A30, RTX 30xx, RTX A-series workstation cards | 8.0 and 8.6 | Supported, like the A10 and A100. |
 
-Other GPUs are not supported. That includes Turing (RTX 20xx, T4), Volta (V100), Ada (RTX 40xx, L4, L40), Hopper (H100) and Blackwell. The kernels are not compiled for them, so the server cannot run on them. Support for other generations has not been built or tested, and there is no date for it.
+Other GPUs are not supported. That includes Volta (V100) and Blackwell. The kernels are not compiled for them, so the server cannot run on them.
 
 To see what you have:
 
@@ -15,7 +17,7 @@ To see what you have:
 nvidia-smi --query-gpu=name,compute_cap --format=csv
 ```
 
-The compute capability should read 8.0 or 8.6.
+The compute capability should read 7.5, 8.0, 8.6, 8.9 or 9.0.
 
 ## Driver and toolkit
 

@@ -42,7 +42,7 @@ Each `insert_vectors` call also adds a new block per touched cluster, so a colle
 
 The centers are fixed when the collection is created. Deletes remove vectors from clusters, inserts add them to the nearest old center, and over time the clusters stop matching the data, which costs recall at a given number of probed clusters. Re-clustering rebuilds them.
 
-`recluster` reads every block with live vectors, decrypts it, and runs k-means again on the live vectors, in the client process, as in [clusters](clusters.md). It builds a new collection called `<name>.g<n>`, with the number of clusters you pass or the old count, using the same keys. The new blocks have no dead slots. The record and document blobs are copied byte for byte, because their encryption is tied to the base name and not to the generation, so they need no re-encryption.
+`recluster` reads every block with live vectors, decrypts it, and runs k-means again on the live vectors on your machine, in the same child process as at creation, as in [clusters](clusters.md). It builds a new collection called `<name>.g<n>`, with the number of clusters you pass or the old count, using the same keys. The new blocks have no dead slots. The record and document blobs are copied byte for byte, because their encryption is tied to the base name and not to the generation, so they need no re-encryption.
 
 Search keeps working on the old collection the whole time. When `recluster` returns, you switch your searches to the new collection and call `retire()` on the old one, which drops it from the server. Until then both exist, so the server stores about twice the data.
 

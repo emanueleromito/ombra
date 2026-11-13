@@ -5,7 +5,7 @@ Ombra runs search in one of two places. Your client code is the same in both. On
 | | Local mode | Server |
 | --- | --- | --- |
 | Where search runs | a child process on your CPU | a GPU server |
-| Needs | `pip install "ombra[local]"` | Docker and an NVIDIA Ampere GPU |
+| Needs | `pip install "ombra[local]"` | Docker and a supported NVIDIA GPU |
 | Speed | several seconds per search | much faster, and many searches at once |
 | Size | a few thousand vectors | larger collections |
 | Default preset | fast | balanced |

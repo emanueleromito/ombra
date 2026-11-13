@@ -35,7 +35,7 @@ python -c "import ombra; print(ombra.__version__)"
 
 ## The server
 
-The server needs a host with an NVIDIA Ampere GPU (an A10 or A100, for example; compute capability 8.0 or 8.6) and Docker with the NVIDIA container toolkit. Start it from the compose file in the repository:
+The server needs a host with a supported NVIDIA GPU (an A10 or A100, for example; see [GPUs](../operations/gpus.md) for the list) and Docker with the NVIDIA container toolkit. Start it from the compose file in the repository:
 
 ```bash
 docker compose up -d

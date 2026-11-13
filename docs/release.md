@@ -8,7 +8,7 @@ reads the same, builds the wheels, builds and pushes the two images, and publish
 | What | Where |
 | --- | --- |
 | `ombra`, `ombra-openfhe`, `langchain-ombra` wheels | PyPI |
-| `ghcr.io/erailabs/ombra-server` (GPU, Ampere `sm_80` and `sm_86`) | GHCR |
+| `ghcr.io/erailabs/ombra-server` (GPU, `sm_75`, `sm_80`, `sm_86`, `sm_89` and `sm_90`) | GHCR |
 | `ghcr.io/erailabs/ombra-cpu` (Python client with local mode, amd64 and arm64) | GHCR |
 
 The CPU image has no `ombra_server`. The server needs CUDA and a GPU, so only the GPU image

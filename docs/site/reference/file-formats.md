@@ -4,7 +4,7 @@ Every file Ombra writes starts with a magic string and a version number, so a pr
 
 | Format | Written by | Magic | Version |
 | --- | --- | --- | --- |
-| [Envelope](#envelope) | client, server | `{{ const("ombra.file_format.MAGIC").decode() }}` | {{ const("ombra.file_format.FORMAT_VERSION") }} |
+| [Envelope](#envelope) | client, server | `{{ const("ombra.file_format.MAGIC").decode() }}` | {{ const("ombra.file_format.FORMAT_VERSION") }}, and {{ const("ombra.file_format.FORMAT_VERSION_SEEDED") }} for seeded ciphertexts |
 | [Key file](#key-file) | client | `{{ const("ombra.keyfile.MAGIC").decode() }}` | {{ const("ombra.keyfile.KEYFILE_VERSION") }} |
 | [Blob](#blobs) | client | `{{ const("ombra.documents.MAGIC").decode() }}` | {{ const("ombra.documents.BLOB_VERSION") }} |
 | [Segment](#server-files) | server | `OSEG` | {{ cpp("server/storage/include/ombra/storage/segment.hpp", "kSegmentVersion") }} |
@@ -17,21 +17,42 @@ A format changes only with a version bump. The version of a file never depends o
 
 ## Envelope
 
-Every ciphertext, crypto context and public evaluation key crosses the network and is stored on the server inside an envelope. It is a small header around OpenFHE's binary serialization. The version is {{ const("ombra.file_format.FORMAT_VERSION") }}.
+Every ciphertext, crypto context and public evaluation key crosses the network and is stored on the server inside an envelope. It is a small header around OpenFHE's binary serialization. The version is {{ const("ombra.file_format.FORMAT_VERSION") }} for kinds 1 to 3 and {{ const("ombra.file_format.FORMAT_VERSION_SEEDED") }} for kind 4, the seeded ciphertext. A reader refuses a kind that does not match its version.
 
 | Offset | Size | Field |
 | --- | --- | --- |
 | 0 | 4 | magic `OMBR` |
 | 4 | 2 | format version |
-| 6 | 2 | kind: 1 context, 2 ciphertext, 3 public evaluation key |
+| 6 | 2 | kind: 1 context, 2 ciphertext, 3 public evaluation key, 4 seeded ciphertext |
 | 8 | 2 | preset name length $P$, 1 to {{ const("ombra.file_format.MAX_NAME") }} |
 | 10 | $P$ | preset name |
 | . | 2 | OpenFHE version length $V$, 1 to {{ const("ombra.file_format.MAX_NAME") }} |
 | . | $V$ | OpenFHE version string |
 | . | 8 | payload length $L$ |
-| . | $L$ | payload: OpenFHE binary serialization. The file ends here. |
+| . | $L$ | payload: OpenFHE binary serialization (kinds 1 to 3) or the seeded layout below (kind 4). The file ends here. |
 
-There is no kind for a secret key, so the secret key cannot travel in an envelope. A reader checks the kind, the preset name and the OpenFHE version against what it expects, and checks the payload length against the bytes present before it allocates anything. The Python side is `client/ombra/file_format.py` and the C++ side is `core/include/ombra/core/file_envelope.hpp`. The C++ constant `kEnvelopeVersion` is {{ cpp("core/include/ombra/core/file_envelope.hpp", "kEnvelopeVersion") }}, the same as the Python one.
+There is no kind for a secret key, so the secret key cannot travel in an envelope. A reader checks the kind, the preset name and the OpenFHE version against what it expects, and checks the payload length against the bytes present before it allocates anything. The Python side is `client/ombra/file_format.py` and the C++ side is `core/include/ombra/core/file_envelope.hpp`. The C++ constants `kEnvelopeVersion` ({{ cpp("core/include/ombra/core/file_envelope.hpp", "kEnvelopeVersion") }}) and `kEnvelopeVersionSeeded` ({{ cpp("core/include/ombra/core/file_envelope.hpp", "kEnvelopeVersionSeeded") }}) match the Python ones.
+
+### Seeded ciphertext
+
+A seeded ciphertext stores a 32-byte seed in place of the uniformly random half of the ciphertext, so it is about half the size. The server expands the seed back into the full ciphertext when it loads a block, and every kernel sees the same words as for an ordinary one. Payload of kind 4:
+
+| Size | Field |
+| --- | --- |
+| 2 | payload version, 1 |
+| 2 | generator, 1 is BLAKE2xb |
+| 32 | seed, a fresh one from the operating system for each ciphertext |
+| 4 | ring dimension $N$ |
+| 2 | towers $T$ |
+| 4 | level |
+| 4 | noise scale degree |
+| 4 | slots |
+| 8 | scaling factor, IEEE double |
+| 2 + $K$ | key tag length $K$ and the key tag |
+| $8T$ | moduli, 8 bytes each |
+| $8TN$ | the first polynomial, tower by tower, in evaluation form |
+
+A reader refuses an unknown payload version or generator, a size that does not match $N$ and $T$, a word that is not reduced, and trailing bytes. A collection may hold both kinds of column. The client writes kind 4 when its compiled module is installed. A client without it writes kind 2 and refuses to read kind 4.
 
 ## Key file
 

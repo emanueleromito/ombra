@@ -6,7 +6,7 @@ The code is in [`client/ombra/search.py`](https://github.com/erailabs/ombra/blob
 
 ## Making the clusters
 
-When you create a collection, the client runs spherical k-means (faiss) on your plaintext vectors. Vectors have unit length, so the nearest center is the one with the largest dot product, and the centers are unit vectors too. K-means runs inside the client process, on vectors the client already holds. The server never sees the plaintext centers. It gets them encrypted, one ciphertext per dimension, in a block of their own (see [encoding](encoding.md) for how a block is laid out).
+When you create a collection, the client runs spherical k-means (faiss) on your plaintext vectors. Vectors have unit length, so the nearest center is the one with the largest dot product, and the centers are unit vectors too. K-means runs on your machine, in a short-lived child process of the client that loads faiss and nothing else, on vectors the client already holds. The vectors pass through a pipe between the two local processes and are never written to disk. The server never sees the plaintext centers. It gets them encrypted, one ciphertext per dimension, in a block of their own (see [encoding](encoding.md) for how a block is laid out).
 
 The default number of clusters is
 

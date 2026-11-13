@@ -4,7 +4,7 @@ Ombra is available under the [PolyForm Noncommercial License 1.0.0](LICENSE) or 
 
 Ombra is a vector database where your vectors, your queries and the scores stay encrypted with fully homomorphic encryption (FHE). The server stores and searches ciphertexts only, so it never sees your data or what you search for.
 
-You keep the secret key in a Python client. The client encrypts vectors and queries, the server computes similarity on the ciphertexts with CUDA kernels on an NVIDIA Ampere GPU, and the client decrypts the scores and picks the top results. Results are exact, because the client re-ranks the candidates itself. The cryptography is CKKS, and OpenFHE does key generation, encryption and decryption.
+You keep the secret key in a Python client. The client encrypts vectors and queries, the server computes similarity on the ciphertexts with CUDA kernels on an NVIDIA GPU, and the client decrypts the scores and picks the top results. Results are exact, because the client re-ranks the candidates itself. The cryptography is CKKS, and OpenFHE does key generation, encryption and decryption.
 
 An encrypted search is slower than a plain one and ciphertexts are much larger than vectors. The docs say by how much.
 
@@ -17,7 +17,7 @@ python examples/local_search.py
 
 Local mode runs a CPU server inside your process, so you need no GPU. It takes several seconds per search and is for trying Ombra and small collections. Wheels exist for Python 3.11 to 3.13 on Linux (x86_64, aarch64) and macOS 15 or newer (arm64, x86_64). There is no Windows build.
 
-For GPU speed, run the server with `docker compose up -d` on a host with an NVIDIA Ampere GPU, and connect with `Client("host:port", ...)`.
+For GPU speed, run the server with `docker compose up -d` on a host with a [supported NVIDIA GPU](docs/site/operations/gpus.md), and connect with `Client("host:port", ...)`.
 
 ## Documentation
 
@@ -43,7 +43,7 @@ The `examples/` folder has runnable scripts, and the LangChain adapter is in `in
 
 ## Development
 
-GPU work runs on [Modal](https://modal.com). Reference cards: NVIDIA Ampere (A10 for development, A100 for benchmarks); Turing, Ada and Hopper cards are built and tested too. See [CONTRIBUTING.md](CONTRIBUTING.md).
+GPU work runs on [Modal](https://modal.com). Reference cards: NVIDIA Ampere (A10 for development, A100 for benchmarks). Turing, Ada and Hopper cards are built and tested too. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ```bash
 make help        # list all commands
