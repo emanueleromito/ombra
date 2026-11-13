@@ -30,12 +30,12 @@ experiments that compare candidates.
 | --- | --- | --- | --- |
 | [0000](0000-survey.md) | Survey: baseline, sources, candidate list | all | reference |
 | [0001](0001-cpu-client-profile/README.md) | Client CPU profile; drop to one tower before decrypting | client CPU | adopted: block decrypt 1.9x to 2.2x |
-| 0002 | GPU baseline profile on the current commit | GPU | not run yet (Modal) |
+| 0002 | GPU baseline on the current commit | GPU | the "before" files of 0006 and 0007 (same run as the candidates) |
 | [0003](0003-cpu-fused-score/README.md) | Local mode: fused lazy score | client CPU | adopted: score 4.8x to 5.8x |
 | [0004](0004-cpu-expansion-monomial/README.md) | Local mode: monomial in evaluation form | client CPU | adopted: expansion 1.07x to 1.25x |
 | [0005](0005-ciphertext-deserialize/README.md) | Cost of deserializing a ciphertext | server and client CPU | baseline; 3.3 ms of fixed cost per ciphertext |
-| 0006 | GPU search kernel: lazy accumulation, Karatsuba cross term | GPU kernel | not run yet (Modal) |
-| 0007 | Expansion writes its leaves in place (no handoff) | GPU host, memory | not run yet (Modal) |
+| [0006](0006-gpu-lazy-search-kernel/README.md) | GPU search kernel: lazy accumulation, Karatsuba cross term | GPU kernel | rejected: 2% to 10% slower; the kernel is memory-bound |
+| [0007](0007-expansion-leaf-sink/README.md) | Expansion writes its leaves in place (no handoff) | GPU host, memory | adopted: server 1.07x to 1.19x, 1.2 GB less at d = 1536 |
 | 0008 | GPU families: T4, L4, L40S, H100 | GPU families | not run yet (Modal) |
 | 0009 | Template reader for ciphertexts | server and client CPU | proposed, not built |
 | 0010 | Hand-written CPU key switch for local mode | client CPU | not run: proposed as a task |

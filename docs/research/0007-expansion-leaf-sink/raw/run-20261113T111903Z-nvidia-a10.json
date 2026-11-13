@@ -1,0 +1,14 @@
+{
+  "utc": "20261113T111903Z",
+  "git_commit": "c854ce3",
+  "build_type": "Release",
+  "cuda_archs": "75;80;86;89;90",
+  "gpu": "NVIDIA A10, 23028 MiB, 610.57.04",
+  "cpu_model": "unknown",
+  "logical_cpus": 20,
+  "cuda_image": "nvidia/cuda:12.6.3-devel-ubuntu22.04",
+  "openfhe": "v1.6.1",
+  "commands": [
+    "python -m pytest -m gpu -q -rf --durations=15 -p no:cacheprovider --ignore=tests/test_license_headers.py"
+  ]
+}
