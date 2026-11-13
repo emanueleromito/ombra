@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 // Unit test of the file envelope. No OpenFHE, no GPU. Synthetic bytes only.
-// argv[1] = path of tests/fixtures/envelope_v1_ciphertext.bin, written by the Python writer.
+// argv[1] = tests/fixtures/envelope_v1_ciphertext.bin, argv[2] = envelope_v2_seeded.bin, both
+// written by the Python writer.
 #include "ombra/core/file_envelope.hpp"
 
 #include <fstream>
 #include <iostream>
 #include <iterator>
+
+#include "ombra/core/seeded_ciphertext.hpp"
 
 using namespace ombra::core;
 
@@ -44,7 +47,7 @@ int main(int argc, char** argv) {
   bad[0] = 'X';
   CHECK(refuses([&] { rd(bad); }));
   bad = b;
-  bad[4] = 2;
+  bad[4] = 3;  // unknown version
   CHECK(refuses([&] { rd(bad); }));
   CHECK(refuses([&] { rd(b, EnvelopeKind::Context); }));
   CHECK(refuses([&] { rd(b, EnvelopeKind::Ciphertext, "other"); }));
@@ -61,6 +64,48 @@ int main(int argc, char** argv) {
   CHECK(refuses([&] { rd({}); }));
   for (std::size_t n = 0; n < b.size(); ++n)
     CHECK(refuses([&] { rd(Bytes(b.begin(), b.begin() + n)); }));
+
+  // Version 2 and kind 4.
+  CHECK(b[4] == 1 && b[5] == 0);  // kind 2 is still written as version 1
+  Envelope se{EnvelopeKind::SeededCiphertext, "m0_depth2", "1.2.3", {9, 8, 7}};
+  Bytes sb = write_envelope(se);
+  CHECK(sb[4] == 2 && sb[5] == 0 && sb[6] == 4);
+  CHECK(read_envelope(sb, EnvelopeKind::SeededCiphertext, "m0_depth2", "1.2.3").payload ==
+        se.payload);
+  CHECK(read_column_envelope(sb, "m0_depth2", "1.2.3").kind == EnvelopeKind::SeededCiphertext);
+  CHECK(read_column_envelope(b, "m0_depth2", "1.2.3").kind == EnvelopeKind::Ciphertext);
+  CHECK(refuses([&] { rd(sb); }));  // plain reader never accepts kind 4 silently
+  Bytes ctx = write_envelope({EnvelopeKind::Context, "m0_depth2", "1.2.3", {1}});
+  CHECK(refuses([&] { read_column_envelope(ctx, "m0_depth2", "1.2.3"); }));
+  bad = sb;
+  bad[4] = 1;  // kind 4 inside a version 1 envelope
+  CHECK(refuses([&] { read_column_envelope(bad, "m0_depth2", "1.2.3"); }));
+  CHECK(refuses([&] { read_envelope(bad, EnvelopeKind::SeededCiphertext, "m0_depth2", "1.2.3"); }));
+  bad = b;
+  bad[4] = 2;  // version 2 may carry kind 2
+  CHECK(read_envelope(bad, EnvelopeKind::Ciphertext, "m0_depth2", "1.2.3").payload == e.payload);
+  for (std::size_t n = 0; n < sb.size(); ++n)
+    CHECK(refuses(
+        [&] { read_column_envelope(Bytes(sb.begin(), sb.begin() + n), "m0_depth2", "1.2.3"); }));
+
+  if (argc > 2) {  // seeded fixture: envelope and payload
+    std::ifstream f(argv[2], std::ios::binary);
+    Bytes fx((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    auto env = read_column_envelope(fx, "fixture_preset", "0.0.0-fixture");
+    CHECK(env.kind == EnvelopeKind::SeededCiphertext);
+    CHECK(write_envelope(env) == fx);
+    SeededPayload p = read_seeded_payload(env.payload);
+    CHECK(p.ring_dim == 8 && p.towers == 2 && p.level == 0 && p.noise_scale_deg == 1 &&
+          p.slots == 4 && p.scaling_factor == 1099511627776.0 && p.key_tag == "fixture-tag");
+    CHECK(p.moduli == (std::vector<std::uint64_t>{97, 193}));
+    CHECK(p.seed[0] == 0 && p.seed[31] == 31);
+    bool words_ok = p.c0.size() == 16;
+    for (std::size_t i = 0; words_ok && i < 16; ++i)
+      words_ok = p.c0[i] == (i < 8 ? i : 100 + i - 8);
+    CHECK(words_ok);
+    CHECK(write_seeded_payload(p) == env.payload);
+    CHECK(check_seeded_header(env.payload).towers == 2);
+  }
 
   if (argc > 1) {  // cross-language: identical bytes
     std::ifstream f(argv[1], std::ios::binary);
