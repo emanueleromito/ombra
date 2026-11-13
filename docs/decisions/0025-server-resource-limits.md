@@ -13,7 +13,7 @@ gRPC C++ API has one receive-size limit for the whole server, not one per method
 
 - **A. A second listener for the large streaming methods.** Exact limits, but two ports and a
   breaking change for clients.
-- **B. One receive limit (flag, default 256 MiB), authentication before the body, a ResourceQuota
+- **B. One receive limit (flag, default 1 GiB, enough for one block insert), authentication before the body, a ResourceQuota
   for all buffered memory and threads, per-field caps in the handlers.** Weaker per method, no API
   change.
 

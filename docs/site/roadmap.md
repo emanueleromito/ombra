@@ -6,7 +6,7 @@ Items are in two groups. "Next" is work that has started or is small and agreed.
 
 ## Next
 
-**A smaller receive limit for single requests.** The server has one receive limit for every call, 256 MiB by default (`--max-message-mb`). Uploads of keys and blocks need that much, but most single requests are small. We plan a small limit for those, kept apart from the limit for streaming uploads. Today: the server refuses a call without a valid API key before it reaches the handler, and a memory quota caps what all calls hold together. Lower `--max-message-mb` if your collections are small.
+**A smaller receive limit for single requests.** The server has one receive limit for every call, 1 GiB by default (`--max-message-mb`). One insert of a block of stored columns needs that much (about 600 MB at 1536 dimensions on Balanced), but most single requests are small. We plan a small limit for those, kept apart from the limit for streaming uploads. Today: the server refuses a call without a valid API key before it reaches the handler, and a memory quota caps what all calls hold together. Lower `--max-message-mb` if your collections are small.
 
 **Checks on uploaded contexts before they are read.** The server rebuilds the encryption context from bytes the client sends. It checks the size and the file header first, then lets OpenFHE read the bytes, and only then checks the security floor and compares the context with the collection's preset. We plan to check the floor and the preset from the raw bytes, before OpenFHE reads them. Today: give API keys only to clients you trust.
 
