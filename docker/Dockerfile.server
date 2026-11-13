@@ -1,13 +1,17 @@
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
-# GPU server image: ombra_server built for sm_80 and sm_86 (Ampere), on the CUDA runtime.
+# GPU server image: ombra_server built for sm_75, 80, 86, 89 and 90 (Turing, Ampere, Ada, Hopper:
+# the CUDA_ARCHS default of CMakeLists.txt), on the CUDA runtime. The base images are pinned by digest;
+# the apt packages are not (Ubuntu 22.04 has no stable pin for them).
 # Build from the repository root:  docker build -f docker/Dockerfile.server -t ombra-server .
 # Run it with the NVIDIA container toolkit (docker run --gpus all, or docker-compose.yml).
 # The OpenFHE build steps are the ones of ci/Dockerfile and modal_app.py; change the version in all.
 
-FROM nvidia/cuda:12.6.3-devel-ubuntu22.04 AS build
+FROM nvidia/cuda:12.6.3-devel-ubuntu22.04@sha256:d49bb8a4ff97fb5fe477947a3f02aa8c0a53eae77e11f00ec28618a0bcaa2ad1 AS build
 
-ARG OPENFHE_TAG=v1.6.1
-ARG CUDA_ARCHS="80;86"
+# OpenFHE v1.6.1, pinned by commit. It is fetched with git (not as a tarball) because its CMake
+# fetches the submodules by commit.
+ARG OPENFHE_COMMIT=b59e1f291965f14fbee5172cd83a20f5b856204f
+ARG CUDA_ARCHS="75;80;86;89;90"
 
 ENV DEBIAN_FRONTEND=noninteractive CMAKE_GENERATOR=Ninja LD_LIBRARY_PATH=/usr/local/lib
 
@@ -17,8 +21,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # OpenFHE (C++), installed to /usr/local. Same flags as ci/Dockerfile.
-RUN git clone --depth 1 --branch ${OPENFHE_TAG} \
-        https://github.com/openfheorg/openfhe-development /opt/openfhe-src \
+RUN git init --quiet /opt/openfhe-src \
+    && git -C /opt/openfhe-src fetch --quiet --depth 1 \
+        https://github.com/openfheorg/openfhe-development ${OPENFHE_COMMIT} \
+    && git -C /opt/openfhe-src checkout --quiet --detach FETCH_HEAD \
+    && test "$(git -C /opt/openfhe-src rev-parse HEAD)" = "${OPENFHE_COMMIT}" \
     && cmake -S /opt/openfhe-src -B /opt/openfhe-build \
         -DCMAKE_BUILD_TYPE=Release -DBUILD_UNITTESTS=OFF -DBUILD_EXAMPLES=OFF \
         -DBUILD_BENCHMARKS=OFF \
@@ -36,7 +43,7 @@ RUN cmake -S /src -B /build -DCMAKE_BUILD_TYPE=Release -DOMBRA_ENABLE_CUDA=ON \
         "-DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCHS}" \
     && cmake --build /build -j --target ombra_server
 
-FROM nvidia/cuda:12.6.3-runtime-ubuntu22.04
+FROM nvidia/cuda:12.6.3-runtime-ubuntu22.04@sha256:63a18dd805367dacfb077aeced8384ab2fb569598ec5f5f5220c3f90a5c23650
 
 LABEL org.opencontainers.image.source="https://github.com/erailabs/ombra"
 LABEL org.opencontainers.image.licenses="PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial"
@@ -53,6 +60,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=build /usr/local/lib/libOPENFHE*.so* /usr/local/lib/
 COPY --from=build /build/server/grpc/ombra_server /usr/local/bin/ombra_server
+COPY licenses /licenses
 COPY docker/entrypoint.sh /usr/local/bin/ombra-entrypoint
 RUN ldconfig && chmod +x /usr/local/bin/ombra-entrypoint
 
