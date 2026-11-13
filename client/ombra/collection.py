@@ -40,6 +40,7 @@ import numpy as np
 
 from ombra import presets
 from ombra import query as oq
+from ombra._decrypt import decrypt_values
 from ombra.blobstore import KIND_DOCUMENT, KIND_RECORD, BlobStore, BlobStoreError, GrpcBlobStore
 from ombra.clustering import assign, cluster_vectors
 from ombra.documents import DocumentCodec
@@ -245,9 +246,7 @@ class KeyKit:
             ct, ok = ofhe.DeserializeCiphertext(str(p), ofhe.BINARY)
         if not ok:
             raise ValueError("ciphertext could not be deserialized")
-        dec = self.cc.Decrypt(ct, self._keys.secretKey)
-        dec.SetLength(self.slots)
-        return np.array(dec.GetRealPackedValue(), dtype=np.float64)
+        return decrypt_values(self.cc, self._keys.secretKey, ct, self.slots)
 
 
 @dataclass(frozen=True)
