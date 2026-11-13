@@ -30,7 +30,9 @@ PRESETS = ["m0_depth2", "m0_compact_n8192"]  # Every test runs on both
 SEED = 20260109
 
 # Max |decrypted slot - q_j| for GPU leaves, and between GPU and CPU leaves. Same agreed bound as
-# the CPU expansion test (tests/test_query_expansion.py); do not loosen.
+# the CPU expansion test (tests/test_query_expansion.py). Do not loosen TOLERANCE; the one
+# exception is COMPACT_SANITY_BOUND below, for the compact preset only, and it was loosened on
+# purpose because of that preset's own decryption noise.
 TOLERANCE = 1e-6
 # m0_compact_n8192 has more decryption noise than 1e-6 on some seeds (up to 1.47e-6 here, 1.16e-6 in
 # CI). The exact RNS match with OpenFHE above is the kernel check and still runs for it; this is

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
-// The 128-bit security floor, enforced on the C++ side (review finding F7).
+// The 128-bit security floor, enforced on the C++ side.
 //
 // `check_security_floor` is a pure function on plain numbers (no OpenFHE), so the negative tests
 // can run without ever building an insecure CryptoContext. `require_security_floor` (in
@@ -17,6 +17,10 @@
 #include <string>
 
 namespace ombra::core {
+
+// Distribution of the secret key. The 128-bit table assumes a ternary (or Gaussian) secret; a sparse
+// ternary or any other distribution is weaker than the table says, so the floor refuses it.
+enum class SecretDist { kUniformTernary, kGaussian, kSparseTernary, kOther };
 
 enum class StdLevel {
   kNotSet,
@@ -38,10 +42,16 @@ inline constexpr SecurityLimit kSecurityTable128Classic[] = {
 };
 
 // Throws std::invalid_argument unless the level is declared and log2_qp is within the limit for
-// ring_dim. A ring dimension that is not in the table is refused. `extra_limit` (0 = none) can only
+// ring_dim, and the secret key distribution is uniform ternary or Gaussian. A ring dimension that
+// is not in the table is refused. `extra_limit` (0 = none) can only
 // lower the limit; it exists for the wiring tests (OMBRA_TEST_LOG2QP_LIMIT) and never accepts more.
 inline void check_security_floor(StdLevel level, std::size_t ring_dim, std::size_t log2_qp,
-                                 std::size_t extra_limit = 0) {
+                                 std::size_t extra_limit = 0,
+                                 SecretDist dist = SecretDist::kUniformTernary) {
+  if (dist != SecretDist::kUniformTernary && dist != SecretDist::kGaussian) {
+    throw std::invalid_argument(
+        "security floor: secret key distribution is not uniform ternary or Gaussian; refusing");
+  }
   if (level == StdLevel::kNotSet) {
     throw std::invalid_argument("security floor: security level is HEStd_NotSet; refusing");
   }

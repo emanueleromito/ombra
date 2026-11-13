@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "seeded_ciphertext_openfhe.hpp"
+#include "ombra/core/security_floor_context.hpp"
 
 using namespace lbcrypto;
 using namespace ombra::native;
@@ -103,6 +104,7 @@ int main(int argc, char** argv) {
     if (std::stoul(argv[6]) != 0) params.SetNumLargeDigits(std::stoul(argv[6]));
     const double tol = std::stod(argv[7]);
     auto cc = GenCryptoContext(params);
+    ombra::core::require_security_floor(cc);  // hard rule 1: never below the 128-bit floor
     cc->Enable(PKE);
     cc->Enable(KEYSWITCH);
     cc->Enable(LEVELEDSHE);

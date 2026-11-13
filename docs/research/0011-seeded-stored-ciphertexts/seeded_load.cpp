@@ -21,6 +21,7 @@
 #include "cryptocontext-ser.h"
 #include "ombra/core/seeded_ciphertext.hpp"
 #include "ombra/core/seeded_ciphertext_prg.hpp"
+#include "ombra/core/security_floor_context.hpp"
 #include "openfhe.h"
 #include "scheme/ckksrns/ckksrns-ser.h"
 
@@ -59,6 +60,7 @@ int main(int argc, char** argv) {
   if (std::stoul(argv[6]) != 0) p.SetNumLargeDigits(std::stoul(argv[6]));
   const int reps = std::stoi(argv[7]);
   auto cc = GenCryptoContext(p);
+  ombra::core::require_security_floor(cc);  // hard rule 1: never below the 128-bit floor
   cc->Enable(PKE);
   cc->Enable(KEYSWITCH);
   cc->Enable(LEVELEDSHE);
