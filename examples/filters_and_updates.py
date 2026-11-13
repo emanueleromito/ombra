@@ -2,6 +2,7 @@
 """Filters, inserts, deletes and reopening a collection: python filters_and_updates.py"""
 
 import tempfile
+import uuid
 from pathlib import Path
 
 from ombra import Client
@@ -20,6 +21,8 @@ def main() -> None:
         "Homomorphic encryption lets a server compute on data it cannot read.",
     ]
     topics = [0, 0, 1, 1, 2, 2]  # one integer per text; the filter compares against it
+    ids = [str(uuid.uuid4()) for _ in texts]  # random ids: the server sees ids in the clear
+    info = {i: (t, topic) for i, t, topic in zip(ids, texts, topics)}  # id -> (text, topic)
 
     model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 
@@ -29,7 +32,8 @@ def main() -> None:
     def show(title: str, hits) -> None:
         print(title)
         for hit in hits:
-            print(f"  {hit.score:.3f}  [{TOPICS[topics[int(hit.id)]]}] {texts[int(hit.id)]}")
+            text, topic = info[hit.id]
+            print(f"  {hit.score:.3f}  [{TOPICS[topic]}] {text}")
 
     workdir = Path(tempfile.mkdtemp())
     key_file = workdir / "notes.key"
@@ -37,7 +41,7 @@ def main() -> None:
     client.create_collection(
         "notes",
         embed(texts),
-        ids=[str(i) for i in range(len(texts))],
+        ids=ids,
         key_file=key_file,
         passphrase="change this passphrase",
         metadata=[{"topic": t} for t in topics],
@@ -48,12 +52,12 @@ def main() -> None:
     show("no filter", client.search("notes", query, k=3))
     show("only topic 2 (tech)", client.search("notes", query, k=2, filter={"topic": 2}))
 
-    texts.append("Bond yields fell after the announcement.")
-    topics.append(1)
-    client.insert("notes", embed(texts[-1:]), ids=["6"], metadata=[{"topic": 1}])
+    new_text, new_id = "Bond yields fell after the announcement.", str(uuid.uuid4())
+    info[new_id] = (new_text, 1)
+    client.insert("notes", embed([new_text]), ids=[new_id], metadata=[{"topic": 1}])
     show("after an insert, topic 1", client.search("notes", query, k=3, filter={"topic": 1}))
 
-    client.delete("notes", ["3"])
+    client.delete("notes", [ids[3]])  # the fourth text, "The central bank raised its policy rate."
     show("after deleting id 3, topic 1", client.search("notes", query, k=3, filter={"topic": 1}))
     client.close()
 

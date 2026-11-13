@@ -13,6 +13,13 @@ vectors = model.encode(texts, normalize_embeddings=True).tolist()  # Ombra needs
 
 ## 2. Create a collection
 
+Every vector needs an id. The server stores ids in plain text and sees them on every insert, delete and search, so an id must not contain anything sensitive: no names, e-mail addresses or file names. The examples use random ids, made with `uuid.uuid4()`, and keep their own map from id to text.
+
+```python
+ids = [str(uuid.uuid4()) for _ in texts]  # random ids: the server sees ids in the clear
+text_of = dict(zip(ids, texts))
+```
+
 A collection is a set of vectors that you search together. Creating one does four things on your machine: it generates the keys, groups the vectors into clusters, encrypts them, and uploads the ciphertexts and the public evaluation keys. The secret key is written to the key file and never leaves it.
 
 ```python
@@ -20,7 +27,7 @@ client = Client.local(workdir / "server")  # a CPU server inside this process
 client.create_collection(
     "notes",
     vectors,
-    ids=[str(i) for i in range(len(texts))],
+    ids=ids,
     key_file=workdir / "notes.key",  # holds the secret key: back it up, never share it
     passphrase="change this passphrase",
 )
@@ -33,10 +40,10 @@ The passphrase protects the key file. Use a real one, and do not put it in code 
 ```python
 query = model.encode(["What did the central bank do?"], normalize_embeddings=True)[0].tolist()
 for hit in client.search("notes", query, k=3):
-    print(f"{hit.score:.3f}  {texts[int(hit.id)]}")  # the score is the exact cosine similarity
+    print(f"{hit.score:.3f}  {text_of[hit.id]}")  # the score is the exact cosine similarity
 ```
 
-The client encrypts the query and sends it. The server scores it against every encrypted vector without decrypting anything, and returns encrypted scores. The client decrypts them, picks the top `k`, and re-ranks those candidates exactly. A hit has an `id` and a `score`. The text is not stored on the server in this example, so you look it up yourself by id.
+The client encrypts the query and sends it. The server scores it against every encrypted vector without decrypting anything, and returns encrypted scores. The client decrypts them, picks the top `k`, and re-ranks those candidates exactly. A hit has an `id` and a `score`. The text is not stored on the server in this example, so you look it up yourself by id, in the `text_of` map.
 
 ## 4. Filter
 
@@ -46,7 +53,7 @@ Filters work on integer fields that you declare when you create the collection. 
 client.create_collection(
     "notes",
     embed(texts),
-    ids=[str(i) for i in range(len(texts))],
+    ids=ids,
     key_file=key_file,
     passphrase="change this passphrase",
     metadata=[{"topic": t} for t in topics],
@@ -63,11 +70,13 @@ Only vectors with `topic` equal to 2 can come back. [Filters](../how-it-works/fi
 ## 5. Insert and delete
 
 ```python
-client.insert("notes", embed(texts[-1:]), ids=["6"], metadata=[{"topic": 1}])
+new_text, new_id = "Bond yields fell after the announcement.", str(uuid.uuid4())
+info[new_id] = (new_text, 1)
+client.insert("notes", embed([new_text]), ids=[new_id], metadata=[{"topic": 1}])
 ```
 
 ```python
-client.delete("notes", ["3"])
+client.delete("notes", [ids[3]])  # the fourth text, "The central bank raised its policy rate."
 ```
 
 An insert encrypts the new vector on your machine and adds it to the collection. A delete marks the vector as removed, and it stops appearing in results at once. The space comes back later, when the collection is compacted. See [deletes](../how-it-works/deletes.md).
