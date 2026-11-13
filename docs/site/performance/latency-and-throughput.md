@@ -1,7 +1,7 @@
 # Latency and throughput
 
 !!! note "Some numbers are pending a new benchmark run on the current code."
-    Figures from before the one-tower decrypt, in-place query expansion and seeded storage were removed. The tables marked TBD wait for the next run: the cold cache at 1,000,000 vectors, throughput, and the A10.
+    Figures from before the one-tower decrypt, in-place query expansion and seeded storage were removed. The A10 figures are TBD until they are rerun.
 
 Synthetic vectors are used for the speed runs. The server and the client run on the same machine, so the network is not in the times unless a line says otherwise. Latency means the whole query as a user sees it: the client encrypts the query, the server searches, the client decrypts and ranks.
 
@@ -64,14 +64,19 @@ These are warm-cache times: the benchmark loads every cluster once before it tim
 
 ## What is slow
 
-**A collection larger than the GPU cache.** When the collection does not fit in the GPU and host cache, every probe is read from disk, and the query takes seconds instead of milliseconds. The earlier test, at 1,000,000 vectors with a 24 GB GPU budget and an 8 GB host budget, showed a gap of two orders of magnitude to the cached case. That test ran before seeded storage, which halves the bytes read from disk, so its numbers are removed.
+**A collection larger than the GPU cache.** When the collection does not fit in the GPU and host cache, every probe is read from disk, and the query takes seconds instead of milliseconds. The test below has 1,000,000 vectors at d = 384, about 49 GB on disk, with a 24 GB GPU budget and an 8 GB host budget, so most clusters come from disk on every query. Medians over 30 queries, with p95 in brackets. Both variants probe the 2 best clusters and read the same number of blocks. The filtered queries ran second and found more of their clusters already in the cache, which is why they are faster.
 
-| Collection | Cache | Balanced median | Fast median |
+| Collection | Cache | Balanced | Fast |
 | --- | --- | --- | --- |
 | 100,000 | fits | 143 ms | 60 ms |
-| 1,000,000 | does not fit | TBD | TBD |
+| 1,000,000 | does not fit, no filter | 9.2 s (46 s) | 2.0 s (11.5 s) |
+| 1,000,000 | does not fit, 2 fields | 4.6 s (31 s) | 98 ms (17 s) |
 
-A cold cache with small budgets is the worst case, not what a tuned A100 box would show. Nobody has profiled the disk path yet, so we cannot say whether disk speed, parsing or copies cost the time.
+![Median query time at 100k and 1M vectors on a log scale](img/cold-cache.svg)
+
+Going from a collection that fits the cache to one that does not makes the median query 30 to 60 times slower.
+
+Loading one cluster from disk took 11.1 s at the median on Balanced (5.0 s on Fast), for about 0.6 GB (0.3 GB) of columns: roughly 60 MB/s. That is slow for a local disk. Nobody has profiled the disk path yet, so we cannot say whether disk speed, parsing or copies cost the time. A cold cache with small budgets is the worst case, not what a tuned A100 box would show. This benchmark uploads columns without seeding, so a client with seeding, the default, reads about half the bytes.
 
 The path from host memory to the GPU runs at 22 to 26 GB/s on the A100's PCIe link, and a search over a collection three times the GPU budget spent about 95% of its time moving data and 5% computing (a synthetic test of the cache). Past the GPU's memory, the link sets the speed.
 
@@ -83,9 +88,10 @@ The path from host memory to the GPU runs at 22 to 26 GB/s on the A100's PCIe li
 
 | Measure | Result |
 | --- | --- |
-| One query stream, Balanced, A100, client included | TBD queries per second |
-| One query stream, server alone | TBD queries per second |
+| One query stream, Balanced, A100, client included | 2.5 to 15.8 queries per second (1 / median latency over the grid above) |
+| One query stream, Balanced, server alone | 8.2 to 30.7 queries per second (1 / median server time) |
 | Ingest, d = 384, A100 server, 16 client processes, 100,000 vectors | 1,132 (Balanced) and 1,755 to 2,010 (Fast, two runs) vectors per second, unseeded |
+| Ingest, d = 384, same setup, 1,000,000 vectors | 2,494 (Balanced, 401 s) and 2,228 (Fast, 449 s) vectors per second, unseeded |
 
 Sending several queries together helps the search kernel: four queries at once ran 1.75x to 1.78x faster per query than one at a time (A100, kernel only, which the changes above do not affect).
 

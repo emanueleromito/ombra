@@ -21,7 +21,7 @@ Expect small differences. The same kernel took up to 26% longer in one run than 
 | Figures | Script and command | Hardware |
 | --- | --- | --- |
 | Latency per query, by dimension, size and share searched | `core/bench/e2e.py`, `modal run modal_app.py::bench --task e2e-latency --extra "--presets-e2e-latency m0_depth2,m0_compact_n8192"` | A100 40 GB |
-| Over gRPC, with a filter, 100k and 1M vectors, ingest speed, bytes on disk, recall | `core/bench/grpc_e2e.py`, `modal run modal_app.py::bench_e2e --extra "--presets-grpc <preset> --sizes-grpc <N>"`, one run per preset and size | A100 80 GB, 16 CPUs |
+| Over gRPC, with a filter, 100k and 1M vectors, ingest speed, bytes on disk, recall | `core/bench/grpc_e2e.py`, `modal run modal_app.py::bench_e2e --extra "--presets-grpc <preset> --sizes-grpc <N>"`, one run per preset and size | A100 40 GB, 32 CPUs, 16 client workers |
 | Search kernel, batching | `core/bench/run.py --task column-search`, `--task batching` | A100 40 GB |
 | Cache paging and host to GPU bandwidth | `core/bench/run.py --task gpu-cache` | A100 40 GB |
 | Object sizes, keys, vectors per GPU | `modal run modal_app.py::test_openfhe --pytest-args "-s -k test_openfhe_sizes"` | CPU only |

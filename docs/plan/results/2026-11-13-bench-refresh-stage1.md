@@ -1,4 +1,4 @@
-# Benchmark refresh, stage 1 (2026-11-13)
+# Benchmark refresh, stages 1 and 2 (2026-11-13)
 
 Re-measured on the code after the client one-tower decrypt, in-place expansion and seeded storage. Modal spend about $0.60.
 
@@ -40,6 +40,24 @@ Recall gaps to plaintext 0.000 at 1, 2 and 4 probes (Balanced). Fast's no-filter
 
 d = 384: create 19.3 s, search median 0.75 s. d = 768: create 36.1 s, search median 1.28 s. Top-1 5/5.
 
+## Stage 2: gRPC at 1,000,000 vectors (d = 384, 30 queries, 24 GB GPU and 8 GB host budget)
+
+Branch: dev + `fix/server-message-limit` + the benchmark change that loads every cluster once before timing. Modal spend about $3.
+
+| | Balanced | Fast |
+| --- | --- | --- |
+| clusters | 61 | 122 |
+| ingest | 401 s, 2,494 vectors/s | 449 s, 2,228 vectors/s |
+| on disk (unseeded) | 48.95 GB, 49.0 KB/vector | 49.01 GB, 49.0 KB/vector |
+| no filter p50 / p95 / mean | 9.15 / 46.0 / 11.9 s | 1.96 / 11.5 / 4.03 s |
+| 2 fields p50 / p95 / mean | 4.60 / 31.3 / 10.3 s | 0.098 / 17.3 / 4.71 s |
+| first touch per cluster, median / p95 / max | 11.1 / 27.5 / 49.4 s | 5.0 / 12.3 / 22.4 s |
+| blocks per query | 5.47 | 5.67 |
+
+Recall gaps 0.000 at 1, 2 and 4 probes. The collection is about 1.5x the GPU plus host budget, so nearly every probe pages. The filtered variant ran second and found more clusters cached (same block count). Disk path: about 60 MB/s per cluster load (0.6 GB Balanced, 0.3 GB Fast); not profiled. Earlier run before seeding and the one-tower decrypt (T2.10): 16.2 s and 8.0 s medians.
+
+Throughput figures on the pages are derived: 1 / median latency of the e2e-latency grid (2.5 to 15.8 queries per second, client included) and 1 / median server time (8.2 to 30.7).
+
 ## Not run
 
-A10 rows (no ready entry point), cold cache and throughput at 1M (stage 2).
+A10 rows (no ready entry point in `modal_app.py`).

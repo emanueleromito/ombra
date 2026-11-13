@@ -35,7 +35,7 @@ Ombra supports 384, 768 and 1536. Use the dimension your embedding model produce
 
 ## Collection size and hardware
 
-Up to about a million vectors at 384 dimensions, one A100 can hold everything encrypted in GPU memory. Above the GPU's memory the collection has to be paged in, and a query then takes seconds. We have not measured multi-GPU setups. Total query times for these cases are TBD, see [latency and throughput](latency-and-throughput.md).
+Up to about a million vectors at 384 dimensions, one A100 can hold everything encrypted in GPU memory. Above the GPU's memory the collection has to be paged in, and a query then takes seconds. We have not measured multi-GPU setups. At 1,000,000 vectors with small cache budgets, a query took 9.2 s at the median on Balanced and 2.0 s on Fast, see [latency and throughput](latency-and-throughput.md).
 
 ## Security level and latency
 

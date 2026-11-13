@@ -1,9 +1,9 @@
 preset,n_vectors,filter,total_p50_ms,total_p95_ms,source
 balanced,100k,none,143.3,170.4,A100 40 GB grpc-e2e run 2026-11-13 (core/bench/grpc_e2e.py; 30 queries)
 balanced,100k,2 fields,142.6,162.9,A100 40 GB grpc-e2e run 2026-11-13 (core/bench/grpc_e2e.py; 30 queries)
-balanced,1M,none,TBD,TBD,pending a new run on the current code
-balanced,1M,2 fields,TBD,TBD,pending a new run on the current code
+balanced,1M,none,9151.4,46023.2,A100 40 GB grpc-e2e run 2026-11-13 (core/bench/grpc_e2e.py; 30 queries; 24 GB GPU and 8 GB host budget)
+balanced,1M,2 fields,4599.6,31310.3,A100 40 GB grpc-e2e run 2026-11-13 (core/bench/grpc_e2e.py; 30 queries; 24 GB GPU and 8 GB host budget)
 fast,100k,none,59.8,61.9,A100 40 GB grpc-e2e run 2026-11-13 (core/bench/grpc_e2e.py; 30 queries)
 fast,100k,2 fields,59.4,61.2,A100 40 GB grpc-e2e run 2026-11-13 (core/bench/grpc_e2e.py; 30 queries)
-fast,1M,none,TBD,TBD,pending a new run on the current code
-fast,1M,2 fields,TBD,TBD,pending a new run on the current code
+fast,1M,none,1964.7,11549.5,A100 40 GB grpc-e2e run 2026-11-13 (core/bench/grpc_e2e.py; 30 queries; 24 GB GPU and 8 GB host budget)
+fast,1M,2 fields,97.7,17338.5,A100 40 GB grpc-e2e run 2026-11-13 (core/bench/grpc_e2e.py; 30 queries; 24 GB GPU and 8 GB host budget)
