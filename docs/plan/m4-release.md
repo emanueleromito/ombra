@@ -25,7 +25,7 @@ T4.3, T4.5 and T4.7 can start at once. T4.1 and T4.4 both edit the workflows fro
 **Depends on:** T4.2
 **Steps:** build two sets of wheels with cibuildwheel for Linux x86_64 and aarch64 and macOS (arm64, x86_64), Python 3.11 to 3.13, with OpenFHE 1.6.1 bundled: `ombra` (the client, with the C++ OpenFHE CPU expansion of `core/`, the server's exact tree method, compiled in) and `ombra-openfhe` (openfhe-python 1.6.1.0 under the same import name `openfhe`, built from the pinned tag, because the `openfhe` wheel on PyPI works on CPython 3.12 x86-64 Linux only; decision 0023). Local mode uses the compiled expansion instead of the Python expansion; `requires-python` is `>=3.11`; the `local` and `grpc` extras depend on `ombra-openfhe==1.6.1.0`; CI builds and tests every wheel, the `ombra` test installing the `ombra-openfhe` wheel just built.
 **Done when:** each wheel installs on its platform and Python version without a compiler, the local-server parity test (T3.7) passes with the compiled expansion, local mode uses the same number of levels as the server, and query time at d = 768 is measured and recorded in `results/`.
-**Status:** todo
+**Status:** done (wheels for Linux x86_64/aarch64 and macOS arm64/x86_64, Python 3.11 to 3.13, each tested by tests/wheel_check.py in CI; local mode 2.7 s per search at d = 768 on 4 CPUs, results/2026-11-12-t4.1-local-mode-wheel.md)
 
 ### T4.2 CI on GitHub runners
 
@@ -49,7 +49,7 @@ T4.3, T4.5 and T4.7 can start at once. T4.1 and T4.4 both edit the workflows fro
 **Depends on:** T4.2, T4.1
 **Steps:** a GPU server image (CUDA runtime, `sm_80` and `sm_86`) and a CPU image (local and test use); a `docker-compose.yml` that starts the server with a persistent volume; a release workflow on `v*` tags that builds and pushes both images to GHCR and publishes the wheels of `ombra` and `ombra-openfhe` (T4.1) and `langchain-ombra` to PyPI through trusted publishing (no API token); set version 0.1.0 in every package and the server; start `CHANGELOG.md`.
 **Done when:** `docker compose up` starts a server that the quickstart client can search against; a tag pushed on a test repository or a dry run publishes images to GHCR and wheels to TestPyPI; all versions read 0.1.0 and `CHANGELOG.md` has a 0.1.0 entry.
-**Status:** todo
+**Status:** in progress (images, compose, release workflow, 0.1.0 and CHANGELOG written; not yet built: the first release dry run and `docker compose up` on a GPU host are still to do)
 
 ### T4.5 Code cleanup
 
