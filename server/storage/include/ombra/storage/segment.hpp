@@ -5,9 +5,11 @@
 //   6   4  CRC32 of the body (everything after this header)
 //   10  .  body: u32 cluster, u32 n_ids, u32 n_columns,
 //          n_ids x (u32 length, id bytes), n_columns x (u64 length, versioned envelope)
-// Each column is a complete versioned envelope of kind ciphertext; its payload is opaque here.
+// Each column is a complete versioned envelope of kind ciphertext (2) or seeded ciphertext (4); a
+// kind-2 payload is opaque here, a kind-4 payload gets the cheap structural check (no OpenFHE).
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -27,6 +29,12 @@ struct SegmentInfo {
   std::uint32_t n_columns = 0;
   std::uint32_t crc = 0;
 };
+
+// Validates one stored column (kind 2 or 4) and refuses with std::runtime_error: wrong kind, preset
+// or OpenFHE version, unknown envelope version, and for kind 4 a malformed seeded payload header.
+void check_column_envelope(const std::uint8_t* data, std::size_t size,
+                           const std::string& expected_preset,
+                           const std::string& expected_openfhe_version);
 
 std::vector<std::uint8_t> encode_segment(const SegmentData& s);
 

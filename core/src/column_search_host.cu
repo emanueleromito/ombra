@@ -156,6 +156,8 @@ void ColumnSearchDevice::set_query_column_from_device(std::size_t j, const std::
   go().throw_if_error();
 }
 
+std::uint64_t* ColumnSearchDevice::query_device() { return impl_->query.get(); }
+
 double ColumnSearchDevice::run() {
   double seconds = 0;
   impl_->run_kernel(seconds).throw_if_error();

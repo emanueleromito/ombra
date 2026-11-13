@@ -26,5 +26,7 @@ One short file per design decision, so the reasoning survives. New decisions cop
 | [0020](0020-client-key-file-and-balanced-preset.md) | Client key file format and the "balanced" preset | accepted |
 | [0021](0021-blob-store-and-recluster-generations.md) | Encrypted blob store and re-clustering by generation | accepted |
 | [0022](0022-local-mode-cpp-expansion.md) | Local mode uses the server's C++ expansion | accepted |
+| [0023](0023-seeded-stored-ciphertexts.md) | Seeded stored ciphertexts: half the disk and upload, with a narrow exception to hard rule 3 | accepted |
+| [0024](0024-gpu-families-beyond-ampere.md) | GPU families beyond Ampere: build for Turing, Ada and Hopper too (update to 0008) | accepted |
 
 Smaller decisions (key management, threat model, accuracy, deletes, migrations, key rotation, parameter presets, format versioning, storage, API, client packaging) are recorded directly in [product-requirements.md](../product-requirements.md) and [architecture.md](../architecture.md).

@@ -246,6 +246,14 @@ void GpuSearch::set_query_from_device(const std::vector<const u64*>& column_ptrs
   s.have_query = true;
 }
 
+std::uint64_t* GpuSearch::query_device() { return impl_->search->query_device(); }
+
+void GpuSearch::set_query_meta(const CtMeta& meta) {
+  Impl& s = *impl_;
+  s.query_meta = meta;
+  s.have_query = true;
+}
+
 void GpuSearch::upload_mask(std::size_t block, const Ct& mask) {
   Impl& s = *impl_;
   if (block >= s.blocks) fail("bad block index");

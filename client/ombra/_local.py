@@ -48,7 +48,15 @@ from typing import Any
 from ombra import params as oparams
 from ombra import presets
 from ombra._proto import load_stubs
-from ombra.file_format import EnvelopeError, Kind, read_envelope, write_envelope
+from ombra.file_format import (
+    EnvelopeError,
+    Kind,
+    read_column_envelope,
+    read_envelope,
+    write_envelope,
+)
+from ombra.seeded_format import SeededFormatError
+from ombra.seeded_format import read_payload as read_seeded_payload
 
 FORMAT = b"ombra-local 1\n"
 OPENFHE_VERSION = "1.6.1"  # the server's OpenFHE; envelopes of another version are refused
@@ -449,8 +457,29 @@ class LocalServer:
             raise Refuse(self.pb.ERROR_UNSUPPORTED_VERSION, "unsupported api_version")
 
     def _envelope(self, c: _Coll, raw: bytes, kind: Kind) -> bytes:
+        return self._open(c, raw, lambda b: read_envelope(b, kind, c.spec.preset, self.version))
+
+    def _column(self, c: _Coll, raw: bytes) -> tuple[int, bytes]:
+        """A stored column: (kind, payload) of an ordinary (2) or seeded (4) ciphertext envelope.
+        A seeded payload is checked cheaply here (header, sizes, moduli range; not every word)."""
+        env = None
+
+        def read(b: bytes) -> Any:
+            nonlocal env
+            env = read_column_envelope(b, c.spec.preset, self.version)
+            return env
+
+        payload = self._open(c, raw, read)
+        if env.kind == Kind.SEEDED_CIPHERTEXT:
+            try:
+                read_seeded_payload(payload, check_words=False)
+            except SeededFormatError as ex:
+                raise Refuse(self.pb.ERROR_INVALID_ARGUMENT, f"bad seeded column: {ex}") from None
+        return int(env.kind), payload
+
+    def _open(self, c: _Coll, raw: bytes, read: Any) -> bytes:
         try:
-            return read_envelope(bytes(raw), kind, c.spec.preset, self.version).payload
+            return read(bytes(raw)).payload
         except EnvelopeError as ex:
             msg = str(ex)
             if "unknown format version" in msg:
@@ -649,7 +678,7 @@ class LocalServer:
                 if len(b.columns) != want:
                     raise Refuse(pb.ERROR_INVALID_ARGUMENT, "wrong number of columns")
                 for col in b.columns:
-                    self._envelope(c, col, Kind.CIPHERTEXT)
+                    self._column(c, col)
                 self._put_segment(c, b)
                 n += len(b.ids)
             if count == 0:
@@ -799,7 +828,7 @@ class LocalServer:
             if len(set(ids)) != len(ids) or set(ids) != set(live) or len(ids) != len(live):
                 raise Refuse(pb.ERROR_BLOCK_MISMATCH, "ids are not exactly the live ids")
             for col in cols:
-                self._envelope(c, col, Kind.CIPHERTEXT)
+                self._column(c, col)
             for s in segs:
                 self._drop_segment(c, s)
             new = pb.InsertBlock(api_version=API, collection=c.spec.name, cluster_id=cluster)
@@ -903,9 +932,9 @@ class LocalServer:
             self._cols.move_to_end(key)
             return cols
         b = c.segments[seg]
-        payloads = [self._envelope(c, col, Kind.CIPHERTEXT) for col in b.columns]
+        opened = [self._column(c, col) for col in b.columns]
         try:
-            cols = c.ctx.load_columns(payloads)
+            cols = c.ctx.load_columns([p for _, p in opened], [k for k, _ in opened])
         except _native().KeyTagError as ex:
             raise Refuse(self.pb.ERROR_KEY_TAG_MISMATCH, str(ex)) from None
         self._cols[key] = cols

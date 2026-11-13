@@ -50,6 +50,10 @@ class ColumnSearchDevice {
   // query buffer. Ordered after earlier work on the default stream. No host round trip and no
   // range check of the words: the source is the output of the expansion kernels.
   void set_query_column_from_device(std::size_t j, const std::uint64_t* src);
+  // The query buffer itself (shape.query_words() words, [dim][component][tower][coeff]), so a
+  // producer (the expansion) can write the columns in place instead of copying them in. Writes
+  // must be ordered before run() (same stream or a synchronize). Valid for the object's life.
+  std::uint64_t* query_device();
   // Score all blocks. Waits for completion; returns the kernel time in seconds (CUDA events).
   double run();
   // Copy the result (shape.out_words() words) to the host.

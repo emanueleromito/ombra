@@ -281,4 +281,35 @@ std::vector<std::pair<GpuCt, GpuCt>> GpuExpansion::split_level(const std::vector
   return out;
 }
 
+GpuExpansion::LeafMeta GpuExpansion::leaf_meta() const {
+  return {sample_->GetLevel(), sample_->GetNoiseScaleDeg(), sample_->GetScalingFactor()};
+}
+
+void GpuExpansion::split_level_into(const std::vector<GpuCt>& nodes, std::size_t level,
+                                    std::uint32_t galois, std::size_t shift,
+                                    const std::vector<char>& want_odd,
+                                    const std::vector<std::size_t>& residues,
+                                    const LeafBuffer& sink) {
+  if (sink.base == nullptr || sink.leaf_words != device_.ct_bytes() / sizeof(u64)) {
+    throw std::invalid_argument("expansion: leaf buffer is null or its leaf size is wrong");
+  }
+  if (nodes.size() != want_odd.size() || nodes.size() != residues.size()) {
+    throw std::invalid_argument("expansion: split_level_into sizes");
+  }
+  std::vector<CtHandle> in;
+  std::vector<u64*> even, odd;
+  in.reserve(nodes.size());
+  even.reserve(nodes.size());
+  odd.reserve(nodes.size());
+  for (std::size_t k = 0; k < nodes.size(); ++k) {
+    if (residues[k] >= sink.leaves || (want_odd[k] != 0 && residues[k] + shift >= sink.leaves)) {
+      throw std::invalid_argument("expansion: leaf index outside the leaf buffer");
+    }
+    in.push_back(nodes[k].dev);
+    even.push_back(sink.base + residues[k] * sink.leaf_words);
+    odd.push_back(want_odd[k] != 0 ? sink.base + (residues[k] + shift) * sink.leaf_words : nullptr);
+  }
+  device_.split_level_into(in, galois, level, want_odd, even, odd);
+}
+
 }  // namespace ombra::core

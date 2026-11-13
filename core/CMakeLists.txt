@@ -11,7 +11,18 @@ add_test(NAME security_floor COMMAND ombra_security_floor_test)
 add_executable(ombra_file_envelope_test src/file_envelope_test.cpp)
 target_include_directories(ombra_file_envelope_test PRIVATE include)
 add_test(NAME file_envelope COMMAND ombra_file_envelope_test
-         ${CMAKE_CURRENT_SOURCE_DIR}/../tests/fixtures/envelope_v1_ciphertext.bin)
+         ${CMAKE_CURRENT_SOURCE_DIR}/../tests/fixtures/envelope_v1_ciphertext.bin
+         ${CMAKE_CURRENT_SOURCE_DIR}/../tests/fixtures/envelope_v2_seeded.bin)
+
+# Seeded payload format (no OpenFHE): every refusal of docs/decisions/0023.
+add_executable(ombra_seeded_payload_test src/seeded_payload_test.cpp)
+target_include_directories(ombra_seeded_payload_test PRIVATE include)
+add_test(NAME seeded_payload COMMAND ombra_seeded_payload_test)
+
+# Expansion tree shape (expand_tree vs expand_tree_into) with a fake ciphertext, header only.
+add_executable(ombra_expansion_tree_test src/expansion_tree_test.cpp)
+target_include_directories(ombra_expansion_tree_test PRIVATE include)
+add_test(NAME expansion_tree COMMAND ombra_expansion_tree_test)
 
 if(NOT OMBRA_ENABLE_CUDA)
   return()

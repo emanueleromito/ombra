@@ -6,8 +6,15 @@ import subprocess
 import tomllib
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parent.parent
 EXPRESSION = "PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial"
+
+if not (ROOT / "ci" / "add_spdx.py").is_file() or not (ROOT / ".git").exists():
+    # The Modal image carries neither ci/ nor .git (modal_upload.py), and pytest collects every
+    # test file there before applying `-m gpu`: skip instead of failing the collection.
+    pytest.skip("needs the repository checkout (ci/ and .git)", allow_module_level=True)
 
 _spec = importlib.util.spec_from_file_location("add_spdx", ROOT / "ci" / "add_spdx.py")
 add_spdx = importlib.util.module_from_spec(_spec)

@@ -6,7 +6,13 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from ombra.file_format import EnvelopeError, Kind, read_envelope, write_envelope
+from ombra.file_format import (
+    EnvelopeError,
+    Kind,
+    read_column_envelope,
+    read_envelope,
+    write_envelope,
+)
 
 FIXTURE = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "envelope_v1_ciphertext.bin"
 PAYLOAD = bytes([0, 1, 2, 3, 250, 255])
@@ -35,7 +41,7 @@ def test_refusals() -> None:
     with pytest.raises(EnvelopeError, match="magic"):
         _read(b"X" + b[1:])
     with pytest.raises(EnvelopeError, match="version"):
-        _read(b[:4] + b"\x02" + b[5:])
+        _read(b[:4] + b"\x03" + b[5:])
     with pytest.raises(EnvelopeError, match="kind"):
         _read(b, Kind.CONTEXT)
     with pytest.raises(EnvelopeError, match="preset"):
@@ -57,3 +63,34 @@ def test_cross_language_fixture() -> None:
     expected = write_envelope(Kind.CIPHERTEXT, "fixture_preset", "0.0.0-fixture", bytes(range(10)))
     assert FIXTURE.read_bytes() == expected
     assert _read(expected, preset="fixture_preset", v="0.0.0-fixture").payload == bytes(range(10))
+
+
+def test_writers_keep_version_1_for_old_kinds() -> None:
+    for k in (Kind.CONTEXT, Kind.CIPHERTEXT, Kind.PUBLIC_EVAL_KEY):
+        assert write_envelope(k, "p", "v", b"x")[4:6] == b"\x01\x00"
+    assert write_envelope(Kind.SEEDED_CIPHERTEXT, "p", "v", b"x")[4:6] == b"\x02\x00"
+
+
+def test_version_2_rules() -> None:
+    seeded = write_envelope(Kind.SEEDED_CIPHERTEXT, "p", "v", b"x")
+    # kind 4 is accepted only when asked for, never by the plain readers
+    assert read_envelope(seeded, Kind.SEEDED_CIPHERTEXT, "p", "v").payload == b"x"
+    assert read_column_envelope(seeded, "p", "v").kind == Kind.SEEDED_CIPHERTEXT
+    with pytest.raises(EnvelopeError, match="kind"):
+        read_envelope(seeded, Kind.CIPHERTEXT, "p", "v")
+    # kind 4 inside a version 1 envelope is refused, by both readers
+    v1 = seeded[:4] + b"\x01\x00" + seeded[6:]
+    with pytest.raises(EnvelopeError, match="not valid"):
+        read_column_envelope(v1, "p", "v")
+    with pytest.raises(EnvelopeError, match="not valid"):
+        read_envelope(v1, Kind.SEEDED_CIPHERTEXT, "p", "v")
+    # a version 2 envelope may carry kinds 1-3; column readers take kind 2 and 4 only
+    plain = write_envelope(Kind.CIPHERTEXT, "p", "v", b"y")
+    assert read_column_envelope(plain, "p", "v").kind == Kind.CIPHERTEXT
+    v2_plain = plain[:4] + b"\x02\x00" + plain[6:]
+    assert read_envelope(v2_plain, Kind.CIPHERTEXT, "p", "v").payload == b"y"
+    ctx = write_envelope(Kind.CONTEXT, "p", "v", b"z")
+    with pytest.raises(EnvelopeError, match="kind"):
+        read_column_envelope(ctx, "p", "v")
+    with pytest.raises(EnvelopeError, match="version"):
+        read_column_envelope(seeded[:4] + b"\x03\x00" + seeded[6:], "p", "v")

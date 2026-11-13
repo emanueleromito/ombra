@@ -38,12 +38,13 @@ from typing import Any
 
 import numpy as np
 
-from ombra import presets
+from ombra import _seeding, presets
 from ombra import query as oq
+from ombra._decrypt import decrypt_values
 from ombra.blobstore import KIND_DOCUMENT, KIND_RECORD, BlobStore, BlobStoreError, GrpcBlobStore
 from ombra.clustering import assign, cluster_vectors
 from ombra.documents import DocumentCodec
-from ombra.file_format import Kind, read_envelope, write_envelope
+from ombra.file_format import Kind, read_column_envelope, write_envelope
 from ombra.keyfile import DEFAULT_SCRYPT, KeyMaterial, export_key_file, import_key_file
 from ombra.params import make_ckks_params
 from ombra.probe import FIELDS_KEY, STATS_ID, ClusterStats, check_user_id
@@ -101,6 +102,7 @@ class KeyKit:
         ):
             cc.Enable(feature)
         self.cc = cc
+        self._seed_pool: _seeding.SeedPool | None = None
         self._keys = cc.KeyGen() if secret_blob is None else self._restore(secret_blob)
         cc.EvalMultKeyGen(self._keys.secretKey)
         cc.ClearEvalAutomorphismKeys()  # the key store is static: hold exactly this layout's keys
@@ -221,33 +223,77 @@ class KeyKit:
         }
         return {k: write_envelope(kind, d, v, b) for k, (kind, b) in raw.items()}
 
-    def encrypt_column(self, values: np.ndarray) -> bytes:
-        """One column (one value per slot, zero padded) as a ciphertext envelope."""
-        import openfhe as ofhe
+    def _pool(self) -> _seeding.SeedPool:
+        """Workers holding the keys in memory, started on first use (see ombra/_seeding.py)."""
+        if self._seed_pool is None:
+            import openfhe as ofhe
 
+            self._seed_pool = _seeding.SeedPool(
+                ofhe.Serialize(self.cc, ofhe.BINARY),
+                ofhe.Serialize(self._keys.publicKey, ofhe.BINARY),
+                ofhe.Serialize(self._keys.secretKey, ofhe.BINARY),
+            )
+        return self._seed_pool
+
+    def _padded(self, values: np.ndarray) -> np.ndarray:
         padded = np.zeros(self.slots)
         padded[: len(values)] = values
         padded[np.abs(padded) < FLUSH] = 0.0
-        ct = self.cc.Encrypt(
-            self._keys.publicKey, self.cc.MakeCKKSPackedPlaintext([float(v) for v in padded])
-        )
-        raw = self._via_file(lambda p: ofhe.SerializeToFile(p, ct, ofhe.BINARY))
-        return write_envelope(Kind.CIPHERTEXT, self.derived.preset, self.openfhe_version, raw)
+        return padded
 
-    def decrypt_column(self, envelope: bytes) -> np.ndarray:
-        """Decrypt a ciphertext envelope to its `slots` values."""
+    def encrypt_column(self, values: np.ndarray) -> bytes:
+        """One stored column (one value per slot, zero padded) as an envelope."""
+        return self.encrypt_columns([values])[0]
+
+    def encrypt_columns(self, columns: Sequence[np.ndarray]) -> list[bytes]:
+        """Stored columns as envelopes: seeded (kind 4, half the bytes, docs/decisions/0023) when
+        ombra._native is installed and OMBRA_SEEDED is not "0", else ordinary ciphertexts
+        (kind 2). Queries never go through here; they stay ordinary ciphertexts."""
         import openfhe as ofhe
 
-        env = read_envelope(envelope, Kind.CIPHERTEXT, self.derived.preset, self.openfhe_version)
-        with tempfile.TemporaryDirectory() as t:
-            p = Path(t) / "ct.bin"
-            p.write_bytes(env.payload)
-            ct, ok = ofhe.DeserializeCiphertext(str(p), ofhe.BINARY)
-        if not ok:
-            raise ValueError("ciphertext could not be deserialized")
-        dec = self.cc.Decrypt(ct, self._keys.secretKey)
-        dec.SetLength(self.slots)
-        return np.array(dec.GetRealPackedValue(), dtype=np.float64)
+        padded = [self._padded(v) for v in columns]
+        d, v = self.derived.preset, self.openfhe_version
+        if padded and _seeding.available():
+            payloads = self._pool().encrypt_columns(padded)
+            return [write_envelope(Kind.SEEDED_CIPHERTEXT, d, v, bytes(pl)) for pl in payloads]
+        out = []
+        for col in padded:
+            ct = self.cc.Encrypt(
+                self._keys.publicKey, self.cc.MakeCKKSPackedPlaintext([float(x) for x in col])
+            )
+            raw = self._via_file(lambda p, ct=ct: ofhe.SerializeToFile(p, ct, ofhe.BINARY))
+            out.append(write_envelope(Kind.CIPHERTEXT, d, v, raw))
+        return out
+
+    def decrypt_column(self, envelope: bytes) -> np.ndarray:
+        """Decrypt a stored-column envelope (kind 2 or 4) to its `slots` values."""
+        return self.decrypt_columns([envelope])[0]
+
+    def decrypt_columns(self, envelopes: Sequence[bytes]) -> list[np.ndarray]:
+        import openfhe as ofhe
+
+        envs = [
+            read_column_envelope(e, self.derived.preset, self.openfhe_version) for e in envelopes
+        ]
+        out: list[np.ndarray | None] = [None] * len(envs)
+        seeded = [i for i, e in enumerate(envs) if e.kind == Kind.SEEDED_CIPHERTEXT]
+        if seeded:
+            if not _seeding.native_installed():
+                raise _seeding.SeededUnavailableError()
+            res = self._pool().decrypt_columns([envs[i].payload for i in seeded], self.slots)
+            for i, r in zip(seeded, res, strict=True):
+                out[i] = r
+        for i, e in enumerate(envs):
+            if e.kind != Kind.CIPHERTEXT:
+                continue
+            with tempfile.TemporaryDirectory() as t:
+                p = Path(t) / "ct.bin"
+                p.write_bytes(e.payload)
+                ct, ok = ofhe.DeserializeCiphertext(str(p), ofhe.BINARY)
+            if not ok:
+                raise ValueError("ciphertext could not be deserialized")
+            out[i] = decrypt_values(self.cc, self._keys.secretKey, ct, self.slots)
+        return [o for o in out if o is not None]
 
 
 @dataclass(frozen=True)
@@ -434,7 +480,7 @@ class Collection:
             raise CollectionError(0, "the center block is missing")
         header, cols = self._get_block(seg[0])
         n = spec.cluster_count
-        c = np.stack([kit.decrypt_column(col)[:n] for col in cols], axis=1)
+        c = np.stack([x[:n] for x in kit.decrypt_columns(cols)], axis=1)
         self.centers = c / np.maximum(np.linalg.norm(c, axis=1, keepdims=True), 1e-12)
         try:
             self.stats = ClusterStats.unseal(
@@ -481,7 +527,7 @@ class Collection:
 
     def _insert_centers(self) -> None:
         pb, d = self.pb, self.derived.dimension
-        cols = [self.kit.encrypt_column(self.centers[:, j]) for j in range(d)]
+        cols = self.kit.encrypt_columns([self.centers[:, j] for j in range(d)])
         block = pb.InsertBlock(
             api_version=API_VERSION,
             collection=self.name,
@@ -493,10 +539,11 @@ class Collection:
         self._insert([block])
 
     def _columns(self, vecs: np.ndarray, fields: np.ndarray) -> list[bytes]:
-        cols = [self.kit.encrypt_column(vecs[:, j]) for j in range(self.derived.dimension)]
+        parts = [vecs[:, j] for j in range(self.derived.dimension)]
         for fi, card in enumerate(self.cards):
             for v in range(card):
-                cols.append(self.kit.encrypt_column((fields[:, fi] == v).astype(np.float64)))
+                parts.append((fields[:, fi] == v).astype(np.float64))
+        cols = self.kit.encrypt_columns(parts)
         return cols
 
     def _insert_cluster(
@@ -652,7 +699,7 @@ class Collection:
         keep = np.array([not d for d in header.deleted], dtype=bool)
         n = len(header.ids)
         d = self.derived.dimension
-        plain = np.stack([self.kit.decrypt_column(c)[:n] for c in cols], axis=1)[keep]
+        plain = np.stack([x[:n] for x in self.kit.decrypt_columns(cols)], axis=1)[keep]
         vecs = plain[:, :d]
         vecs = vecs / np.maximum(np.linalg.norm(vecs, axis=1, keepdims=True), 1e-12)
         fields = np.zeros((len(vecs), len(self.cards)), dtype=np.int64)

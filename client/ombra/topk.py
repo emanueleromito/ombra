@@ -22,6 +22,8 @@ from typing import Any
 
 import numpy as np
 
+from ombra._decrypt import decrypt_values, usable_cpus
+
 # The crypto context and secret key of a worker process (set by _worker_init); empty in the parent.
 _STATE: dict[str, Any] = {}
 
@@ -58,9 +60,7 @@ def _decrypt_block(path: str, index: int, count: int, slots: int, k: int):
     ct, ok = ofhe.DeserializeCiphertext(path, ofhe.BINARY)
     if not ok:
         raise RuntimeError(f"cannot deserialize block {index}")
-    dec = st["cc"].Decrypt(ct, st["sk"])
-    dec.SetLength(slots)
-    vals = np.asarray(dec.GetRealPackedValue(), dtype=np.float64)[:count]
+    vals = decrypt_values(st["cc"], st["sk"], ct, slots)[:count]
     idx = np.arange(count, dtype=np.int64) + index * slots
     return _order(vals, idx, k)
 
@@ -72,9 +72,7 @@ def _decrypt_values(path: str, count: int, slots: int) -> np.ndarray:
     ct, ok = ofhe.DeserializeCiphertext(path, ofhe.BINARY)
     if not ok:
         raise RuntimeError("cannot deserialize block")
-    dec = st["cc"].Decrypt(ct, st["sk"])
-    dec.SetLength(slots)
-    return np.asarray(dec.GetRealPackedValue(), dtype=np.float64)[:count]
+    return decrypt_values(st["cc"], st["sk"], ct, slots)[:count]
 
 
 def _values_task(args: tuple[str, int, int]) -> np.ndarray:
@@ -123,7 +121,7 @@ class ParallelTopk:
 
         init = (ofhe.Serialize(cc, ofhe.BINARY), ofhe.Serialize(sk, ofhe.BINARY))
         self._pool = mp.get_context("spawn").Pool(
-            workers or len(os.sched_getaffinity(0)), initializer=_worker_init, initargs=init
+            workers or usable_cpus(), initializer=_worker_init, initargs=init
         )
         del init
 
@@ -159,6 +157,6 @@ def parallel_topk(
     workers: int | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Same result as serial_topk, with blocks decrypted by spawned worker processes."""
-    n = max(1, min(workers or len(os.sched_getaffinity(0)), len(files)))
+    n = max(1, min(workers or usable_cpus(), len(files)))
     with ParallelTopk(cc, sk, n) as pool:
         return pool.run(files, slots, valid_last, k)

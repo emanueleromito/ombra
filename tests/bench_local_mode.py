@@ -4,7 +4,9 @@
     python tests/bench_local_mode.py --d 768 [--n 10000] [--queries 5]
 
 Run on Modal with `modal run modal_app.py::cpu_run --cmd "python tests/bench_local_mode.py --d 768"`
-(4 CPUs) or `::cpu_run8` (8 CPUs). Prints one JSON line. Synthetic data only; nothing is logged
+(4 CPUs) or `::cpu_run8` (8 CPUs). Prints one JSON line; `data_bytes` is everything the local
+server wrote. OMBRA_SEEDED=0 stores plain column ciphertexts instead of seeded ones (0023).
+Synthetic data only; nothing is logged
 about the vectors.
 """
 
@@ -57,6 +59,7 @@ def main() -> None:
             if i:
                 times.append(dt)
                 ok += hits[0].id == f"v{row}"
+        data_bytes = sum(f.stat().st_size for f in (Path(t) / "data").rglob("*") if f.is_file())
         client.close()
     print(
         json.dumps(
@@ -66,6 +69,8 @@ def main() -> None:
                 "cpus": os.cpu_count(),
                 "preset": info.preset,
                 "clusters": info.cluster_count,
+                "seeded_columns": os.environ.get("OMBRA_SEEDED", "1") != "0",
+                "data_bytes": data_bytes,
                 "create_s": round(create_s, 1),
                 "search_s": [round(v, 2) for v in times],
                 "search_median_s": round(statistics.median(times), 2),

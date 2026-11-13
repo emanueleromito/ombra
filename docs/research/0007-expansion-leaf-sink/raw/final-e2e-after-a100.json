@@ -1,0 +1,1565 @@
+{
+  "task": "e2e-latency",
+  "preset": "m0_depth2",
+  "host_cpu": {
+    "model": "unknown",
+    "os_cpu_count": 20,
+    "usable_cores": 20
+  },
+  "gpu_name": "NVIDIA A100-SXM4-40GB",
+  "openfhe_version": "1.6.1",
+  "queries_per_case": 10,
+  "warmup_queries": 3,
+  "k": 10,
+  "steps": [
+    "client_encode_encrypt",
+    "server_deserialize_query",
+    "expansion",
+    "leaf_handoff_d2d",
+    "stage1_gpu",
+    "stage1_d2h",
+    "client_stage1",
+    "stage2_gpu",
+    "stage2_d2h",
+    "client_stage2"
+  ],
+  "data_note": "centers block and stored block 0 are real encrypted random unit vectors; the other chosen blocks are device-to-device copies of block 0 (kernel timing does not depend on the values); network time excluded",
+  "cases": [
+    {
+      "d": 384,
+      "n_vectors": 100000,
+      "fraction_searched": 0.05,
+      "nlist": 100,
+      "nprobe": 5,
+      "chosen_vectors": 5000,
+      "chosen_blocks": 1,
+      "queries": 10,
+      "warmup_queries": 3,
+      "steps_seconds": {
+        "client_encode_encrypt": {
+          "median": 0.010976679000009426,
+          "min": 0.01085226500001113,
+          "max": 0.011216665000006287
+        },
+        "server_deserialize_query": {
+          "median": 0.010399628000000001,
+          "min": 0.010305136,
+          "max": 0.010517262
+        },
+        "expansion": {
+          "median": 0.025041246500000003,
+          "min": 0.024993703,
+          "max": 0.0250726
+        },
+        "leaf_handoff_d2d": {
+          "median": 4.7315e-06,
+          "min": 4.248e-06,
+          "max": 6.722e-06
+        },
+        "stage1_gpu": {
+          "median": 0.0012056545000000002,
+          "min": 0.001199229,
+          "max": 0.001243787
+        },
+        "stage1_d2h": {
+          "median": 0.0001193565,
+          "min": 0.000114133,
+          "max": 0.000136265
+        },
+        "client_stage1": {
+          "median": 0.013258285999995678,
+          "min": 0.013063641000002235,
+          "max": 0.013363895999987108
+        },
+        "stage2_gpu": {
+          "median": 0.0012448009999999998,
+          "min": 0.001229761,
+          "max": 0.001263765
+        },
+        "stage2_d2h": {
+          "median": 0.000134681,
+          "min": 0.000120731,
+          "max": 0.000153412
+        },
+        "client_stage2": {
+          "median": 0.013239255999991428,
+          "min": 0.013149721000019099,
+          "max": 0.013465028000013035
+        }
+      },
+      "step_share": {
+        "client_encode_encrypt": 0.14514747372287023,
+        "server_deserialize_query": 0.1375169786650707,
+        "expansion": 0.33112689806666895,
+        "leaf_handoff_d2d": 6.256585183179456e-05,
+        "stage1_gpu": 0.015942682195357997,
+        "stage1_d2h": 0.001578281960089102,
+        "client_stage1": 0.17531775492323484,
+        "stage2_gpu": 0.016460326519300364,
+        "stage2_d2h": 0.001780921798701875,
+        "client_stage2": 0.1750661162968743
+      },
+      "stage1_gpu_parts_median_seconds": {
+        "search_s": 0.0006704925,
+        "relin_s": 0.0001785305,
+        "rescale1_s": 8.5703e-05,
+        "mask_s": 0.000183403,
+        "rescale2_s": 8.4317e-05
+      },
+      "stage2_gpu_parts_median_seconds": {
+        "search_s": 0.000695109,
+        "relin_s": 0.0001887535,
+        "rescale1_s": 8.766049999999999e-05,
+        "mask_s": 0.00018527,
+        "rescale2_s": 8.4935e-05
+      },
+      "stage2_gpu_per_block_median_seconds": 0.0012448009999999998,
+      "total_seconds_sum_of_median_steps": 0.07562431999999653,
+      "total_seconds_median_of_queries": 0.07566534099999436,
+      "server_seconds_sum_of_median_steps": 0.038150099,
+      "queries_per_second_single_stream": 13.223259395919804,
+      "queries_per_second_server_only": 26.21225176899279,
+      "bytes": {
+        "upload_query": 787423,
+        "download_stage1": 263251,
+        "download_stage2": 263251,
+        "download_total": 526502
+      },
+      "chosen_block_h2d_standin_for_m2_paging": {
+        "seconds_one_block_measured": 0.067160887,
+        "seconds_all_chosen_blocks_estimate": 0.067160887,
+        "note": "pageable host memory, cudaMemcpy of one block times the block count; not part of the search latency"
+      },
+      "memory": {
+        "block_bytes": 301989888,
+        "full_collection_blocks": 13,
+        "full_collection_bytes": 3925868544,
+        "chosen_blocks_bytes": 301989888,
+        "resident_blocks": 1,
+        "passes": 1,
+        "stage2_device_bytes": 608567296,
+        "device_total_bytes": 42429251600,
+        "device_free_bytes_before_stage2": 39693713400,
+        "device_free_bytes_after_stage2": 39070859300,
+        "device_used_since_start_bytes": 2912944130,
+        "plan": "resident: centers block + query buffers + chosen blocks + masks + stage buffers + expansion pool; the whole collection is not resident",
+        "fits_whole_collection": true,
+        "fits_chosen_blocks": true
+      },
+      "max_abs_score_error": {
+        "stage1_center_scores": 4.126321839770242e-09,
+        "stage2_block0": 6.552987825980683e-09,
+        "stage2_last_masked_block": 0.0,
+        "bound": 1e-06
+      }
+    },
+    {
+      "d": 384,
+      "n_vectors": 100000,
+      "fraction_searched": 0.2,
+      "nlist": 100,
+      "nprobe": 20,
+      "chosen_vectors": 20000,
+      "chosen_blocks": 3,
+      "queries": 10,
+      "warmup_queries": 3,
+      "steps_seconds": {
+        "client_encode_encrypt": {
+          "median": 0.010931179499991117,
+          "min": 0.010863471000021718,
+          "max": 0.010994077999981755
+        },
+        "server_deserialize_query": {
+          "median": 0.0104912375,
+          "min": 0.010446333,
+          "max": 0.010592795
+        },
+        "expansion": {
+          "median": 0.02502719,
+          "min": 0.025007834,
+          "max": 0.025105833
+        },
+        "leaf_handoff_d2d": {
+          "median": 4.572e-06,
+          "min": 3.963e-06,
+          "max": 8.087e-06
+        },
+        "stage1_gpu": {
+          "median": 0.0012042715,
+          "min": 0.001200585,
+          "max": 0.001217516
+        },
+        "stage1_d2h": {
+          "median": 0.000133082,
+          "min": 0.000121903,
+          "max": 0.000145988
+        },
+        "client_stage1": {
+          "median": 0.013319994500008647,
+          "min": 0.013133898000006639,
+          "max": 0.013366212999983418
+        },
+        "stage2_gpu": {
+          "median": 0.0023429230000000002,
+          "min": 0.002335002,
+          "max": 0.002360521
+        },
+        "stage2_d2h": {
+          "median": 0.000370417,
+          "min": 0.000359047,
+          "max": 0.000388584
+        },
+        "client_stage2": {
+          "median": 0.03971334699998863,
+          "min": 0.03912812199999394,
+          "max": 0.04019241699998588
+        }
+      },
+      "step_share": {
+        "client_encode_encrypt": 0.10557628027070606,
+        "server_deserialize_query": 0.10132720176147886,
+        "expansion": 0.2417193520452536,
+        "leaf_handoff_d2d": 4.4157609286176326e-05,
+        "stage1_gpu": 0.011631178996386155,
+        "stage1_d2h": 0.001285341854554444,
+        "client_stage1": 0.1286480999180664,
+        "stage2_gpu": 0.02262858233193266,
+        "stage2_d2h": 0.0035775873051088316,
+        "client_stage2": 0.3835622179072268
+      },
+      "stage1_gpu_parts_median_seconds": {
+        "search_s": 0.0006697855,
+        "relin_s": 0.0001789985,
+        "rescale1_s": 8.684550000000001e-05,
+        "mask_s": 0.00018363100000000002,
+        "rescale2_s": 8.4261e-05
+      },
+      "stage2_gpu_parts_median_seconds": {
+        "search_s": 0.001753833,
+        "relin_s": 0.0002174585,
+        "rescale1_s": 9.44325e-05,
+        "mask_s": 0.000193777,
+        "rescale2_s": 8.5939e-05
+      },
+      "stage2_gpu_per_block_median_seconds": 0.0007809743333333334,
+      "total_seconds_sum_of_median_steps": 0.1035382139999884,
+      "total_seconds_median_of_queries": 0.1035802919999795,
+      "server_seconds_sum_of_median_steps": 0.03957369300000001,
+      "queries_per_second_single_stream": 9.658269747632618,
+      "queries_per_second_server_only": 25.26931211600595,
+      "bytes": {
+        "upload_query": 787423,
+        "download_stage1": 263251,
+        "download_stage2": 789753,
+        "download_total": 1053004
+      },
+      "chosen_block_h2d_standin_for_m2_paging": {
+        "seconds_one_block_measured": 0.068366993,
+        "seconds_all_chosen_blocks_estimate": 0.20510097900000002,
+        "note": "pageable host memory, cudaMemcpy of one block times the block count; not part of the search latency"
+      },
+      "memory": {
+        "block_bytes": 301989888,
+        "full_collection_blocks": 13,
+        "full_collection_bytes": 3925868544,
+        "chosen_blocks_bytes": 905969664,
+        "resident_blocks": 3,
+        "passes": 1,
+        "stage2_device_bytes": 1221722110,
+        "device_total_bytes": 42429251600,
+        "device_free_bytes_before_stage2": 39691616300,
+        "device_free_bytes_after_stage2": 38450102300,
+        "device_used_since_start_bytes": 3533701120,
+        "plan": "resident: centers block + query buffers + chosen blocks + masks + stage buffers + expansion pool; the whole collection is not resident",
+        "fits_whole_collection": true,
+        "fits_chosen_blocks": true
+      },
+      "max_abs_score_error": {
+        "stage1_center_scores": 4.0419327815288675e-09,
+        "stage2_block0": 8.13229519142089e-09,
+        "stage2_last_masked_block": 6.70343628522696e-09,
+        "bound": 1e-06
+      }
+    },
+    {
+      "d": 384,
+      "n_vectors": 1000000,
+      "fraction_searched": 0.05,
+      "nlist": 1000,
+      "nprobe": 50,
+      "chosen_vectors": 50000,
+      "chosen_blocks": 7,
+      "queries": 10,
+      "warmup_queries": 3,
+      "steps_seconds": {
+        "client_encode_encrypt": {
+          "median": 0.010985299500006818,
+          "min": 0.010756780999997773,
+          "max": 0.011200443999996423
+        },
+        "server_deserialize_query": {
+          "median": 0.010539696500000001,
+          "min": 0.01042344,
+          "max": 0.011238354
+        },
+        "expansion": {
+          "median": 0.025037188000000002,
+          "min": 0.025006725,
+          "max": 0.025083423
+        },
+        "leaf_handoff_d2d": {
+          "median": 5.1755e-06,
+          "min": 3.86e-06,
+          "max": 6.82e-06
+        },
+        "stage1_gpu": {
+          "median": 0.0012087315,
+          "min": 0.001200961,
+          "max": 0.001218622
+        },
+        "stage1_d2h": {
+          "median": 0.00013713050000000002,
+          "min": 0.000126028,
+          "max": 0.000142325
+        },
+        "client_stage1": {
+          "median": 0.013371581999990667,
+          "min": 0.013283123999997315,
+          "max": 0.013541043000003583
+        },
+        "stage2_gpu": {
+          "median": 0.004043349999999999,
+          "min": 0.004033346,
+          "max": 0.004064352
+        },
+        "stage2_d2h": {
+          "median": 0.0009221005,
+          "min": 0.000896126,
+          "max": 0.000965826
+        },
+        "client_stage2": {
+          "median": 0.09226944249998326,
+          "min": 0.09119420100000752,
+          "max": 0.09353892100000394
+        }
+      },
+      "step_share": {
+        "client_encode_encrypt": 0.06929927158930785,
+        "server_deserialize_query": 0.06648824551592099,
+        "expansion": 0.15794370386018902,
+        "leaf_handoff_d2d": 3.2648939622469116e-05,
+        "stage1_gpu": 0.007625118686750368,
+        "stage1_d2h": 0.0008650691556176219,
+        "client_stage1": 0.084352811008519,
+        "stage2_gpu": 0.02550692493913834,
+        "stage2_d2h": 0.005816945908675216,
+        "client_stage2": 0.5820692603962592
+      },
+      "stage1_gpu_parts_median_seconds": {
+        "search_s": 0.0006727695,
+        "relin_s": 0.0001792435,
+        "rescale1_s": 8.70765e-05,
+        "mask_s": 0.000184127,
+        "rescale2_s": 8.4561e-05
+      },
+      "stage2_gpu_parts_median_seconds": {
+        "search_s": 0.003256041,
+        "relin_s": 0.00030395650000000004,
+        "rescale1_s": 0.000127464,
+        "mask_s": 0.00024806000000000003,
+        "rescale2_s": 0.0001073785
+      },
+      "stage2_gpu_per_block_median_seconds": 0.0005776214285714285,
+      "total_seconds_sum_of_median_steps": 0.15851969649998074,
+      "total_seconds_median_of_queries": 0.15842505950000846,
+      "server_seconds_sum_of_median_steps": 0.041893372500000005,
+      "queries_per_second_single_stream": 6.308364336290043,
+      "queries_per_second_server_only": 23.870124087049806,
+      "bytes": {
+        "upload_query": 787423,
+        "download_stage1": 263251,
+        "download_stage2": 1842757,
+        "download_total": 2106008
+      },
+      "chosen_block_h2d_standin_for_m2_paging": {
+        "seconds_one_block_measured": 0.067957826,
+        "seconds_all_chosen_blocks_estimate": 0.475704782,
+        "note": "pageable host memory, cudaMemcpy of one block times the block count; not part of the search latency"
+      },
+      "memory": {
+        "block_bytes": 301989888,
+        "full_collection_blocks": 123,
+        "full_collection_bytes": 37144756224,
+        "chosen_blocks_bytes": 2113929216,
+        "resident_blocks": 7,
+        "passes": 1,
+        "stage2_device_bytes": 2448031740,
+        "device_total_bytes": 42429251600,
+        "device_free_bytes_before_stage2": 39691616300,
+        "device_free_bytes_after_stage2": 37227462700,
+        "device_used_since_start_bytes": 4756340740,
+        "plan": "resident: centers block + query buffers + chosen blocks + masks + stage buffers + expansion pool; the whole collection is not resident",
+        "fits_whole_collection": true,
+        "fits_chosen_blocks": true
+      },
+      "max_abs_score_error": {
+        "stage1_center_scores": 5.188736204586597e-09,
+        "stage2_block0": 7.84266685621704e-09,
+        "stage2_last_masked_block": 5.560478681665426e-09,
+        "bound": 1e-06
+      }
+    },
+    {
+      "d": 384,
+      "n_vectors": 1000000,
+      "fraction_searched": 0.2,
+      "nlist": 1000,
+      "nprobe": 200,
+      "chosen_vectors": 200000,
+      "chosen_blocks": 25,
+      "queries": 10,
+      "warmup_queries": 3,
+      "steps_seconds": {
+        "client_encode_encrypt": {
+          "median": 0.011045905999992556,
+          "min": 0.010866809999981797,
+          "max": 0.011187484000004133
+        },
+        "server_deserialize_query": {
+          "median": 0.010572439,
+          "min": 0.010457513,
+          "max": 0.010949903
+        },
+        "expansion": {
+          "median": 0.025033276,
+          "min": 0.020829529,
+          "max": 0.025113345
+        },
+        "leaf_handoff_d2d": {
+          "median": 5.7705e-06,
+          "min": 4.011e-06,
+          "max": 1.5405e-05
+        },
+        "stage1_gpu": {
+          "median": 0.0012119305,
+          "min": 0.001017232,
+          "max": 0.001221668
+        },
+        "stage1_d2h": {
+          "median": 0.00013950600000000002,
+          "min": 0.000126445,
+          "max": 0.000143018
+        },
+        "client_stage1": {
+          "median": 0.013379472499991607,
+          "min": 0.013324552999989692,
+          "max": 0.013930305999991788
+        },
+        "stage2_gpu": {
+          "median": 0.011511096,
+          "min": 0.009411658,
+          "max": 0.011558783
+        },
+        "stage2_d2h": {
+          "median": 0.0032325175,
+          "min": 0.003171137,
+          "max": 0.003317474
+        },
+        "client_stage2": {
+          "median": 0.33219416999999396,
+          "min": 0.32759461000000556,
+          "max": 0.3358830859999955
+        }
+      },
+      "step_share": {
+        "client_encode_encrypt": 0.027051678628478577,
+        "server_deserialize_query": 0.025892147022379707,
+        "expansion": 0.061307070454018175,
+        "leaf_handoff_d2d": 1.4132087628279729e-05,
+        "stage1_gpu": 0.00296804575433409,
+        "stage1_d2h": 0.0003416534124721934,
+        "client_stage1": 0.03276663682350581,
+        "stage2_gpu": 0.028190939670659436,
+        "stage2_d2h": 0.007916509933272284,
+        "client_stage2": 0.8135511862132515
+      },
+      "stage1_gpu_parts_median_seconds": {
+        "search_s": 0.000672952,
+        "relin_s": 0.00017968,
+        "rescale1_s": 8.753250000000001e-05,
+        "mask_s": 0.0001843675,
+        "rescale2_s": 8.4217e-05
+      },
+      "stage2_gpu_parts_median_seconds": {
+        "search_s": 0.0098683765,
+        "relin_s": 0.000723647,
+        "rescale1_s": 0.000249467,
+        "mask_s": 0.000492277,
+        "rescale2_s": 0.000174358
+      },
+      "stage2_gpu_per_block_median_seconds": 0.00046044384,
+      "total_seconds_sum_of_median_steps": 0.4083260839999781,
+      "total_seconds_median_of_queries": 0.4077410349999941,
+      "server_seconds_sum_of_median_steps": 0.05170653549999999,
+      "queries_per_second_single_stream": 2.449023070492978,
+      "queries_per_second_server_only": 19.33991497071004,
+      "bytes": {
+        "upload_query": 787423,
+        "download_stage1": 263251,
+        "download_stage2": 6581275,
+        "download_total": 6844526
+      },
+      "chosen_block_h2d_standin_for_m2_paging": {
+        "seconds_one_block_measured": 0.067520222,
+        "seconds_all_chosen_blocks_estimate": 1.6880055500000002,
+        "note": "pageable host memory, cudaMemcpy of one block times the block count; not part of the search latency"
+      },
+      "memory": {
+        "block_bytes": 301989888,
+        "full_collection_blocks": 123,
+        "full_collection_bytes": 37144756224,
+        "chosen_blocks_bytes": 7549747200,
+        "resident_blocks": 25,
+        "passes": 1,
+        "stage2_device_bytes": 7966425090,
+        "device_total_bytes": 42429251600,
+        "device_free_bytes_before_stage2": 39691616300,
+        "device_free_bytes_after_stage2": 31701467100,
+        "device_used_since_start_bytes": 10282336300,
+        "plan": "resident: centers block + query buffers + chosen blocks + masks + stage buffers + expansion pool; the whole collection is not resident",
+        "fits_whole_collection": true,
+        "fits_chosen_blocks": true
+      },
+      "max_abs_score_error": {
+        "stage1_center_scores": 5.324333956363558e-09,
+        "stage2_block0": 7.4101681873939285e-09,
+        "stage2_last_masked_block": 6.1019365116266044e-09,
+        "bound": 1e-06
+      }
+    },
+    {
+      "d": 768,
+      "n_vectors": 100000,
+      "fraction_searched": 0.05,
+      "nlist": 100,
+      "nprobe": 5,
+      "chosen_vectors": 5000,
+      "chosen_blocks": 1,
+      "queries": 10,
+      "warmup_queries": 3,
+      "steps_seconds": {
+        "client_encode_encrypt": {
+          "median": 0.01101892499998769,
+          "min": 0.01095794599999067,
+          "max": 0.01115822100001651
+        },
+        "server_deserialize_query": {
+          "median": 0.010506325,
+          "min": 0.010439895,
+          "max": 0.010600641
+        },
+        "expansion": {
+          "median": 0.0384167895,
+          "min": 0.038273521,
+          "max": 0.04114047
+        },
+        "leaf_handoff_d2d": {
+          "median": 6.26e-06,
+          "min": 5.021e-06,
+          "max": 8.242e-06
+        },
+        "stage1_gpu": {
+          "median": 0.001563935,
+          "min": 0.001554779,
+          "max": 0.001635621
+        },
+        "stage1_d2h": {
+          "median": 0.000127571,
+          "min": 0.000124685,
+          "max": 0.000134054
+        },
+        "client_stage1": {
+          "median": 0.013353286499992123,
+          "min": 0.013251164999985576,
+          "max": 0.013456012000006012
+        },
+        "stage2_gpu": {
+          "median": 0.0016179885,
+          "min": 0.001594691,
+          "max": 0.001674806
+        },
+        "stage2_d2h": {
+          "median": 0.0001425845,
+          "min": 0.000133307,
+          "max": 0.000156062
+        },
+        "client_stage2": {
+          "median": 0.013432747000010181,
+          "min": 0.013331489000023566,
+          "max": 0.013589736999989555
+        }
+      },
+      "step_share": {
+        "client_encode_encrypt": 0.12217943652075781,
+        "server_deserialize_query": 0.11649565346940696,
+        "expansion": 0.42597092675118575,
+        "leaf_handoff_d2d": 6.941178677782074e-05,
+        "stage1_gpu": 0.017341137820187074,
+        "stage1_d2h": 0.0014145257270021356,
+        "client_stage1": 0.14806317497134272,
+        "stage2_gpu": 0.017940490857981793,
+        "stage2_d2h": 0.0015809975897479523,
+        "client_stage2": 0.1489442445056099
+      },
+      "stage1_gpu_parts_median_seconds": {
+        "search_s": 0.001127891,
+        "relin_s": 0.0001481365,
+        "rescale1_s": 7.10485e-05,
+        "mask_s": 0.00014991549999999998,
+        "rescale2_s": 6.83835e-05
+      },
+      "stage2_gpu_parts_median_seconds": {
+        "search_s": 0.001161057,
+        "relin_s": 0.0001617445,
+        "rescale1_s": 7.25445e-05,
+        "mask_s": 0.00015251750000000003,
+        "rescale2_s": 6.93875e-05
+      },
+      "stage2_gpu_per_block_median_seconds": 0.0016179885,
+      "total_seconds_sum_of_median_steps": 0.09018641199999,
+      "total_seconds_median_of_queries": 0.09038863250001228,
+      "server_seconds_sum_of_median_steps": 0.05238145350000001,
+      "queries_per_second_single_stream": 11.08814485268702,
+      "queries_per_second_server_only": 19.090726453400148,
+      "bytes": {
+        "upload_query": 787423,
+        "download_stage1": 263251,
+        "download_stage2": 263251,
+        "download_total": 526502
+      },
+      "chosen_block_h2d_standin_for_m2_paging": {
+        "seconds_one_block_measured": 0.133703628,
+        "seconds_all_chosen_blocks_estimate": 0.133703628,
+        "note": "pageable host memory, cudaMemcpy of one block times the block count; not part of the search latency"
+      },
+      "memory": {
+        "block_bytes": 603979776,
+        "full_collection_blocks": 13,
+        "full_collection_bytes": 7851737088,
+        "chosen_blocks_bytes": 603979776,
+        "resident_blocks": 1,
+        "passes": 1,
+        "stage2_device_bytes": 1212547070,
+        "device_total_bytes": 42429251600,
+        "device_free_bytes_before_stage2": 38548668400,
+        "device_free_bytes_after_stage2": 37321834500,
+        "device_used_since_start_bytes": 4661968900,
+        "plan": "resident: centers block + query buffers + chosen blocks + masks + stage buffers + expansion pool; the whole collection is not resident",
+        "fits_whole_collection": true,
+        "fits_chosen_blocks": true
+      },
+      "max_abs_score_error": {
+        "stage1_center_scores": 6.447624541910946e-09,
+        "stage2_block0": 9.804615244690673e-09,
+        "stage2_last_masked_block": 0.0,
+        "bound": 1e-06
+      }
+    },
+    {
+      "d": 768,
+      "n_vectors": 100000,
+      "fraction_searched": 0.2,
+      "nlist": 100,
+      "nprobe": 20,
+      "chosen_vectors": 20000,
+      "chosen_blocks": 3,
+      "queries": 10,
+      "warmup_queries": 3,
+      "steps_seconds": {
+        "client_encode_encrypt": {
+          "median": 0.010949878000005242,
+          "min": 0.010822925000013583,
+          "max": 0.01104724199998941
+        },
+        "server_deserialize_query": {
+          "median": 0.010439984,
+          "min": 0.010315888,
+          "max": 0.010636157
+        },
+        "expansion": {
+          "median": 0.0383387225,
+          "min": 0.038284,
+          "max": 0.03839719
+        },
+        "leaf_handoff_d2d": {
+          "median": 5.5335000000000005e-06,
+          "min": 3.953e-06,
+          "max": 6.917e-06
+        },
+        "stage1_gpu": {
+          "median": 0.00156055,
+          "min": 0.001550935,
+          "max": 0.001573481
+        },
+        "stage1_d2h": {
+          "median": 0.0001261745,
+          "min": 0.000120962,
+          "max": 0.000134331
+        },
+        "client_stage1": {
+          "median": 0.013268443000015395,
+          "min": 0.013200148999999328,
+          "max": 0.01348641999999245
+        },
+        "stage2_gpu": {
+          "median": 0.0033323375,
+          "min": 0.003322016,
+          "max": 0.003342041
+        },
+        "stage2_d2h": {
+          "median": 0.00036833600000000003,
+          "min": 0.000349355,
+          "max": 0.000404082
+        },
+        "client_stage2": {
+          "median": 0.03945518899999456,
+          "min": 0.039201671000000715,
+          "max": 0.039833527999974194
+        }
+      },
+      "step_share": {
+        "client_encode_encrypt": 0.09291751239519705,
+        "server_deserialize_query": 0.08859069870232293,
+        "expansion": 0.32533136196659584,
+        "leaf_handoff_d2d": 4.695568798470419e-05,
+        "stage1_gpu": 0.013242378040034357,
+        "stage1_d2h": 0.001070680483170879,
+        "client_stage1": 0.11259218750366952,
+        "stage2_gpu": 0.028277256692821755,
+        "stage2_d2h": 0.0031255932573477914,
+        "client_stage2": 0.33480537527085524
+      },
+      "stage1_gpu_parts_median_seconds": {
+        "search_s": 0.001125039,
+        "relin_s": 0.00014665849999999999,
+        "rescale1_s": 6.95355e-05,
+        "mask_s": 0.000149425,
+        "rescale2_s": 6.777049999999999e-05
+      },
+      "stage2_gpu_parts_median_seconds": {
+        "search_s": 0.0028481635,
+        "relin_s": 0.00017917699999999998,
+        "rescale1_s": 7.645500000000001e-05,
+        "mask_s": 0.000155601,
+        "rescale2_s": 6.9265e-05
+      },
+      "stage2_gpu_per_block_median_seconds": 0.0011107791666666667,
+      "total_seconds_sum_of_median_steps": 0.11784514800001519,
+      "total_seconds_median_of_queries": 0.1178773750000041,
+      "server_seconds_sum_of_median_steps": 0.054171637999999994,
+      "queries_per_second_single_stream": 8.485712114340686,
+      "queries_per_second_server_only": 18.459844245433377,
+      "bytes": {
+        "upload_query": 787423,
+        "download_stage1": 263251,
+        "download_stage2": 789753,
+        "download_total": 1053004
+      },
+      "chosen_block_h2d_standin_for_m2_paging": {
+        "seconds_one_block_measured": 0.134393786,
+        "seconds_all_chosen_blocks_estimate": 0.403181358,
+        "note": "pageable host memory, cudaMemcpy of one block times the block count; not part of the search latency"
+      },
+      "memory": {
+        "block_bytes": 603979776,
+        "full_collection_blocks": 13,
+        "full_collection_bytes": 7851737088,
+        "chosen_blocks_bytes": 1811939328,
+        "resident_blocks": 3,
+        "passes": 1,
+        "stage2_device_bytes": 2429681660,
+        "device_total_bytes": 42429251600,
+        "device_free_bytes_before_stage2": 38544474100,
+        "device_free_bytes_after_stage2": 36097097700,
+        "device_used_since_start_bytes": 5886705660,
+        "plan": "resident: centers block + query buffers + chosen blocks + masks + stage buffers + expansion pool; the whole collection is not resident",
+        "fits_whole_collection": true,
+        "fits_chosen_blocks": true
+      },
+      "max_abs_score_error": {
+        "stage1_center_scores": 8.501820657202952e-09,
+        "stage2_block0": 1.1316701173380572e-08,
+        "stage2_last_masked_block": 9.726243685448388e-09,
+        "bound": 1e-06
+      }
+    },
+    {
+      "d": 768,
+      "n_vectors": 1000000,
+      "fraction_searched": 0.05,
+      "nlist": 1000,
+      "nprobe": 50,
+      "chosen_vectors": 50000,
+      "chosen_blocks": 7,
+      "queries": 10,
+      "warmup_queries": 3,
+      "steps_seconds": {
+        "client_encode_encrypt": {
+          "median": 0.010988190500000883,
+          "min": 0.010863894999999957,
+          "max": 0.01131264899998996
+        },
+        "server_deserialize_query": {
+          "median": 0.010465546499999999,
+          "min": 0.010418024,
+          "max": 0.01056095
+        },
+        "expansion": {
+          "median": 0.0388414325,
+          "min": 0.038275347,
+          "max": 0.046424459
+        },
+        "leaf_handoff_d2d": {
+          "median": 5.7215e-06,
+          "min": 3.303e-06,
+          "max": 9.809e-06
+        },
+        "stage1_gpu": {
+          "median": 0.001684884,
+          "min": 0.00155003,
+          "max": 0.001832889
+        },
+        "stage1_d2h": {
+          "median": 0.000134465,
+          "min": 0.000129961,
+          "max": 0.000150848
+        },
+        "client_stage1": {
+          "median": 0.013303472499998747,
+          "min": 0.013142731000016283,
+          "max": 0.01353870099998744
+        },
+        "stage2_gpu": {
+          "median": 0.0064124655,
+          "min": 0.005665912,
+          "max": 0.007218616
+        },
+        "stage2_d2h": {
+          "median": 0.000857298,
+          "min": 0.00083476,
+          "max": 0.000898959
+        },
+        "client_stage2": {
+          "median": 0.0909678344999918,
+          "min": 0.089179090000016,
+          "max": 0.09154275700001335
+        }
+      },
+      "step_share": {
+        "client_encode_encrypt": 0.0632736817910943,
+        "server_deserialize_query": 0.06026412256056604,
+        "expansion": 0.22366197967855317,
+        "leaf_handoff_d2d": 3.2946313623495784e-05,
+        "stage1_gpu": 0.00970212648487461,
+        "stage1_d2h": 0.0007742945139182664,
+        "client_stage1": 0.07660585113458189,
+        "stage2_gpu": 0.03692512443639722,
+        "stage2_d2h": 0.0049366090669921685,
+        "client_stage2": 0.5238232640193987
+      },
+      "stage1_gpu_parts_median_seconds": {
+        "search_s": 0.0012049305,
+        "relin_s": 0.000162363,
+        "rescale1_s": 7.69125e-05,
+        "mask_s": 0.00016455149999999998,
+        "rescale2_s": 7.5829e-05
+      },
+      "stage2_gpu_parts_median_seconds": {
+        "search_s": 0.0057143490000000005,
+        "relin_s": 0.0002679065,
+        "rescale1_s": 0.0001145845,
+        "mask_s": 0.0002198605,
+        "rescale2_s": 9.54935e-05
+      },
+      "stage2_gpu_per_block_median_seconds": 0.0009160665,
+      "total_seconds_sum_of_median_steps": 0.17366131049999145,
+      "total_seconds_median_of_queries": 0.17406946550001173,
+      "server_seconds_sum_of_median_steps": 0.058401813,
+      "queries_per_second_single_stream": 5.758334986191695,
+      "queries_per_second_server_only": 17.122756103479187,
+      "bytes": {
+        "upload_query": 787423,
+        "download_stage1": 263251,
+        "download_stage2": 1842757,
+        "download_total": 2106008
+      },
+      "chosen_block_h2d_standin_for_m2_paging": {
+        "seconds_one_block_measured": 0.134004243,
+        "seconds_all_chosen_blocks_estimate": 0.9380297009999999,
+        "note": "pageable host memory, cudaMemcpy of one block times the block count; not part of the search latency"
+      },
+      "memory": {
+        "block_bytes": 603979776,
+        "full_collection_blocks": 123,
+        "full_collection_bytes": 74289512448,
+        "chosen_blocks_bytes": 4227858432,
+        "resident_blocks": 7,
+        "passes": 1,
+        "stage2_device_bytes": 4863950850,
+        "device_total_bytes": 42429251600,
+        "device_free_bytes_before_stage2": 38544474100,
+        "device_free_bytes_after_stage2": 33666498600,
+        "device_used_since_start_bytes": 8317304830,
+        "plan": "resident: centers block + query buffers + chosen blocks + masks + stage buffers + expansion pool; the whole collection is not resident",
+        "fits_whole_collection": false,
+        "fits_chosen_blocks": true
+      },
+      "max_abs_score_error": {
+        "stage1_center_scores": 7.296430064307469e-09,
+        "stage2_block0": 1.0983975187728312e-08,
+        "stage2_last_masked_block": 6.940101784924657e-09,
+        "bound": 1e-06
+      }
+    },
+    {
+      "d": 768,
+      "n_vectors": 1000000,
+      "fraction_searched": 0.2,
+      "nlist": 1000,
+      "nprobe": 200,
+      "chosen_vectors": 200000,
+      "chosen_blocks": 25,
+      "queries": 10,
+      "warmup_queries": 3,
+      "steps_seconds": {
+        "client_encode_encrypt": {
+          "median": 0.010950637500002358,
+          "min": 0.01070404700001859,
+          "max": 0.011355834999989156
+        },
+        "server_deserialize_query": {
+          "median": 0.010556310999999999,
+          "min": 0.010444347,
+          "max": 0.010850782
+        },
+        "expansion": {
+          "median": 0.046432724499999994,
+          "min": 0.038320204,
+          "max": 0.046579059
+        },
+        "leaf_handoff_d2d": {
+          "median": 6.958e-06,
+          "min": 4.747e-06,
+          "max": 1.7713e-05
+        },
+        "stage1_gpu": {
+          "median": 0.001833064,
+          "min": 0.001572761,
+          "max": 0.001854867
+        },
+        "stage1_d2h": {
+          "median": 0.0001378905,
+          "min": 0.000132415,
+          "max": 0.000221488
+        },
+        "client_stage1": {
+          "median": 0.013350629999990815,
+          "min": 0.01330043799998748,
+          "max": 0.01361427099999446
+        },
+        "stage2_gpu": {
+          "median": 0.021237189,
+          "min": 0.017357658,
+          "max": 0.021257497
+        },
+        "stage2_d2h": {
+          "median": 0.003180679,
+          "min": 0.003143103,
+          "max": 0.005035546
+        },
+        "client_stage2": {
+          "median": 0.3265952284999969,
+          "min": 0.3233798379999939,
+          "max": 0.3337417629999777
+        }
+      },
+      "step_share": {
+        "client_encode_encrypt": 0.025215539323051987,
+        "server_deserialize_query": 0.02430754146749985,
+        "expansion": 0.10691854154663936,
+        "leaf_handoff_d2d": 1.6021872937512353e-05,
+        "stage1_gpu": 0.004220913839368804,
+        "stage1_d2h": 0.00031751423832854946,
+        "client_stage1": 0.03074189386254576,
+        "stage2_gpu": 0.048901917750493684,
+        "stage2_d2h": 0.007324006150188827,
+        "client_stage2": 0.7520361099489455
+      },
+      "stage1_gpu_parts_median_seconds": {
+        "search_s": 0.001297868,
+        "relin_s": 0.000179625,
+        "rescale1_s": 8.729e-05,
+        "mask_s": 0.000182661,
+        "rescale2_s": 8.3743e-05
+      },
+      "stage2_gpu_parts_median_seconds": {
+        "search_s": 0.019608472000000002,
+        "relin_s": 0.0007154335,
+        "rescale1_s": 0.000248244,
+        "mask_s": 0.0004910715,
+        "rescale2_s": 0.00017244949999999998
+      },
+      "stage2_gpu_per_block_median_seconds": 0.00084948756,
+      "total_seconds_sum_of_median_steps": 0.4342813119999901,
+      "total_seconds_median_of_queries": 0.43429162450000064,
+      "server_seconds_sum_of_median_steps": 0.083384816,
+      "queries_per_second_single_stream": 2.302654920596774,
+      "queries_per_second_server_only": 11.99259107317572,
+      "bytes": {
+        "upload_query": 787423,
+        "download_stage1": 263251,
+        "download_stage2": 6581275,
+        "download_total": 6844526
+      },
+      "chosen_block_h2d_standin_for_m2_paging": {
+        "seconds_one_block_measured": 0.13233688,
+        "seconds_all_chosen_blocks_estimate": 3.3084219999999998,
+        "note": "pageable host memory, cudaMemcpy of one block times the block count; not part of the search latency"
+      },
+      "memory": {
+        "block_bytes": 603979776,
+        "full_collection_blocks": 123,
+        "full_collection_bytes": 74289512448,
+        "chosen_blocks_bytes": 15099494400,
+        "resident_blocks": 25,
+        "passes": 1,
+        "stage2_device_bytes": 15818162200,
+        "device_total_bytes": 42429251600,
+        "device_free_bytes_before_stage2": 38544474100,
+        "device_free_bytes_after_stage2": 22704685100,
+        "device_used_since_start_bytes": 19279118300,
+        "plan": "resident: centers block + query buffers + chosen blocks + masks + stage buffers + expansion pool; the whole collection is not resident",
+        "fits_whole_collection": false,
+        "fits_chosen_blocks": true
+      },
+      "max_abs_score_error": {
+        "stage1_center_scores": 7.678845698189107e-09,
+        "stage2_block0": 1.0206558750947003e-08,
+        "stage2_last_masked_block": 1.0167130185933376e-08,
+        "bound": 1e-06
+      }
+    },
+    {
+      "d": 1536,
+      "n_vectors": 100000,
+      "fraction_searched": 0.05,
+      "nlist": 100,
+      "nprobe": 5,
+      "chosen_vectors": 5000,
+      "chosen_blocks": 1,
+      "queries": 10,
+      "warmup_queries": 3,
+      "steps_seconds": {
+        "client_encode_encrypt": {
+          "median": 0.011233728999997084,
+          "min": 0.010887643999978991,
+          "max": 0.012030968999965808
+        },
+        "server_deserialize_query": {
+          "median": 0.010466725999999999,
+          "min": 0.01039389,
+          "max": 0.010667541
+        },
+        "expansion": {
+          "median": 0.07345420250000001,
+          "min": 0.073165995,
+          "max": 0.073602383
+        },
+        "leaf_handoff_d2d": {
+          "median": 8.137e-06,
+          "min": 6.805e-06,
+          "max": 1.5095e-05
+        },
+        "stage1_gpu": {
+          "median": 0.0026525209999999997,
+          "min": 0.002635035,
+          "max": 0.002664017
+        },
+        "stage1_d2h": {
+          "median": 0.0001376495,
+          "min": 0.000135118,
+          "max": 0.000228755
+        },
+        "client_stage1": {
+          "median": 0.013348255500005735,
+          "min": 0.013151860999983,
+          "max": 0.013893082000038248
+        },
+        "stage2_gpu": {
+          "median": 0.0026940949999999996,
+          "min": 0.002665801,
+          "max": 0.002733406
+        },
+        "stage2_d2h": {
+          "median": 0.0001394875,
+          "min": 0.000132577,
+          "max": 0.000223839
+        },
+        "client_stage2": {
+          "median": 0.013358829999987165,
+          "min": 0.012755685000001904,
+          "max": 0.013808025000003
+        }
+      },
+      "step_share": {
+        "client_encode_encrypt": 0.08811207850668092,
+        "server_deserialize_query": 0.08209606827974554,
+        "expansion": 0.5761401630150877,
+        "leaf_handoff_d2d": 6.382279497832365e-05,
+        "stage1_gpu": 0.020805125225353077,
+        "stage1_d2h": 0.0010796578367173112,
+        "client_stage1": 0.1046974283022179,
+        "stage2_gpu": 0.021131212097471652,
+        "stage2_d2h": 0.0010940742429075727,
+        "client_stage2": 0.10478036969883989
+      },
+      "stage1_gpu_parts_median_seconds": {
+        "search_s": 0.0022078914999999998,
+        "relin_s": 0.0001510845,
+        "rescale1_s": 7.070399999999999e-05,
+        "mask_s": 0.0001488485,
+        "rescale2_s": 6.82035e-05
+      },
+      "stage2_gpu_parts_median_seconds": {
+        "search_s": 0.002236029,
+        "relin_s": 0.00016568399999999998,
+        "rescale1_s": 7.232150000000001e-05,
+        "mask_s": 0.000150149,
+        "rescale2_s": 6.75965e-05
+      },
+      "stage2_gpu_per_block_median_seconds": 0.0026940949999999996,
+      "total_seconds_sum_of_median_steps": 0.12749363299999,
+      "total_seconds_median_of_queries": 0.12740927149998305,
+      "server_seconds_sum_of_median_steps": 0.0895528185,
+      "queries_per_second_single_stream": 7.843528939206544,
+      "queries_per_second_server_only": 11.16659438250958,
+      "bytes": {
+        "upload_query": 787423,
+        "download_stage1": 263251,
+        "download_stage2": 263251,
+        "download_total": 526502
+      },
+      "chosen_block_h2d_standin_for_m2_paging": {
+        "seconds_one_block_measured": 0.270127733,
+        "seconds_all_chosen_blocks_estimate": 0.270127733,
+        "note": "pageable host memory, cudaMemcpy of one block times the block count; not part of the search latency"
+      },
+      "memory": {
+        "block_bytes": 1207959550,
+        "full_collection_blocks": 13,
+        "full_collection_bytes": 15703474150,
+        "chosen_blocks_bytes": 1207959550,
+        "resident_blocks": 1,
+        "passes": 1,
+        "stage2_device_bytes": 2420506620,
+        "device_total_bytes": 42429251600,
+        "device_free_bytes_before_stage2": 36262772700,
+        "device_free_bytes_after_stage2": 33827979300,
+        "device_used_since_start_bytes": 8155824130,
+        "plan": "resident: centers block + query buffers + chosen blocks + masks + stage buffers + expansion pool; the whole collection is not resident",
+        "fits_whole_collection": true,
+        "fits_chosen_blocks": true
+      },
+      "max_abs_score_error": {
+        "stage1_center_scores": 9.407986001352953e-09,
+        "stage2_block0": 1.7634506986607956e-08,
+        "stage2_last_masked_block": 0.0,
+        "bound": 1e-06
+      }
+    },
+    {
+      "d": 1536,
+      "n_vectors": 100000,
+      "fraction_searched": 0.2,
+      "nlist": 100,
+      "nprobe": 20,
+      "chosen_vectors": 20000,
+      "chosen_blocks": 3,
+      "queries": 10,
+      "warmup_queries": 3,
+      "steps_seconds": {
+        "client_encode_encrypt": {
+          "median": 0.014001145500003531,
+          "min": 0.01157365500000651,
+          "max": 0.020465413000010813
+        },
+        "server_deserialize_query": {
+          "median": 0.011044218,
+          "min": 0.010531847,
+          "max": 0.021690647
+        },
+        "expansion": {
+          "median": 0.07352688,
+          "min": 0.073382956,
+          "max": 0.089503297
+        },
+        "leaf_handoff_d2d": {
+          "median": 1.897e-05,
+          "min": 7.151e-06,
+          "max": 3.4304e-05
+        },
+        "stage1_gpu": {
+          "median": 0.0026718765,
+          "min": 0.002653602,
+          "max": 0.003145209
+        },
+        "stage1_d2h": {
+          "median": 0.000156831,
+          "min": 0.000143773,
+          "max": 0.000227411
+        },
+        "client_stage1": {
+          "median": 0.014954122999995434,
+          "min": 0.013756322000006094,
+          "max": 0.016249684999991132
+        },
+        "stage2_gpu": {
+          "median": 0.006226539,
+          "min": 0.006149102,
+          "max": 0.00745205
+        },
+        "stage2_d2h": {
+          "median": 0.000445801,
+          "min": 0.00040139,
+          "max": 0.000767454
+        },
+        "client_stage2": {
+          "median": 0.04570879599998534,
+          "min": 0.041733774999954676,
+          "max": 0.05994786700000532
+        }
+      },
+      "step_share": {
+        "client_encode_encrypt": 0.08296720432525291,
+        "server_deserialize_query": 0.06544520885226177,
+        "expansion": 0.4357014700230645,
+        "leaf_handoff_d2d": 0.00011241136420228265,
+        "stage1_gpu": 0.015832856212178188,
+        "stage1_d2h": 0.0009293403615818761,
+        "client_stage1": 0.08861430505420234,
+        "stage2_gpu": 0.03689687629144527,
+        "stage2_d2h": 0.0026417026132178074,
+        "client_stage2": 0.27085862490259316
+      },
+      "stage1_gpu_parts_median_seconds": {
+        "search_s": 0.0022155485,
+        "relin_s": 0.00015941749999999998,
+        "rescale1_s": 7.238700000000001e-05,
+        "mask_s": 0.00015091600000000002,
+        "rescale2_s": 6.88415e-05
+      },
+      "stage2_gpu_parts_median_seconds": {
+        "search_s": 0.0056771035,
+        "relin_s": 0.000208518,
+        "rescale1_s": 7.90545e-05,
+        "mask_s": 0.0001668045,
+        "rescale2_s": 7.183450000000001e-05
+      },
+      "stage2_gpu_per_block_median_seconds": 0.0020755129999999998,
+      "total_seconds_sum_of_median_steps": 0.1687551799999843,
+      "total_seconds_median_of_queries": 0.17393814649999914,
+      "server_seconds_sum_of_median_steps": 0.09409111549999999,
+      "queries_per_second_single_stream": 5.9257440275320326,
+      "queries_per_second_server_only": 10.627996008826148,
+      "bytes": {
+        "upload_query": 787423,
+        "download_stage1": 263251,
+        "download_stage2": 789753,
+        "download_total": 1053004
+      },
+      "chosen_block_h2d_standin_for_m2_paging": {
+        "seconds_one_block_measured": 0.277365532,
+        "seconds_all_chosen_blocks_estimate": 0.8320965960000001,
+        "note": "pageable host memory, cudaMemcpy of one block times the block count; not part of the search latency"
+      },
+      "memory": {
+        "block_bytes": 1207959550,
+        "full_collection_blocks": 13,
+        "full_collection_bytes": 15703474150,
+        "chosen_blocks_bytes": 3623878650,
+        "resident_blocks": 3,
+        "passes": 1,
+        "stage2_device_bytes": 4845600770,
+        "device_total_bytes": 42429251600,
+        "device_free_bytes_before_stage2": 36258578400,
+        "device_free_bytes_after_stage2": 31395282900,
+        "device_used_since_start_bytes": 10588520400,
+        "plan": "resident: centers block + query buffers + chosen blocks + masks + stage buffers + expansion pool; the whole collection is not resident",
+        "fits_whole_collection": true,
+        "fits_chosen_blocks": true
+      },
+      "max_abs_score_error": {
+        "stage1_center_scores": 9.707788892199254e-09,
+        "stage2_block0": 1.9791848882011465e-08,
+        "stage2_last_masked_block": 1.6482931769479237e-08,
+        "bound": 1e-06
+      }
+    },
+    {
+      "d": 1536,
+      "n_vectors": 1000000,
+      "fraction_searched": 0.05,
+      "nlist": 1000,
+      "nprobe": 50,
+      "chosen_vectors": 50000,
+      "chosen_blocks": 7,
+      "queries": 10,
+      "warmup_queries": 3,
+      "steps_seconds": {
+        "client_encode_encrypt": {
+          "median": 0.011680325500009303,
+          "min": 0.011090168000009726,
+          "max": 0.026247577999981786
+        },
+        "server_deserialize_query": {
+          "median": 0.010742587500000001,
+          "min": 0.010465355,
+          "max": 0.024903911
+        },
+        "expansion": {
+          "median": 0.0734552275,
+          "min": 0.073256934,
+          "max": 0.075617422
+        },
+        "leaf_handoff_d2d": {
+          "median": 1.0322e-05,
+          "min": 7.235e-06,
+          "max": 2.5565e-05
+        },
+        "stage1_gpu": {
+          "median": 0.002658649,
+          "min": 0.002641707,
+          "max": 0.002689553
+        },
+        "stage1_d2h": {
+          "median": 0.00021178499999999998,
+          "min": 0.000134671,
+          "max": 0.00023392
+        },
+        "client_stage1": {
+          "median": 0.013633811000033802,
+          "min": 0.013311998000006042,
+          "max": 0.019398294999973587
+        },
+        "stage2_gpu": {
+          "median": 0.0107422275,
+          "min": 0.010673286,
+          "max": 0.012062091
+        },
+        "stage2_d2h": {
+          "median": 0.0014074355,
+          "min": 0.000859289,
+          "max": 0.002357395
+        },
+        "client_stage2": {
+          "median": 0.09357879150002191,
+          "min": 0.0912170020000076,
+          "max": 0.1089387229999943
+        }
+      },
+      "step_share": {
+        "client_encode_encrypt": 0.053549712430038414,
+        "server_deserialize_query": 0.04925055139765301,
+        "expansion": 0.33676341546345745,
+        "leaf_handoff_d2d": 4.732232262726037e-05,
+        "stage1_gpu": 0.012188863178709855,
+        "stage1_d2h": 0.0009709511817103599,
+        "client_stage1": 0.06250567746393051,
+        "stage2_gpu": 0.049248900938813074,
+        "stage2_d2h": 0.006452539896149923,
+        "client_stage2": 0.42902206572691015
+      },
+      "stage1_gpu_parts_median_seconds": {
+        "search_s": 0.0022106755000000002,
+        "relin_s": 0.000157083,
+        "rescale1_s": 7.12715e-05,
+        "mask_s": 0.000150105,
+        "rescale2_s": 6.87635e-05
+      },
+      "stage2_gpu_parts_median_seconds": {
+        "search_s": 0.010080695,
+        "relin_s": 0.000260302,
+        "rescale1_s": 0.000105652,
+        "mask_s": 0.00020409250000000002,
+        "rescale2_s": 8.7537e-05
+      },
+      "stage2_gpu_per_block_median_seconds": 0.0015346039285714286,
+      "total_seconds_sum_of_median_steps": 0.218121162000065,
+      "total_seconds_median_of_queries": 0.21908789049998784,
+      "server_seconds_sum_of_median_steps": 0.099228234,
+      "queries_per_second_single_stream": 4.584607888709588,
+      "queries_per_second_server_only": 10.07777685532527,
+      "bytes": {
+        "upload_query": 787423,
+        "download_stage1": 263251,
+        "download_stage2": 1842757,
+        "download_total": 2106008
+      },
+      "chosen_block_h2d_standin_for_m2_paging": {
+        "seconds_one_block_measured": 0.272789478,
+        "seconds_all_chosen_blocks_estimate": 1.9095263459999998,
+        "note": "pageable host memory, cudaMemcpy of one block times the block count; not part of the search latency"
+      },
+      "memory": {
+        "block_bytes": 1207959550,
+        "full_collection_blocks": 123,
+        "full_collection_bytes": 148579024650,
+        "chosen_blocks_bytes": 8455716850,
+        "resident_blocks": 7,
+        "passes": 1,
+        "stage2_device_bytes": 9695789060,
+        "device_total_bytes": 42429251600,
+        "device_free_bytes_before_stage2": 36258578400,
+        "device_free_bytes_after_stage2": 26546667500,
+        "device_used_since_start_bytes": 15437135900,
+        "plan": "resident: centers block + query buffers + chosen blocks + masks + stage buffers + expansion pool; the whole collection is not resident",
+        "fits_whole_collection": false,
+        "fits_chosen_blocks": true
+      },
+      "max_abs_score_error": {
+        "stage1_center_scores": 1.307080974011221e-08,
+        "stage2_block0": 1.7630082040087647e-08,
+        "stage2_last_masked_block": 1.2626204685950437e-08,
+        "bound": 1e-06
+      }
+    },
+    {
+      "d": 1536,
+      "n_vectors": 1000000,
+      "fraction_searched": 0.2,
+      "nlist": 1000,
+      "nprobe": 200,
+      "chosen_vectors": 200000,
+      "chosen_blocks": 25,
+      "queries": 10,
+      "warmup_queries": 3,
+      "steps_seconds": {
+        "client_encode_encrypt": {
+          "median": 0.011381647499973724,
+          "min": 0.010814334000031067,
+          "max": 0.01188069599999153
+        },
+        "server_deserialize_query": {
+          "median": 0.0105706765,
+          "min": 0.010482386,
+          "max": 0.010821484
+        },
+        "expansion": {
+          "median": 0.073470464,
+          "min": 0.073348459,
+          "max": 0.089494336
+        },
+        "leaf_handoff_d2d": {
+          "median": 1.03495e-05,
+          "min": 5.388e-06,
+          "max": 1.6694e-05
+        },
+        "stage1_gpu": {
+          "median": 0.002655337,
+          "min": 0.002642389,
+          "max": 0.003091831
+        },
+        "stage1_d2h": {
+          "median": 0.00015380100000000001,
+          "min": 0.000136774,
+          "max": 0.000235068
+        },
+        "client_stage1": {
+          "median": 0.013486356500010288,
+          "min": 0.013307093999969766,
+          "max": 0.013712687000008827
+        },
+        "stage2_gpu": {
+          "median": 0.033348996,
+          "min": 0.033303395,
+          "max": 0.040801202
+        },
+        "stage2_d2h": {
+          "median": 0.0041342725,
+          "min": 0.003124987,
+          "max": 0.004993896
+        },
+        "client_stage2": {
+          "median": 0.33584681499996805,
+          "min": 0.3277415769999834,
+          "max": 0.33928257399998074
+        }
+      },
+      "step_share": {
+        "client_encode_encrypt": 0.02346447375601243,
+        "server_deserialize_query": 0.0217925710068002,
+        "expansion": 0.1514671557324224,
+        "leaf_handoff_d2d": 2.133659218829359e-05,
+        "stage1_gpu": 0.00547425891989825,
+        "stage1_d2h": 0.00031707707765126267,
+        "client_stage1": 0.02780355463999826,
+        "stage2_gpu": 0.06875249311957429,
+        "stage2_d2h": 0.008523241347676411,
+        "client_stage2": 0.6923838378077782
+      },
+      "stage1_gpu_parts_median_seconds": {
+        "search_s": 0.002210564,
+        "relin_s": 0.000153697,
+        "rescale1_s": 7.1822e-05,
+        "mask_s": 0.00015091,
+        "rescale2_s": 6.88935e-05
+      },
+      "stage2_gpu_parts_median_seconds": {
+        "search_s": 0.032008649,
+        "relin_s": 0.0005985820000000001,
+        "rescale1_s": 0.0002018485,
+        "mask_s": 0.0004025125,
+        "rescale2_s": 0.0001411765
+      },
+      "stage2_gpu_per_block_median_seconds": 0.00133395984,
+      "total_seconds_sum_of_median_steps": 0.48505871549995205,
+      "total_seconds_median_of_queries": 0.4863678315000141,
+      "server_seconds_sum_of_median_steps": 0.12434389649999998,
+      "queries_per_second_single_stream": 2.061606086119483,
+      "queries_per_second_server_only": 8.04221218851703,
+      "bytes": {
+        "upload_query": 787423,
+        "download_stage1": 263251,
+        "download_stage2": 6581275,
+        "download_total": 6844526
+      },
+      "chosen_block_h2d_standin_for_m2_paging": {
+        "seconds_one_block_measured": 0.270512879,
+        "seconds_all_chosen_blocks_estimate": 6.762821975,
+        "note": "pageable host memory, cudaMemcpy of one block times the block count; not part of the search latency"
+      },
+      "memory": {
+        "block_bytes": 1207959550,
+        "full_collection_blocks": 123,
+        "full_collection_bytes": 148579024650,
+        "chosen_blocks_bytes": 30198988750,
+        "resident_blocks": 25,
+        "passes": 1,
+        "stage2_device_bytes": 31521636400,
+        "device_total_bytes": 42429251600,
+        "device_free_bytes_before_stage2": 36258578400,
+        "device_free_bytes_after_stage2": 4713218050,
+        "device_used_since_start_bytes": 37270585300,
+        "plan": "resident: centers block + query buffers + chosen blocks + masks + stage buffers + expansion pool; the whole collection is not resident",
+        "fits_whole_collection": false,
+        "fits_chosen_blocks": true
+      },
+      "max_abs_score_error": {
+        "stage1_center_scores": 1.3905001799291439e-08,
+        "stage2_block0": 2.4880977476243737e-08,
+        "stage2_last_masked_block": 1.5493395143229005e-08,
+        "bound": 1e-06
+      }
+    }
+  ]
+}

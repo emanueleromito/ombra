@@ -13,6 +13,9 @@
 //   4. the whole expansion tree (expand_tree with the CPU and the GPU Ops, the GPU one batched per
 //      level, in 3-node chunks, and node by node): every leaf's RNS words, moduli, level,
 //      noise-scale degree and scaling factor
+//   5. expand_tree_into: the last level written straight into one contiguous device buffer (leaf j
+//      at j * ct_words, pre-filled with a sentinel), batched and in 3-node chunks: every word of
+//      every leaf vs the OpenFHE leaves, plus the tree statistics
 // Stage 1 and 2 use synthetic pseudo-random words for the special-prime towers. Prints stage
 // verdicts, indices of mismatches and timings only: never data values. If out_dir is given, writes
 // cpu_<j>.bin and gpu_<j>.bin for the leaves. Exit code: 0 all exact, 1 mismatch, 2 error.
@@ -314,6 +317,60 @@ int main(int argc, char** argv) {
       ++g_failures;
     } else {
       std::printf("stage 4 expansion tree: PASS (%zu leaves)\n", d);
+    }
+
+    // Stage 5: the same tree with the last level written straight into one contiguous device
+    // buffer (leaf j at j * leaf_words), batched and in 3-node chunks. The buffer starts as a
+    // sentinel no reduced word can equal (all ones, above every modulus), so a leaf that is never
+    // written, or only partly, is caught. Every word of every leaf is compared with OpenFHE, and
+    // the stats and metadata with the returning variant.
+    {
+      const std::size_t leaf_words = gx.device().ct_bytes() / sizeof(u64);
+      const std::size_t total = d * leaf_words;
+      ombra::core::DeviceWords buffer(total);
+      const GpuExpansion::LeafBuffer sink{buffer.data(), leaf_words, d};
+      const GpuExpansion::LeafMeta meta = gx.leaf_meta();
+      std::size_t bad_words = 0, bad_other = 0;
+      for (const std::size_t batch : {default_batch, std::size_t{3}}) {
+        buffer.upload(std::vector<u64>(total, ~u64{0}));
+        gx.device().set_max_batch(batch);
+        ombra::core::ExpansionStats into_stats;
+        ombra::core::expand_tree_into(root, d, ring, gx, sink, &into_stats);
+        gx.synchronize();
+        gx.device().set_max_batch(default_batch);
+        if (into_stats.nodes != stats.nodes || into_stats.splits != stats.splits ||
+            into_stats.automorphisms != stats.automorphisms || into_stats.depth != stats.depth ||
+            into_stats.nodes_per_level != stats.nodes_per_level) {
+          std::printf("stage 5: statistics differ from expand_tree (max batch %zu)\n", batch);
+          ++bad_other;
+        }
+        const std::vector<u64> got = buffer.download(0, total);
+        for (std::size_t j = 0; j < d; ++j) {
+          const auto flat = ombra::core::flatten_ciphertexts({cpu_leaves[j]});
+          if (flat.words.size() != leaf_words || flat.level != meta.level ||
+              flat.noise_scale_deg != meta.noise_scale_deg ||
+              flat.scaling_factor != meta.scaling_factor) {
+            std::printf("stage 5: leaf %zu shape or metadata differs\n", j);
+            ++bad_other;
+            continue;
+          }
+          std::size_t bad = 0;
+          for (std::size_t i = 0; i < leaf_words; ++i) {
+            if (got[j * leaf_words + i] != flat.words[i]) ++bad;
+          }
+          if (bad != 0) {
+            std::printf("stage 5: leaf %zu: %zu words differ (max batch %zu)\n", j, bad, batch);
+            bad_words += bad;
+          }
+        }
+      }
+      if (bad_words != 0 || bad_other != 0) {
+        std::printf("stage 5 expansion into buffer: FAIL (%zu words, %zu other problems)\n",
+                    bad_words, bad_other);
+        ++g_failures;
+      } else {
+        std::printf("stage 5 expansion into buffer: PASS (%zu leaves)\n", d);
+      }
     }
 
     std::printf(

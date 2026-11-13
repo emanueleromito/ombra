@@ -24,6 +24,7 @@
 #include "ombra/core/file_envelope.hpp"
 #include "ombra/core/gpu_search.hpp"
 #include "ombra/core/security_floor_context.hpp"
+#include "ombra/core/seeded_ciphertext_prg.hpp"
 #include "openfhe.h"
 #include "scheme/ckksrns/ckksrns-ser.h"
 
@@ -133,9 +134,12 @@ struct EngineCore {
     const std::size_t col_words = 2 * c->nq * c->ring;
     if (sd.column_envelopes.size() * col_words != words) throw SearchError("loader: block shape");
     for (std::size_t j = 0; j < sd.column_envelopes.size(); ++j) {
-      const core::Envelope e =
-          core::read_envelope(sd.column_envelopes[j], core::EnvelopeKind::Ciphertext,
-                              c->spec.preset, store.openfhe_version());
+      const core::Envelope e = core::read_column_envelope(sd.column_envelopes[j], c->spec.preset,
+                                                          store.openfhe_version());
+      if (e.kind == core::EnvelopeKind::SeededCiphertext) {
+        load_seeded_column(*c, e.payload, dst + j * col_words);
+        continue;
+      }
       std::istringstream in(to_string_bytes(e.payload), std::ios::in | std::ios::binary);
       Ct ct;
       Serial::Deserialize(ct, in, SerType::BINARY);
@@ -147,6 +151,24 @@ struct EngineCore {
           f.noise_scale_deg != 1 || f.scaling_factor != c->column_scale)
         throw SearchError("loader: stored column has an unexpected level, scale or shape");
       std::copy(f.words.begin(), f.words.end(), dst + j * col_words);
+    }
+  }
+
+  // A seeded stored column (kind 4): c0' is read from the file, u is expanded from the seed, both
+  // written to dst as [component][tower][coeff], the layout core::flatten_ciphertexts gives a
+  // 2-component ciphertext. Checked against the collection like a kind-2 column.
+  void load_seeded_column(const Coll& c, const std::vector<std::uint8_t>& payload, u64* dst) {
+    const core::SeededPayload p = core::read_seeded_payload(payload);
+    if (p.key_tag != c.spec.key_tag)
+      throw KeyTagMismatch("stored column was made under another key than the collection's");
+    if (p.towers != c.nq || p.ring_dim != c.ring || p.moduli != c.moduli || p.level != 0 ||
+        p.noise_scale_deg != 1 || p.scaling_factor != c.column_scale || p.slots != c.batch)
+      throw SearchError("loader: stored column has an unexpected level, scale or shape");
+    std::copy(p.c0.begin(), p.c0.end(), dst);
+    u64* u = dst + p.c0.size();
+    for (std::uint32_t t = 0; t < p.towers; ++t) {
+      const std::vector<u64> w = core::expand_seed_tower(p.seed, t, p.moduli[t], p.ring_dim);
+      std::copy(w.begin(), w.end(), u + static_cast<std::size_t>(t) * p.ring_dim);
     }
   }
 
@@ -367,22 +389,23 @@ std::unique_ptr<SearchSession> SearchEngine::open_session(
   const std::size_t leaves = c->layout.leaves();
   const std::size_t leaf_words = 2 * c->nq * c->ring;
 
-  // Expand once; the leaves are copied into one contiguous device buffer (the column search kernel
-  // reads the query as D consecutive ciphertexts), the first d of them serve stage 1.
+  // Expand once; the last tree level writes every leaf straight into one contiguous device buffer
+  // (the column search kernel reads the query as D consecutive ciphertexts, leaf j at offset
+  // j * leaf_words), the first d of them serve stage 1. No second copy of the leaves exists.
   auto sess = std::unique_ptr<SearchSession::Impl>(new SearchSession::Impl);
   sess->eng = &e;
   sess->coll = c;
   sess->query = std::make_unique<cache::DeviceArray>(leaves * leaf_words);
   {
     core::GpuExpansion& gx = *c->gx;
+    const core::GpuExpansion::LeafMeta leaf =
+        gx.leaf_meta();  // what the leaves carry (the sample's)
+    if (leaf.level != 0 || leaf.noise_scale_deg != 1)
+      throw SearchError("expansion leaves are not at level 0 and noise degree 1");
     const core::GpuCt root = gx.upload(query);
-    std::vector<core::GpuCt> lv = core::expand_tree(root, leaves, c->ring, gx);
+    core::expand_tree_into(root, leaves, c->ring, gx,
+                           core::GpuExpansion::LeafBuffer{sess->query->get(), leaf_words, leaves});
     gx.synchronize();
-    for (std::size_t j = 0; j < leaves; ++j)
-      device_copy_words(sess->query->get() + j * leaf_words, gx.device().device_ptr(lv[j].dev),
-                        leaf_words);
-    device_sync();
-    lv.clear();
   }
   log_line("expand", leaves, ms_since(t0));
   return std::unique_ptr<SearchSession>(new SearchSession(std::move(sess)));
