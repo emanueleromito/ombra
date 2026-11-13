@@ -6,10 +6,10 @@ import subprocess
 import tomllib
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parent.parent
 EXPRESSION = "PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial"
-
-import pytest
 
 if not (ROOT / "ci" / "add_spdx.py").is_file() or not (ROOT / ".git").exists():
     # The Modal image carries neither ci/ nor .git (modal_upload.py), and pytest collects every
