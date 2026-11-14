@@ -26,6 +26,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates curl git build-essential cmake ninja-build libomp-dev pkg-config \
         python3 python3-venv python3-dev \
         protobuf-compiler libssl-dev openssl \
+        libgrpc++-dev libprotobuf-dev protobuf-compiler-grpc \
     && rm -rf /var/lib/apt/lists/* \
     && python3 -m venv /opt/venv
 

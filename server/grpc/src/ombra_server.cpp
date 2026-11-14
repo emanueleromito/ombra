@@ -12,7 +12,9 @@
 // ombra_server --version
 //
 // The ombra.v1 gRPC server over the storage engine and the GPU search engine, with TLS,
-// API keys and a REST admin port.
+// API keys and a REST admin port. A build with OMBRA_ENABLE_CUDA=OFF (tests and development only)
+// has no GPU: every call works except Search, which answers with an error that says so, and
+// /metrics reports gpu_available false.
 //
 // Safe defaults: the server refuses to start without TLS unless --insecure is given, and without an
 // API key file (D/api_keys.v1, made with --create-api-key) unless --no-auth is given. Both flags
@@ -96,6 +98,9 @@ ombra::server::Gauges collect_gauges(ombra::storage::Store& store,
     }
   }
   ombra::server::gpu_memory(&g.gpu_used_bytes, &g.gpu_total_bytes);
+#ifdef OMBRA_NO_GPU
+  g.gpu_available = false;
+#endif
   const auto cm = engine.cache_metrics();
   g.cache_hits = cm.hits;
   g.cache_misses = cm.misses;
@@ -278,6 +283,11 @@ int main(int argc, char** argv) {
       return 2;
     }
   }
+#ifdef OMBRA_NO_GPU
+  std::fprintf(stderr,
+               "WARNING: this server was built without GPU support (for tests and development): "
+               "Search fails, every other call works\n");
+#endif
   if (!tls) std::fprintf(stderr, "WARNING: --insecure: connections are NOT encrypted\n");
   if (no_auth) std::fprintf(stderr, "WARNING: --no-auth: anyone who can connect has full access\n");
   // The REST port is checked on the host it really binds (audit A-18), and defaults to loopback.

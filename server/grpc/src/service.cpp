@@ -93,6 +93,10 @@ Status classify_current() {
     return {Err::CollectionNotFound, e.what()};
   } catch (const search::InvalidQuery& e) {
     return {Err::InvalidArgument, e.what()};
+  } catch (const search::GpuUnavailable& e) {
+    // CPU-only build. No existing ErrorCode fits (the request is valid and the client can change
+    // nothing), so ERROR_INTERNAL with the fixed, safe message that says why.
+    return {Err::Internal, e.what()};
   } catch (const search::SearchError& e) {
     std::fprintf(stderr, "[ombra.server] internal error: %s\n", e.what());
     return {Err::Internal, "internal error"};
