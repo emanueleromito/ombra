@@ -1,6 +1,6 @@
 # Configuration
 
-The server is the `ombra_server` binary. In the Docker image a small entrypoint script builds its command line from environment variables; see [Docker and compose](../operations/docker.md). This page lists both.
+The server is the `ombra_server` binary. The tools `ombra_verify` and `ombra_backup` check and copy its data directory, see [Command line tools](cli.md). In the Docker image a small entrypoint script builds its command line from environment variables; see [Docker and compose](../operations/docker.md). This page lists both.
 
 ## Flags
 
