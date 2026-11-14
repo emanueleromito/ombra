@@ -8,6 +8,10 @@ Open pull requests against `dev`. `main` only takes release merges from `dev`. K
 
 Run `make help` for the commands. Before you open a pull request, run `make fmt`, `make lint` and `make test`. CI runs them again, plus the OpenFHE tests. Changes to `core/` also need the GPU tests (`make test-gpu`), which a maintainer runs.
 
+## CPU-only build
+
+`make build-cpu` builds without CUDA. If OpenFHE 1.6.1 and gRPC for C++ are installed, it also builds `ombra_server` without a GPU. That server is for tests and development, not for production: every call works except Search, which fails with the error "this server was built without GPU support". Key upload and collection load run the same checks as in the GPU build. `make test-openfhe-local` builds it and runs `tests/test_server_cpu.py` against it. `tests/server_harness.py` starts, stops and kills the binary for tests; set `OMBRA_SERVER_BIN` to use another binary.
+
 Report security problems privately, as [SECURITY.md](SECURITY.md) explains, not in a public issue.
 
 ## Security invariants
