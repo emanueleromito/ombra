@@ -25,7 +25,7 @@ from collections.abc import Sequence
 
 from ombra.keyfile import KeyFileError, backup_key_file, check_key_file
 
-PASSPHRASE_ENV = "OMBRA_KEY_PASSPHRASE"
+PASSPHRASE_ENV = "OMBRA_KEY_PASSPHRASE"  # noqa: S105 - the name of a variable, not a secret
 API_KEY_ENV = "OMBRA_API_KEY"
 
 
