@@ -18,6 +18,7 @@ Synthetic data only: the harness never reads what the server stores.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import signal
 import subprocess
@@ -104,7 +105,7 @@ class ServerProcess:
         ]
         log = open(self.log_path, "ab")
         try:
-            self._proc = subprocess.Popen(
+            self._proc = subprocess.Popen(  # noqa: S603 - our own binary, fixed arguments
                 args, stdout=subprocess.PIPE, stderr=log, text=True, bufsize=1
             )
         finally:
@@ -121,7 +122,9 @@ class ServerProcess:
                 )
             if time.monotonic() > deadline:
                 self.kill()
-                raise TimeoutError(f"server not ready after {timeout} s; log tail:\n{self.log_tail()}")
+                raise TimeoutError(
+                    f"server not ready after {timeout} s; log tail:\n{self.log_tail()}"
+                )
         return self.address
 
     def _read_stdout(self, proc: subprocess.Popen[str], ready: threading.Event) -> None:
@@ -179,10 +182,8 @@ class ServerProcess:
     def _close_clients(self) -> None:
         clients, self._clients = self._clients, []
         for c in clients:
-            try:
+            with contextlib.suppress(Exception):
                 c.close()
-            except Exception:
-                pass
 
     def log_tail(self, lines: int = 40) -> str:
         try:

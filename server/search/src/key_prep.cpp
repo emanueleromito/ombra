@@ -60,8 +60,8 @@ void prepare_collection_keys(CollKeys& c, storage::Store& store, const EngineCon
     const std::size_t scale_bits = hi > lo + 1 ? 1 : lo;
     if (towers.size() < 2 ||
         !cfg.preset_check(c.spec.preset, c.cc->GetRingDimension(),
-                            c.cc->GetEncodingParams()->GetBatchSize(), towers.size() - 1,
-                            towers[0]->GetModulus().GetMSB(), scale_bits))
+                          c.cc->GetEncodingParams()->GetBatchSize(), towers.size() - 1,
+                          towers[0]->GetModulus().GetMSB(), scale_bits))
       throw InvalidQuery("the uploaded context does not match the collection's preset");
   }
 
