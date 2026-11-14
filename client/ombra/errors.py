@@ -145,6 +145,11 @@ class BlobNotFoundError(NotFoundError):
     """ERROR_BLOB_NOT_FOUND."""
 
 
+class StorageFullError(ResourceExhaustedError):
+    """ERROR_STORAGE_FULL: the server's disk or quota is full. Nothing was stored; a repeat may
+    work once space is freed, so it is retryable (the server also sends RESOURCE_EXHAUSTED)."""
+
+
 # ---- classes kept for existing callers --------------------------------------------------------
 class CollectionError(OmbraError):
     """The server answered with an ombra.v1.Error (or a collection check failed). `code` is the
@@ -192,6 +197,7 @@ _PROTO_CLASSES: dict[int, type[OmbraError]] = {
     12: BlockNotFoundError,
     13: BlockMismatchError,
     14: BlobNotFoundError,
+    15: StorageFullError,
 }
 
 _combos: dict[tuple[type, type], type[OmbraError]] = {}

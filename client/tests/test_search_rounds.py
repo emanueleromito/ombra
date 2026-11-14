@@ -39,7 +39,7 @@ def _fake(level, matches_per_cluster, requests):
             for c in req.chosen.cluster_ids:
                 ids = [bytes([c, j]) for j in range(N)]
                 blk = np.full(N, GOOD).tobytes()
-                yield _Msg(kind="scores", scores=_ns(cluster_id=c, score_blocks=[blk], ids=ids))
+                yield _Msg(kind="scores", scores=_ns(cluster_id=c, score_blocks=[blk], ids=ids, block_sizes=[N]))
 
     pb = _ns(
         ListBlocksRequest=lambda **kw: None,

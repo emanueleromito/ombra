@@ -668,6 +668,7 @@ grpc::Status OmbraService::run_Search(
           for (const auto& b : results) {
             if (b.cluster != group[i]) continue;
             s->add_score_blocks(to_str(b.envelope));
+            s->add_block_sizes(static_cast<std::uint32_t>(b.ids.size()));
             for (const auto& id : b.ids) s->add_ids(id);
             ++blocks;
             bytes += b.envelope.size();

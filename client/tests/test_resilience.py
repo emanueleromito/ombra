@@ -489,7 +489,7 @@ def _fake_search(break_after):
             for c in req.chosen.cluster_ids:
                 ids = [bytes([c, j]) for j in range(N)]
                 blk = np.full(N, GOOD).tobytes()
-                yield _Msg(kind="scores", scores=_ns(cluster_id=c, score_blocks=[blk], ids=ids))
+                yield _Msg(kind="scores", scores=_ns(cluster_id=c, score_blocks=[blk], ids=ids, block_sizes=[N]))
 
     def enc(ext):
         encrypted.append(1)

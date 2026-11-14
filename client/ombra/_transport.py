@@ -13,9 +13,10 @@ from ombra._proto import load_stubs
 from ombra.errors import OmbraError, from_rpc_error
 from ombra.retry import Replayable, RetryPolicy, call_with_retry
 
-# Largest message the client sends: one InsertBlock carries d (+ filter) column ciphertexts of
-# about 0.8 MB each at the biggest preset (d = 768: ~600 MB), so the send limit stays high.
-MAX_SEND_MESSAGE = 1 << 30
+# Largest message the client sends. Every stream is sent in parts (Insert, ReplaceBlock: one column
+# of about 0.8 MB at the biggest preset; PutBlob and UploadKeys: chunks of at most 4 MiB; Insert
+# header: at most one block of ids, about 2 MB), so this equals the server's receive limit.
+MAX_SEND_MESSAGE = 16 << 20
 # Largest message the client accepts from a server. Server answers are one ciphertext or blob chunk
 # (<= 4 MiB), one SearchScores (a few blocks and <= 100,000 ids of 256 bytes) or a ListBlocks
 # catalog (~50 bytes a block); 64 MiB covers all of them (audit A-23).
@@ -45,9 +46,11 @@ def may_retry(rpc: str) -> bool:
 
     A call is listed only if doing it twice leaves the same state: reads, Search, Delete (an id
     that is already gone is ignored), PutBlob (atomic replace), DeleteBlobs and UploadKeys (atomic
-    replace with the same keys). Insert and ReplaceBlock are NOT listed: a repeated Insert whose
-    first try reached the server would store the vectors twice. Add "Insert" here once the server
-    makes Insert idempotent (and send it as a `Replayable`, as the call site already does).
+    replace with the same keys) and Insert: the server treats a block whose ids are all stored in
+    one block with byte-identical columns as a success that stores nothing, so a repeat after a
+    lost answer neither duplicates nor fails (the call site sends the same encrypted bytes, as a
+    `Replayable`). ReplaceBlock is NOT listed: after a lost answer the old blocks are gone, so a
+    repeat is refused as ERROR_BLOCK_NOT_FOUND although the first try worked.
     """
     return rpc in {
         "GetCollection",
@@ -56,6 +59,7 @@ def may_retry(rpc: str) -> bool:
         "GetBlock",
         "GetBlob",
         "Search",
+        "Insert",
         "Delete",
         "PutBlob",
         "DeleteBlobs",

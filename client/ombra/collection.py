@@ -38,6 +38,7 @@ import numpy as np
 
 from ombra import _seeding, presets
 from ombra import query as oq
+from ombra._proto import insert_requests
 from ombra._decrypt import ExpectedShapes, check_ciphertext, decrypt_values
 from ombra.blobstore import KIND_DOCUMENT, KIND_RECORD, BlobStore, BlobStoreError, GrpcBlobStore
 from ombra.clustering import assign, cluster_vectors
@@ -582,7 +583,9 @@ class Collection:
         self._insert(blocks)
 
     def _insert(self, blocks: list[Any]) -> int:
-        r = self.stub.Insert(Replayable(lambda: iter(blocks)))
+        # The blocks are encrypted once and kept: a retry after a lost answer sends the same bytes,
+        # and the server then recognizes the stored block and stores nothing twice.
+        r = self.stub.Insert(Replayable(lambda: insert_requests(self.pb, blocks)))
         _check(r.error)
         return r.inserted
 

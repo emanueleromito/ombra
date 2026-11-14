@@ -184,6 +184,9 @@ message SearchScores {                // round 2 out: filtered scores and the id
   repeated bytes score_blocks = 2;    // each: slot i holds score + lambda * c
   repeated bytes ids = 3;             // slot order within the cluster, tombstoned slots included
   bool last = 4;                      // last message of the stream
+  repeated uint32 block_sizes = 5;    // occupied slots of each score block, in block order;
+                                      // they sum to the number of ids, so an answer
+                                      // describes itself (blocks may change between answers)
 }
 message SearchRequest {
   oneof step { SearchStart start = 1; SearchChosen chosen = 2; }
