@@ -42,11 +42,13 @@ from ombra._decrypt import ExpectedShapes, check_ciphertext, decrypt_values
 from ombra.blobstore import KIND_DOCUMENT, KIND_RECORD, BlobStore, BlobStoreError, GrpcBlobStore
 from ombra.clustering import assign, cluster_vectors
 from ombra.documents import DocumentCodec
+from ombra.errors import CollectionError, collection_error
 from ombra.file_format import Kind, read_column_envelope, write_envelope
 from ombra.keyfile import DEFAULT_SCRYPT, KeyMaterial, export_key_file, import_key_file
 from ombra.params import make_ckks_params
 from ombra.probe import FIELDS_KEY, STATS_ID, ClusterStats, check_user_id
 from ombra.repack import DEFAULT_THRESHOLD, BlockStat, plan_repack
+from ombra.retry import Replayable, retrying
 
 KEY_CHUNK = 4_000_000  # below LIMIT_MAX_CHUNK_BYTES (4 MiB)
 API_VERSION = 1
@@ -58,18 +60,31 @@ _LEVELS = {
 }
 
 
-class CollectionError(Exception):
-    """The server answered with an ombra.v1.Error."""
-
-    def __init__(self, code: int, message: str) -> None:
-        super().__init__(f"error code {code}: {message}")
-        self.code = code
-        self.message = message
-
-
 def _check(err: Any) -> None:
     if err.code != 0:
-        raise CollectionError(err.code, err.message)
+        raise collection_error(err.code, err.message)
+
+
+def _create_on_server(pb: Any, stub: Any, spec: Any) -> None:
+    """CreateCollection, repeated after a retryable transport error. If an earlier try reached the
+    server but its answer was lost, the repeat gets ERROR_COLLECTION_EXISTS: that counts as success
+    only if the stored spec is identical to ours (its key tag is a hash of our public key). An
+    EXISTS on the first try is always an error."""
+    tries = 0
+
+    def attempt() -> Any:
+        nonlocal tries
+        tries += 1
+        return stub.CreateCollection(pb.CreateCollectionRequest(spec=spec))
+
+    r = retrying(stub, "CreateCollection", attempt)
+    if r.WhichOneof("result") != "error":
+        return
+    if tries > 1 and r.error.code == pb.ERROR_COLLECTION_EXISTS:
+        got = stub.GetCollection(pb.GetCollectionRequest(name=spec.name))
+        if got.WhichOneof("result") != "error" and got.info.spec == spec:
+            return
+    raise collection_error(r.error.code, r.error.message)
 
 
 def check_server_spec(derived: presets.Derived, cards: Sequence[int], cluster_count: int) -> None:
@@ -426,9 +441,7 @@ class Collection:
         )
         for i, c in enumerate(cards):
             spec.filter_fields.add(field_id=i, cardinality=c)
-        r = stub.CreateCollection(pb.CreateCollectionRequest(spec=spec))
-        if r.WhichOneof("result") == "error":
-            raise CollectionError(r.error.code, r.error.message)
+        _create_on_server(pb, stub, spec)
         try:
             self._upload_keys()
             self._insert_centers()
@@ -454,7 +467,7 @@ class Collection:
         """
         r = stub.GetCollection(pb.GetCollectionRequest(name=name))
         if r.WhichOneof("result") == "error":
-            raise CollectionError(r.error.code, r.error.message)
+            raise collection_error(r.error.code, r.error.message)
         spec = r.info.spec
         derived = presets.derive(spec.preset, spec.dimension)
         cards = tuple(f.cardinality for f in sorted(spec.filter_fields, key=lambda f: f.field_id))
@@ -528,7 +541,7 @@ class Collection:
                         first = False
                     yield c
 
-        _check(self.stub.UploadKeys(chunks()).error)
+        _check(self.stub.UploadKeys(Replayable(chunks)).error)
 
     def _insert_centers(self) -> None:
         pb, d = self.pb, self.derived.dimension
@@ -569,7 +582,7 @@ class Collection:
         self._insert(blocks)
 
     def _insert(self, blocks: list[Any]) -> int:
-        r = self.stub.Insert(iter(blocks))
+        r = self.stub.Insert(Replayable(lambda: iter(blocks)))
         _check(r.error)
         return r.inserted
 
@@ -689,7 +702,7 @@ class Collection:
         for m in stream:
             part = m.WhichOneof("part")
             if part == "error":
-                raise CollectionError(m.error.code, m.error.message)
+                raise collection_error(m.error.code, m.error.message)
             if part == "header":
                 header = m.header
             else:
@@ -749,7 +762,7 @@ class Collection:
                 for c in cols:
                     yield pb.ReplaceBlockRequest(api_version=API_VERSION, column=c)
 
-            _check(self.stub.ReplaceBlock(msgs()).error)
+            _check(self.stub.ReplaceBlock(Replayable(msgs)).error)
             n_before += len(group)
             n_after += 1
         return RepackReport(len(groups), n_before, n_after, before, after)
@@ -815,7 +828,7 @@ class Collection:
                     if part == "error":
                         if r.error.code == pb.ERROR_BLOB_NOT_FOUND:
                             break
-                        raise CollectionError(r.error.code, r.error.message)
+                        raise collection_error(r.error.code, r.error.message)
                     if part == "size":
                         size = r.size
                     else:
@@ -832,7 +845,7 @@ class Collection:
                         chunk = data[o : o + pb.LIMIT_MAX_CHUNK_BYTES]
                         yield pb.PutBlobRequest(api_version=API_VERSION, data=chunk)
 
-                _check(self.stub.PutBlob(msgs()).error)
+                _check(self.stub.PutBlob(Replayable(msgs)).error)
 
 
 def _fields(fields: np.ndarray | None, n: int, cards: Sequence[int]) -> np.ndarray:
