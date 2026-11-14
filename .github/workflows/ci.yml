@@ -86,3 +86,29 @@ jobs:
           persist-credentials: false
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - run: make test-openfhe-local
+
+  upgrade:
+    name: Upgrade tests
+    needs: image
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ${{ needs.image.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      # Full history and tags: the tests look for the highest v* tag below HEAD. With no tag they
+      # skip (the first release is v0.1.0). The previous release's CPU server is built on every
+      # run; no actions/cache is used anywhere in this repository yet, so none is added here.
+      # OMBRA_UPGRADE_CACHE is where a cache would go.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          fetch-tags: true
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - run: make test-upgrade

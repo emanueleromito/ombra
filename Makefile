@@ -11,7 +11,7 @@ GPU         ?= a10
 CMD         ?= nvidia-smi
 
 .DEFAULT_GOAL := help
-.PHONY: help venv build build-cpu test test-gpu test-openfhe test-openfhe-local bench gpu-info results-pull fmt lint clean prebuild on-gpu
+.PHONY: help venv build build-cpu test test-gpu test-openfhe test-openfhe-local test-upgrade bench gpu-info results-pull fmt lint clean prebuild on-gpu
 
 help: ## List commands
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-14s %s\n", $$1, $$2}'
@@ -47,7 +47,10 @@ test-openfhe-local: build-cpu ## Run tests marked openfhe here, no Modal (needs 
 		-DPython_EXECUTABLE=$$($(PYTHON) -c 'import sys; print(sys.executable)')
 	cmake --build $(BUILD_DIR)-native -j
 	cp $(BUILD_DIR)-native/_native*.so client/ombra/
-	OMBRA_SERVER_BIN=$(CURDIR)/$(BUILD_DIR)-cpu/server/grpc/ombra_server $(PYTHON) -m pytest -m openfhe -v
+	OMBRA_SERVER_BIN=$(CURDIR)/$(BUILD_DIR)-cpu/server/grpc/ombra_server $(PYTHON) -m pytest -m "openfhe and not upgrade" -v
+
+test-upgrade: build-cpu ## Client/server one release apart and old data dirs (CPU; skips with no v* tag; OMBRA_PREV_REF=<ref> to try)
+	OMBRA_SERVER_BIN=$(CURDIR)/$(BUILD_DIR)-cpu/server/grpc/ombra_server $(PYTHON) -m pytest -m upgrade -v
 
 bench: ## Run benchmarks on Modal (A100); TASK=<name> to pick one
 	modal run modal_app.py::bench --task $(TASK)

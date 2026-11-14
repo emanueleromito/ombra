@@ -24,7 +24,10 @@ Versions: `ombra`, `langchain-ombra`, the CMake project and `ombra_server --vers
    to `CHANGELOG.md`.
 2. Run the workflow by hand first: Actions, Release, Run workflow, with `dry_run` on. It publishes
    to TestPyPI and pushes the images as `dryrun-<commit>`.
-3. Tag the release commit on `main` with `v<version>` and push the tag. The workflow refuses a tag
+3. Freeze a data-dir fixture of this version: run `python tests/upgrade/make_fixture.py
+   tests/fixtures/datadir-<version>` at the release commit and commit the result, if it is small
+   enough for git (under 5 MB). The upgrade tests then check that every later version opens it.
+4. Tag the release commit on `main` with `v<version>` and push the tag. The workflow refuses a tag
    that does not match the version in `client/pyproject.toml`, a tag whose commit is not on `main`,
    and any real release (`dry_run` off) that is not started from a `v*` tag. Both the image push
    and the PyPI upload then wait for your approval, in that order.

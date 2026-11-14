@@ -17,6 +17,7 @@ ignore = ["S101"]  # assert is fine in tests
 # Experiment scripts: timing closures run inside their loop (B023), fixed commands (S603, S607),
 # and the rerun command in a docstring may be long (E501).
 "docs/research/**/*.py" = ["B023", "S603", "S607", "E501", "UP031", "B905"]
+"tests/upgrade/*.py" = ["S603", "S607"]  # git, cmake and our own scripts with fixed arguments
 "examples/*.py" = ["S106"]  # the examples use a placeholder passphrase
 
 [tool.pytest.ini_options]
@@ -25,6 +26,7 @@ pythonpath = ["client", "integrations/langchain-ombra"]
 markers = [
     "openfhe: needs openfhe-python; runs in the pinned image on Modal via `make test-openfhe`",
     "gpu: needs a CUDA GPU; runs on Modal via `make test-gpu`",
+    "upgrade: client/server one version apart and old data dirs; needs the previous release (`make test-upgrade`)",
     "slow: large sizes; run via `make bench`, not in normal tests",
 ]
 addopts = "-ra"
