@@ -29,9 +29,11 @@ from typing import Any
 import numpy as np
 
 from ombra.blobstore import KIND_RECORD
+from ombra.errors import CollectionError, OmbraError, collection_error, from_rpc_error
 from ombra.file_format import Kind, read_envelope
 from ombra.presets import FILTER_LAMBDA
 from ombra.probe import FIELDS_KEY, ProbePlanner, decoy_round_sizes, strict_halves
+from ombra.retry import retrying
 from ombra.topk import ParallelTopk
 
 API_VERSION = 1
@@ -57,33 +59,82 @@ class SearchResult:
 
 
 class _Stream:
-    """One Search stream; requests come from a queue so rounds can follow each other."""
+    """One Search stream; requests come from a queue so rounds can follow each other.
+
+    If the stream breaks with a retryable error, a new stream is opened and every request sent so
+    far is sent again, unchanged and in the same order: the same query ciphertext and the same
+    cluster choices (real clusters and decoys). Two different decoy sets for one query would let
+    the server intersect them and find the real clusters, so nothing is ever drawn a second time.
+    The answers already read are skipped on the new stream.
+    """
 
     def __init__(self, stub: Any, first: Any) -> None:
+        self._stub = stub
+        self._sent: list[Any] = [first]
+        self._got = 0  # answers already handed to the caller
+        self._broken = False
         self._q: queue.Queue = queue.Queue()
-        self._q.put(first)
-        self._call = stub.Search(self._requests())
+        self._open()
 
-    def _requests(self):
+    def _open(self) -> None:
+        old = getattr(self, "_q", None)
+        if old is not None:  # let the old request generator end
+            old.put(None)
+        self._q = queue.Queue()
+        for request in self._sent:
+            self._q.put(request)
+        self._call = self._stub.Search(self._requests(self._q))
+
+    @staticmethod
+    def _requests(q: queue.Queue):
         while True:
-            item = self._q.get()
+            item = q.get()
             if item is None:
                 return
             yield item
 
     def send(self, request: Any) -> None:
+        self._sent.append(request)
         self._q.put(request)
 
-    def next(self) -> Any:
-        from ombra.collection import CollectionError
-
+    def _read(self) -> Any:
         try:
-            resp = next(self._call)
+            return next(self._call)
         except StopIteration:
             raise CollectionError(0, "search stream ended early") from None
+        except OmbraError:
+            raise
+        except Exception as exc:
+            mapped = from_rpc_error(exc, "Search")
+            if mapped is None:
+                raise
+            raise mapped from exc
+
+    def _reopen(self) -> None:
+        cancel = getattr(self._call, "cancel", None)
+        if cancel is not None:
+            cancel()
+        self._open()
+        for _ in range(self._got):  # answers the caller already has
+            self._read()
+        self._broken = False
+
+    def _read_next(self) -> Any:
+        try:
+            if self._broken:
+                self._reopen()
+            return self._read()
+        except OmbraError as err:
+            if err.retryable:
+                self._broken = True
+            raise
+
+    def next(self) -> Any:
+        resp = retrying(self._stub, "Search", self._read_next)
+        self._got += 1
         if resp.WhichOneof("step") == "error":
             self._q.put(None)
-            raise CollectionError(resp.error.code, resp.error.message)
+            raise collection_error(resp.error.code, resp.error.message)
         return resp
 
     def close(self) -> None:

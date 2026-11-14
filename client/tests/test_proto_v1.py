@@ -7,11 +7,9 @@ the protobuf C++ library, which arrives with the server. Synthetic data only.
 
 from __future__ import annotations
 
-import importlib.util
 import re
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -31,15 +29,12 @@ def _protoc(out: Path, *flags: str) -> None:
 
 
 @pytest.fixture(scope="module")
-def pb(tmp_path_factory: pytest.TempPathFactory):
-    out = tmp_path_factory.mktemp("gen")
-    _protoc(out, "--python_out=OUT")
-    path = out / "ombra" / "v1" / "ombra_pb2.py"
-    spec = importlib.util.spec_from_file_location("ombra_v1_pb2", path)
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = mod
-    spec.loader.exec_module(mod)
-    return mod
+def pb():
+    """The messages module the client uses (built from the packaged copy of the proto, which a
+    test keeps equal to proto/). One process can hold one copy of ombra.v1 in the protobuf pool."""
+    from ombra._proto import load_stubs
+
+    return load_stubs(grpc_module=False)[0]
 
 
 def test_parses_with_descriptor_set(tmp_path: Path) -> None:

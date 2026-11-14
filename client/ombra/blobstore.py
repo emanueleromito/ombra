@@ -12,16 +12,15 @@ from __future__ import annotations
 from collections.abc import Iterable, Iterator
 from typing import Any, Protocol
 
+from ombra.errors import BlobStoreError, from_proto_error
+from ombra.retry import Replayable
+
 KIND_RECORD = 1  # BlobKind.BLOB_KIND_RECORD
 KIND_DOCUMENT = 2  # BlobKind.BLOB_KIND_DOCUMENT
 BUCKET_SIZES = (16384, 262144, 2097152, 16777216)  # LIMIT_BLOB_BUCKET_0..3
 API_VERSION = 1
 CHUNK_BYTES = 1 << 20
 MAX_CHUNK_BYTES = 4194304  # LIMIT_MAX_CHUNK_BYTES
-
-
-class BlobStoreError(RuntimeError):
-    """A blob store operation failed. The message carries no ids or contents."""
 
 
 class BlobStore(Protocol):
@@ -70,7 +69,9 @@ class GrpcBlobStore:
     @staticmethod
     def _check(error: Any) -> None:
         if getattr(error, "code", 0):
-            raise BlobStoreError(f"server error code {error.code}")
+            raise from_proto_error(
+                error.code, error.message, BlobStoreError, f"server error code {error.code}"
+            )
 
     def put(self, collection: str, kind: int, blob_id: bytes, data: bytes) -> None:
         pb = self._pb
@@ -83,7 +84,7 @@ class GrpcBlobStore:
             for i in range(0, len(data), CHUNK_BYTES):
                 yield pb.PutBlobRequest(api_version=API_VERSION, data=data[i : i + CHUNK_BYTES])
 
-        resp = self._stub.PutBlob(requests())
+        resp = self._stub.PutBlob(Replayable(requests))
         if resp.HasField("error"):
             self._check(resp.error)
 

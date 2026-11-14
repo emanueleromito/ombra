@@ -10,6 +10,7 @@
 #include <cerrno>
 #include <chrono>
 #include <cstdio>
+#include <exception>
 #include <map>
 #include <set>
 #include <stdexcept>
@@ -58,18 +59,19 @@ void log_line(const char* what, std::size_t a, std::size_t b, double ms) {
   std::fprintf(stderr, "[ombra.storage] %s count=%zu bytes=%zu ms=%.2f\n", what, a, b, ms);
 }
 
-double ms_since(std::chrono::steady_clock::time_point t0) {
-  return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+// For the directory fsync after a committed change. The catalog commit is the point of no return,
+// so a failure here (a full disk, say) must not turn an applied write into an error: the unlinks
+// are only housekeeping, and recovery sweeps any file that was not removed.
+void fsync_best_effort(const std::string& path) {
+  try {
+    fsync_path(path);
+  } catch (const std::exception&) {
+    std::fprintf(stderr, "[ombra.storage] directory sync failed after a committed change\n");
+  }
 }
 
-// "s" + 16 hex digits + ".oseg", exactly what hex_name('s', id, ".oseg") makes.
-bool is_segment_name(const std::string& n) {
-  if (n.size() != 22 || n[0] != 's' || n.compare(17, 5, ".oseg") != 0) return false;
-  for (std::size_t i = 1; i <= 16; ++i)
-    if (!std::isxdigit(static_cast<unsigned char>(n[i])) ||
-        std::isupper(static_cast<unsigned char>(n[i])))
-      return false;
-  return true;
+double ms_since(std::chrono::steady_clock::time_point t0) {
+  return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
 }
 
 }  // namespace
@@ -135,7 +137,15 @@ bool Store::drop_collection(const std::string& name) {
   maybe_crash(CrashPoint::DropBeforeCatalog);
   if (!catalog_->drop_collection(name, &segs, &keys, &blobs)) return false;
   maybe_crash(CrashPoint::DropAfterCatalog);
-  wal_->reset();  // everything in the log is in the (durable) catalog or belongs to this collection
+  // Past the point of no return: do all the cleanup even if the log checkpoint fails, then report
+  // that failure. Files left behind are swept at the next start.
+  std::exception_ptr reset_error;
+  try {
+    wal_->reset();  // everything in the log is in the (durable) catalog or belongs to this
+                    // collection
+  } catch (...) {
+    reset_error = std::current_exception();
+  }
   maybe_crash(CrashPoint::DropAfterWalReset);
   bool first = true;
   for (const auto& f : segs) {
@@ -145,9 +155,10 @@ bool Store::drop_collection(const std::string& name) {
   }
   for (const auto& f : keys) ::unlink((root_ + "/keys/" + f).c_str());
   for (const auto& f : blobs) ::unlink((blob_dir() + "/" + f).c_str());
-  fsync_path(blob_dir());
-  fsync_path(segments_dir());
-  fsync_path(root_ + "/keys");
+  fsync_best_effort(blob_dir());
+  fsync_best_effort(segments_dir());
+  fsync_best_effort(root_ + "/keys");
+  if (reset_error) std::rethrow_exception(reset_error);
   log_line("drop", segs.size() + keys.size() + blobs.size(), 0, ms_since(t0));
   return true;
 }
@@ -179,7 +190,7 @@ void Store::unpin(const std::vector<std::string>& files) const {
       any = true;
     }
   }
-  if (any) fsync_path(segments_dir());
+  if (any) fsync_best_effort(segments_dir());  // runs in a destructor: must not throw
 }
 
 Snapshot Store::snapshot(const std::string& collection) const {
@@ -216,7 +227,7 @@ std::size_t Store::drop_dead_blocks(const std::string& collection) {
   catalog_->drop_segments(collection, dead);
   maybe_crash(CrashPoint::CompactAfterCatalog);
   for (const auto& f : dead) unlink_or_defer(f);
-  fsync_path(segments_dir());
+  fsync_best_effort(segments_dir());
   maybe_crash(CrashPoint::CompactAfterUnlink);
   log_line("drop_dead_blocks", dead.size(), 0, ms_since(t0));
   return dead.size();
@@ -280,7 +291,7 @@ std::string Store::replace_segments(const std::string& collection,
     if (first) maybe_crash(CrashPoint::ReplaceAfterFirstUnlink);  // some old files gone
     first = false;
   }
-  fsync_path(segments_dir());
+  fsync_best_effort(segments_dir());
   maybe_crash(CrashPoint::ReplaceAfterUnlink);
   log_line("replace_block", neu.ids.size(), bytes, ms_since(t0));
   return name;
@@ -335,7 +346,14 @@ std::string Store::insert(const std::string& collection, std::uint32_t cluster,
   commit.type = WalType::InsertCommit;
   commit.collection = collection;
   commit.segment = name;
-  wal_->append(commit);
+  // The catalog already has the segment, so the insert is applied and acknowledged. The commit
+  // record only saves recovery a step (it logs it itself when it is missing), so a failure to
+  // append it (a full disk) must not fail the call: a retry would meet "duplicate id".
+  try {
+    wal_->append(commit);
+  } catch (const std::exception&) {
+    std::fprintf(stderr, "[ombra.storage] insert: commit record not written\n");
+  }
   maybe_crash(CrashPoint::InsertAfterCommit);
   log_line("insert", ids.size(), bytes, ms_since(t0));
   return name;
@@ -375,8 +393,22 @@ void Store::put_key_file(const std::string& collection, const std::string& kind,
   for (auto& [kk, f] : catalog_->key_files(collection))
     if (kk == kind) old = f;
   const std::string file = hex_name('k', catalog_->next_segment_id(), ".env");
-  write_file_durable(root_ + "/keys/" + file, envelope);
-  catalog_->put_key_file(collection, kind, file);
+  try {
+    write_file_durable(root_ + "/keys/" + file, envelope);
+    catalog_->put_key_file(collection, kind, file);
+  } catch (...) {
+    bool registered = false;
+    try {
+      for (auto& [kk, f] : catalog_->key_files(collection))
+        if (f == file) registered = true;
+    } catch (...) {
+    }
+    if (!registered) {
+      ::unlink((root_ + "/keys/" + file).c_str());
+      ::unlink((root_ + "/keys/" + file + ".tmp").c_str());
+    }
+    throw;
+  }
   if (!old.empty()) ::unlink((root_ + "/keys/" + old).c_str());
 }
 
@@ -403,8 +435,8 @@ void Store::put_key_files(
   try {
     for (const auto& [kind, envelope] : files) {
       const std::string file = hex_name('k', catalog_->next_segment_id(), ".env");
+      written.push_back(file);  // before the write: a failure after the rename leaves the file
       write_file_durable(key_dir() + "/" + file, envelope);  // temp + fsync + rename
-      written.push_back(file);
       rows.emplace_back(kind, file);
     }
     catalog_->put_key_files(collection, rows);
@@ -446,7 +478,7 @@ void Store::put_blob(const std::string& collection, std::uint32_t kind, const st
   }
   maybe_crash(CrashPoint::BlobAfterCatalog);
   if (had) ::unlink((blob_dir() + "/" + old).c_str());
-  fsync_path(blob_dir());
+  fsync_best_effort(blob_dir());
   log_line("put_blob", 1, payload.size(), ms_since(t0));
 }
 
@@ -476,7 +508,7 @@ std::size_t Store::delete_blobs(const std::string& collection, std::uint32_t kin
   const auto files = catalog_->delete_blobs(collection, kind, ids);
   maybe_crash(CrashPoint::BlobDeleteAfterCatalog);
   for (const auto& f : files) ::unlink((blob_dir() + "/" + f).c_str());
-  fsync_path(blob_dir());
+  fsync_best_effort(blob_dir());
   log_line("delete_blobs", files.size(), 0, ms_since(t0));
   return files.size();
 }
@@ -522,7 +554,7 @@ void Store::recover() {
 
   // Names from the log reach unlink(): accept only the names this store generates (audit A-56).
   for (const auto& r : recs)
-    if (r.type != WalType::Delete && !is_segment_name(r.segment))
+    if (r.type != WalType::Delete && !is_valid_segment_name(r.segment))
       throw std::runtime_error("wal: record with an invalid segment name; refusing to start");
 
   for (const auto& r : recs) {

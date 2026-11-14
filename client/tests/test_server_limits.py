@@ -8,6 +8,7 @@ from ombra import _transport, presets
 from ombra.blobstore import BUCKET_SIZES, BlobStoreError, GrpcBlobStore
 from ombra.collection import CollectionError, check_server_spec
 from ombra.presets import ParamsError
+from ombra.retry import RetryPolicy
 
 
 def _ns(**kw):
@@ -61,7 +62,9 @@ def test_deadlines_are_set_and_can_be_overridden():
         Search=lambda it, **kw: seen.update(search=kw),
         GetCollection=lambda r, **kw: seen.update(get=kw),
     )
-    stub = _transport._DeadlineStub(inner, 5.0, 50.0)
+    stub = _transport.ResilientStub(
+        inner, _transport.default_deadlines(5.0, 50.0), RetryPolicy.never()
+    )
     stub.Search(iter(()))
     stub.GetCollection(None)
     assert seen == {"search": {"timeout": 50.0}, "get": {"timeout": 5.0}}

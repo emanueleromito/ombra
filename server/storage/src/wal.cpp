@@ -10,7 +10,9 @@
 #include <cstring>
 #include <stdexcept>
 
+#include "ombra/storage/failpoint.hpp"
 #include "ombra/storage/fsutil.hpp"
+#include "ombra/storage/segment.hpp"
 
 namespace ombra::storage {
 
@@ -19,7 +21,7 @@ constexpr std::size_t kHeader = 6;
 constexpr std::size_t kMaxRecord = 64u << 20;  // sanity bound before allocating
 
 [[noreturn]] void fail(const std::string& what, const std::string& path) {
-  throw std::runtime_error("wal: " + what + " '" + path + "': " + std::strerror(errno));
+  throw_io_error("wal: " + what, path);
 }
 
 void put_str(std::vector<std::uint8_t>& o, const std::string& s) {
@@ -76,6 +78,15 @@ bool decode_body(const std::uint8_t* p, std::size_t n, WalRecord* r) {
 
 void write_all(int fd, const std::uint8_t* d, std::size_t n, const std::string& path) {
   while (n > 0) {
+    if (fs_fault_hit()) {  // a full disk takes part of the frame, then refuses
+      const int saved = errno;
+      if (n > 1) {
+        ssize_t part = ::write(fd, d, n / 2);
+        (void)part;
+      }
+      errno = saved;
+      fail("write", path);
+    }
     ssize_t w = ::write(fd, d, n);
     if (w < 0) {
       if (errno == EINTR) continue;
@@ -176,7 +187,7 @@ void Wal::append(const WalRecord& r) {
   // back to where it was (audit A-52), then report the original error.
   try {
     write_all(fd_, frame.data(), frame.size(), path_);
-    if (::fsync(fd_) != 0) fail("fsync", path_);
+    if (fs_fault_hit() || ::fsync(fd_) != 0) fail("fsync", path_);
   } catch (...) {
     if (::ftruncate(fd_, end) != 0) {
       std::fprintf(stderr, "[ombra.storage] wal: cannot truncate after a failed append\n");
@@ -187,7 +198,43 @@ void Wal::append(const WalRecord& r) {
 
 void Wal::reset() {
   if (::ftruncate(fd_, static_cast<off_t>(kHeader)) != 0) fail("truncate", path_);
-  if (::fsync(fd_) != 0) fail("fsync", path_);
+  if (fs_fault_hit() || ::fsync(fd_) != 0) fail("fsync", path_);
+}
+
+WalScan scan_wal_file(const std::string& path) {
+  WalScan sc;
+  const auto b = read_file(path);
+  if (b.size() < kHeader) {
+    sc.header_ok = false;
+    return sc;
+  }
+  if (std::memcmp(b.data(), "OWAL", 4) != 0) {
+    sc.bad_magic = true;
+    return sc;
+  }
+  sc.version = static_cast<std::uint16_t>(get_le(b.data() + 4, 2));
+  if (sc.version != kWalVersion) return sc;
+  std::size_t pos = kHeader;
+  while (b.size() - pos >= 8) {
+    auto len = get_le(b.data() + pos, 4);
+    auto crc = static_cast<std::uint32_t>(get_le(b.data() + pos + 4, 4));
+    if (len > kMaxRecord || b.size() - pos - 8 < len) break;
+    const std::uint8_t* body = b.data() + pos + 8;
+    if (crc32(body, len) != crc) break;
+    WalRecord r;
+    if (!decode_body(body, len, &r)) break;
+    ++sc.records;
+    if (r.type != WalType::Delete && !is_valid_segment_name(r.segment)) ++sc.bad_names;
+    pos += 8 + len;
+  }
+  sc.tail_bytes = b.size() - pos;
+  if (pos < b.size())
+    for (std::size_t q = pos + 1; q + 8 < b.size(); ++q)
+      if (valid_frame_at(b, q)) {
+        sc.mid_corruption = true;
+        break;
+      }
+  return sc;
 }
 
 }  // namespace ombra::storage

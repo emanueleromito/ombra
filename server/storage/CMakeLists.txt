@@ -19,13 +19,26 @@ find_package(Threads REQUIRED)
 target_link_libraries(ombra_sqlite PUBLIC Threads::Threads ${CMAKE_DL_LIBS})
 
 add_library(ombra_storage STATIC src/segment.cpp src/wal.cpp src/catalog.cpp src/store.cpp
-                                 src/fsutil.cpp src/blob.cpp)
+                                 src/fsutil.cpp src/blob.cpp src/verify.cpp src/backup.cpp)
 target_include_directories(ombra_storage PUBLIC include
                            ${CMAKE_CURRENT_SOURCE_DIR}/../../core/include)
 target_link_libraries(ombra_storage PUBLIC ombra_sqlite)
 
-foreach(t segment wal catalog recovery blob seeded)
+# Offline tools: read-only integrity check and online backup. CPU only, no OpenFHE.
+add_executable(ombra_verify tools/ombra_verify.cpp)
+target_link_libraries(ombra_verify PRIVATE ombra_storage)
+add_executable(ombra_backup tools/ombra_backup.cpp)
+target_link_libraries(ombra_backup PRIVATE ombra_storage)
+
+foreach(t segment wal catalog recovery blob seeded verify backup diskfull)
   add_executable(ombra_storage_${t}_test tests/${t}_test.cpp)
   target_link_libraries(ombra_storage_${t}_test PRIVATE ombra_storage)
   add_test(NAME storage_${t} COMMAND ombra_storage_${t}_test)
 endforeach()
+# The CLI tests run the real binaries.
+add_dependencies(ombra_storage_verify_test ombra_verify)
+target_compile_definitions(ombra_storage_verify_test PRIVATE
+                           OMBRA_VERIFY_BIN="$<TARGET_FILE:ombra_verify>")
+add_dependencies(ombra_storage_backup_test ombra_backup)
+target_compile_definitions(ombra_storage_backup_test PRIVATE
+                           OMBRA_BACKUP_BIN="$<TARGET_FILE:ombra_backup>")
