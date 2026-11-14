@@ -56,6 +56,7 @@ class ServerProcess:
         extra_args: list[str] | None = None,
         rest: bool = False,
         openfhe_version: str | None = None,
+        auth: bool = False,
     ) -> None:
         found = binary or find_server_binary()
         if found is None:
@@ -68,6 +69,9 @@ class ServerProcess:
         self.log_path = self.root / "server.log"
         self.extra_args = list(extra_args or [])
         self.rest = rest
+        # False (default): --no-auth. True: the server needs an API key file in the data dir
+        # (create one with `ombra_server --create-api-key`, see `create_key`).
+        self.auth = auth
         # The version the stored envelopes carry; the client writes openfhe-python's version.
         self.openfhe_version = openfhe_version
         self.address = ""  # "127.0.0.1:PORT" while running
@@ -97,7 +101,7 @@ class ServerProcess:
             "--listen",
             "127.0.0.1:0",
             "--insecure",
-            "--no-auth",
+            *([] if self.auth else ["--no-auth"]),
             "--openfhe-version",
             self.openfhe_version or _installed_openfhe_version(),
             *(["--rest-port", "0"] if self.rest else []),
@@ -169,6 +173,16 @@ class ServerProcess:
         """Stop (or SIGKILL) and start again on the same data dir."""
         self.kill() if kill else self.stop()
         return self.start()
+
+    def create_key(self, scope: str, collection: str | None = None) -> str:
+        """Create an API key in the data dir with the server binary and return its token."""
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        args = [str(self.binary), "--create-api-key", "--scope", scope]
+        args += ["--data-dir", str(self.data_dir)]
+        if collection is not None:
+            args += ["--collection", collection]
+        out = subprocess.run(args, capture_output=True, text=True, check=True)  # noqa: S603
+        return out.stdout.strip()
 
     # ---- clients ------------------------------------------------------------------------------
     def client(self, **kwargs: Any) -> Any:
