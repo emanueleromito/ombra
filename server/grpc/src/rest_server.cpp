@@ -228,6 +228,13 @@ void RestServer::serve(int fd) {
     write_all(http_response(200, "{\"status\":\"ok\"}"));
     return;
   }
+  if (req.path == "/readyz") {  // ready to take calls; 503 once shutdown has begun
+    if (draining_.load())
+      write_all(http_response(503, "{\"status\":\"draining\"}"));
+    else
+      write_all(http_response(200, "{\"status\":\"ready\"}"));
+    return;
+  }
   if (req.path == "/metrics") {
     std::string key_id;
     switch (authorize(keys_, req.authorization, Scope::Admin, &key_id)) {

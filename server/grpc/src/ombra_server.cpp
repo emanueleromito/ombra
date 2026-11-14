@@ -4,6 +4,7 @@
 //                [--tls-cert F --tls-key F] [--rest-port N [--rest-host H]]
 //                [--insecure] [--no-auth]
 //                [--max-message-mb N] [--memory-quota-mb N] [--max-threads N]
+//                [--shutdown-grace-s N]
 //                [--max-sessions N] [--max-sessions-per-key N] [--session-budget-mb N]
 //                [--search-idle-s N] [--search-total-s N] [--max-rounds N]
 //                [--max-collections N] [--max-cluster-count N] [--max-blobs N]
@@ -30,8 +31,14 @@
 // collection, the blocks whose vectors are all deleted; it logs counts only.
 //
 // Prints "ombra_server listening on HOST:PORT" on stdout once the port is bound (PORT 0 picks a
-// free port), then, with --rest-port, "ombra_server rest listening on HOST:PORT". Shuts down on
-// SIGINT or SIGTERM.
+// free port), then, with --rest-port, "ombra_server rest listening on HOST:PORT".
+//
+// Shutdown. On the first SIGTERM or SIGINT the server (1) reports not ready at once (GET /readyz
+// answers 503; /healthz stays 200 while the process lives), (2) stops accepting new calls (they get
+// UNAVAILABLE, which clients retry), (3) lets running calls finish for --shutdown-grace-s seconds
+// (default 30), then cancels the rest (a cancelled call is not acknowledged and never stores the
+// block it was still receiving), and (4) exits 0. A second SIGTERM or SIGINT skips the wait and
+// exits 1 at once; every acknowledged write is already durable and recovery sweeps the rest.
 #include <grpcpp/grpcpp.h>
 #include <sys/stat.h>
 
@@ -68,8 +75,12 @@
 namespace {
 
 std::atomic<bool> g_stop{false};
+std::atomic<int> g_signals{0};  // SIGTERM/SIGINT received so far; the second one forces the exit
 std::atomic<bool> g_reload{false};
-extern "C" void on_signal(int) { g_stop.store(true); }
+extern "C" void on_signal(int) {
+  g_signals.fetch_add(1);
+  g_stop.store(true);
+}
 extern "C" void on_hup(int) { g_reload.store(true); }
 
 using ombra::server::is_loopback_listen;
@@ -127,10 +138,13 @@ int main(int argc, char** argv) {
   std::string tls_cert, tls_key, scope_arg, rest_host;
   std::uint64_t gpu_mb = 4096, host_mb = 2048;
   std::uint64_t compact_ms = 60000;
-  // Messages carry whole blocks (tens of MB at the larger preset). The C++ API has one receive
-  // limit for the whole server, so it is the size of the largest legitimate message; it is applied
-  // after authentication, and the ResourceQuota bounds all buffered messages together.
-  std::uint64_t max_message_mb = 1024, memory_quota_mb = 4096, max_threads = 128;
+  // The C++ API has one receive limit for the whole server. No message is larger than a column or
+  // a 4 MiB chunk of a key or blob (Insert, ReplaceBlock, PutBlob and UploadKeys are streams of
+  // parts), so 16 MiB holds the largest one with room: an unseeded column of the largest preset
+  // is under 1 MiB, an id list of one block at most 2.2 MB. The limit is applied after
+  // authentication, and the ResourceQuota bounds all buffered messages together.
+  std::uint64_t max_message_mb = 16, memory_quota_mb = 2048, max_threads = 128;
+  std::uint64_t shutdown_grace_s = 30;
   std::uint64_t session_budget_mb = 0, rest_workers = 4, rest_max_conns = 32;
   std::uint64_t max_blob_mb = 16384, max_key_upload_mb = 2048;
   std::uint64_t search_idle_s = 60, search_total_s = 600;
@@ -175,7 +189,9 @@ int main(int argc, char** argv) {
     else if (a == "--compact-interval-ms")
       compact_ms = num(0, std::uint64_t{1} << 40);
     else if (a == "--max-message-mb")
-      max_message_mb = num(4, 2000);
+      max_message_mb = num(8, 2000);  // at least a 4 MiB chunk plus its framing, with room
+    else if (a == "--shutdown-grace-s")
+      shutdown_grace_s = num(0, 86400);
     else if (a == "--memory-quota-mb")
       memory_quota_mb = num(64, std::uint64_t{1} << 24);
     else if (a == "--max-threads")
@@ -443,10 +459,29 @@ int main(int argc, char** argv) {
         }
       }
     }
+    // Shutdown (see the header comment). Not ready first, so a load balancer stops sending.
+    std::fprintf(stderr, "[ombra.server] shutdown requested: not ready, draining up to %llu s\n",
+                 static_cast<unsigned long long>(shutdown_grace_s));
+    if (rest) rest->begin_drain();
+    service.begin_drain();
     if (compactor.joinable()) compactor.join();
-    if (rest) rest->stop();
-    server->Shutdown(std::chrono::system_clock::now() + std::chrono::seconds(2));
+    std::atomic<bool> drained{false};
+    // gRPC: no new calls from now on; running calls have until the deadline, then they are
+    // cancelled. Shutdown returns when every handler has returned.
+    std::thread drain([&] {
+      server->Shutdown(std::chrono::system_clock::now() + std::chrono::seconds(shutdown_grace_s));
+      drained.store(true);
+    });
+    while (!drained.load() && g_signals.load() < 2)
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    if (!drained.load()) {
+      std::fprintf(stderr, "[ombra.server] second signal: exiting now, running calls are cut\n");
+      std::_Exit(1);  // acknowledged writes are durable; recovery sweeps unfinished ones
+    }
+    drain.join();
     server->Wait();
+    if (rest) rest->stop();
+    std::fprintf(stderr, "[ombra.server] shutdown complete\n");
   } catch (const std::exception& e) {
     std::fprintf(stderr, "fatal: %s\n", e.what());
     return 1;
