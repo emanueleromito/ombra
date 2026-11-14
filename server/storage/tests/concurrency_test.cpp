@@ -92,8 +92,7 @@ void writers_and_readers() {
             s.insert("docs", static_cast<std::uint32_t>(w % 4), {a, b},
                      cols2(static_cast<std::uint8_t>(w * 10 + i)));
             if (i % 3 == 0) s.remove("docs", {a});
-            if (i % 4 == 0)
-              s.put_blob("docs", 1, a, blob_bytes(static_cast<std::uint8_t>(i)));
+            if (i % 4 == 0) s.put_blob("docs", 1, a, blob_bytes(static_cast<std::uint8_t>(i)));
           }
         } catch (const std::exception& e) {
           std::fprintf(stderr, "writer failed: %s\n", e.what());
@@ -204,7 +203,7 @@ void failed_write_leaves_no_file() {
   const auto seg = s.segments("docs").front().file;
   SegmentData neu{0, {"vec-alpha-1", "vec-alpha-2"}, cols2(4)};
   s.remove("docs", {"vec-alpha-3"});
-  s.replace_segments("docs", {seg}, neu);  // ids are exactly the live ids now
+  s.replace_segments("docs", {seg}, neu);                // ids are exactly the live ids now
   CHECK_THROWS(s.replace_segments("docs", {seg}, neu));  // the old block is gone
   check_files(d.path, s);
 }

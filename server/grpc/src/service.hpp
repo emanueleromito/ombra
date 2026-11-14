@@ -132,7 +132,7 @@ class OmbraService final : public ombra::v1::Ombra::Service {
   Watchdog watchdog_;
   LogLimiter refused_log_{std::chrono::seconds(5)};  // failed-login log lines
   std::atomic<bool> draining_{false};
-  std::atomic<std::size_t> key_uploads_{0};          // uploads staging key files right now
+  std::atomic<std::size_t> key_uploads_{0};  // uploads staging key files right now
   std::mutex load_mu_;
   std::set<std::string> loaded_;  // collections whose keys the engine holds, guarded by load_mu_
 };

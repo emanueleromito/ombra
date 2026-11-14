@@ -38,8 +38,8 @@ import numpy as np
 
 from ombra import _seeding, presets
 from ombra import query as oq
-from ombra._proto import insert_requests
 from ombra._decrypt import ExpectedShapes, check_ciphertext, decrypt_values
+from ombra._proto import insert_requests
 from ombra.blobstore import KIND_DOCUMENT, KIND_RECORD, BlobStore, BlobStoreError, GrpcBlobStore
 from ombra.clustering import assign, cluster_vectors
 from ombra.documents import DocumentCodec

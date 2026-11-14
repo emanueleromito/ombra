@@ -5,6 +5,25 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- API (`ombra.v1`, not released yet): `Insert` is a client stream of parts like `ReplaceBlock`: one
+  `InsertHeader` per block, then one column per message (`InsertRequest`). The server's default
+  receive limit falls from 1 GiB to 16 MiB (`--max-message-mb`), and the memory quota default from
+  4096 to 2048 MiB. `InsertBlock` is no longer sent by any call.
+- `Insert` is idempotent: a block whose ids all exist in one stored block of the same cluster with
+  byte-identical columns is a success that stores nothing. The client now retries `Insert`.
+- `SearchScores` has `block_sizes`, so each answer describes its own blocks; the client no longer
+  calls `ListBlocks` during a search, and a reconnected search stream checks the answers it skips.
+- New error code `ERROR_STORAGE_FULL` (the server also sends `RESOURCE_EXHAUSTED`). Search and key
+  upload limits are now `RESOURCE_EXHAUSTED` too.
+
+### Added
+
+- `ombra_server`: graceful shutdown with `--shutdown-grace-s` (default 30), `GET /readyz`, and a
+  forced exit on a second signal.
+- Storage: big files are written without the store lock, so a slow disk no longer blocks reads.
+
 ## [0.1.0]
 
 First release. Ombra is a vector database where vectors, queries, filters and scores stay encrypted

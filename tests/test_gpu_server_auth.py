@@ -29,6 +29,7 @@ pytest.importorskip("grpc_tools")
 pytest.importorskip("openfhe")
 
 import e2e_client as ec  # noqa: E402
+from ombra._proto import insert_requests  # noqa: E402
 
 pytestmark = pytest.mark.gpu
 
@@ -204,7 +205,7 @@ def test_grpc_scopes(deployment):
     c["read"].stub.ListCollections(list_req)  # read works
     block = pb.InsertBlock(api_version=1, collection=COLLECTION, cluster_id=0, ids=[SECRET_ID])
     with pytest.raises(grpc.RpcError) as ei:
-        c["read"].stub.Insert(iter([block]))
+        c["read"].stub.Insert(insert_requests(pb, [block]))
     assert _code(ei) == grpc.StatusCode.PERMISSION_DENIED
     with pytest.raises(grpc.RpcError) as ei:
         c["read"].create_collection(c["read"].make_spec(COLLECTION, 16, [3, 4], 6, "tag"))

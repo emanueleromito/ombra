@@ -69,7 +69,8 @@ def test_every_proto_error_code_has_a_class_and_is_not_retryable():
         if code == 0:
             continue
         err = from_proto_error(code, "m")
-        assert err.error_code == code and err.retryable is False, name
+        assert err.error_code == code, name
+        assert err.retryable is (name == "ERROR_STORAGE_FULL"), name  # the one retryable code
         assert type(err) is not CollectionError  # a specific class
         assert isinstance(err, CollectionError) and err.code == code and err.message == "m"
         blob = from_proto_error(code, "m", BlobStoreError)
@@ -289,7 +290,7 @@ def test_deadline_is_sent_with_each_call_kind(server):
     s = stub()
     s.GetCollection(pb.GetCollectionRequest(name="c"))  # short metadata call
     s.Delete(pb.DeleteRequest(collection="c"))  # single-answer call
-    s.Insert(Replayable(lambda: iter([pb.InsertBlock()])))  # client stream
+    s.Insert(Replayable(lambda: iter([pb.InsertRequest()])))  # client stream
     assert list(s.GetBlob(pb.GetBlobRequest()))
     assert 20 < servicer.remaining["GetCollection"] <= 30 * 1.05
     assert 100 < servicer.remaining["Delete"] <= 120 * 1.05
@@ -378,17 +379,17 @@ def test_resource_exhausted_is_retried(server):
     assert servicer.calls["Delete"] == 2
 
 
-def test_insert_and_drop_are_not_retried(server):
+def test_insert_is_retried_but_drop_and_replace_are_not(server):
     servicer, stub = server
     servicer.fail["Insert"] = 1
     servicer.fail["DropCollection"] = 1
     s = stub()
-    with pytest.raises(errors.ServerUnavailableError):
-        s.Insert(Replayable(lambda: iter([pb.InsertBlock()])))
+    s.Insert(Replayable(lambda: iter([pb.InsertRequest()])))  # the server is idempotent: retried
+    assert servicer.calls["Insert"] == 2
     with pytest.raises(errors.ServerUnavailableError):
         s.DropCollection(pb.DropCollectionRequest(name="c"))
-    assert servicer.calls == {"Insert": 1, "DropCollection": 1}
-    assert not may_retry("Insert") and not may_retry("ReplaceBlock")
+    assert servicer.calls["DropCollection"] == 1
+    assert may_retry("Insert") and not may_retry("ReplaceBlock")
     assert not may_retry("DropCollection") and not may_retry("CreateCollection")
 
 
@@ -489,7 +490,10 @@ def _fake_search(break_after):
             for c in req.chosen.cluster_ids:
                 ids = [bytes([c, j]) for j in range(N)]
                 blk = np.full(N, GOOD).tobytes()
-                yield _Msg(kind="scores", scores=_ns(cluster_id=c, score_blocks=[blk], ids=ids, block_sizes=[N]))
+                yield _Msg(
+                    kind="scores",
+                    scores=_ns(cluster_id=c, score_blocks=[blk], ids=ids, block_sizes=[N]),
+                )
 
     def enc(ext):
         encrypted.append(1)
@@ -574,3 +578,14 @@ def test_search_does_not_retry_a_non_retryable_stream_error():
     col.stub.Search = failing
     with pytest.raises(errors.PermissionDeniedError):
         _search(col)
+
+
+def test_search_reconnect_survives_a_block_layout_change():
+    """The second stream answers with other block sizes (a repack happened); each answer carries
+    its own sizes, so the search still works. A different answer kind or cluster is refused."""
+    col, streams, _ = _fake_search("round1")
+    res = _search(col)
+    assert res.rounds == 2
+    s = search._Stream
+    assert s._identity(_Msg(kind="centers")) == ("centers",)
+    assert s._identity(_Msg(kind="scores", scores=_ns(cluster_id=4))) == ("scores", 4)

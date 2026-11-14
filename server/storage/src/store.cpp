@@ -358,8 +358,9 @@ std::string Store::insert(const std::string& collection, std::uint32_t cluster,
     }
     if (known == 0) return std::nullopt;
     Candidate c;
-    if (known != ids.size() || !one_block || !catalog_->segment_row(collection, first_file, &c.row) ||
-        c.row.cluster != cluster || c.row.n_vectors != ids.size() || c.row.n_columns != cols.size())
+    if (known != ids.size() || !one_block ||
+        !catalog_->segment_row(collection, first_file, &c.row) || c.row.cluster != cluster ||
+        c.row.n_vectors != ids.size() || c.row.n_columns != cols.size())
       throw std::runtime_error("insert: duplicate id");
     ++pins_[c.row.file];
     c.pin = SegmentPin(this, {c.row.file});
@@ -447,8 +448,8 @@ std::string Store::insert(const std::string& collection, std::uint32_t cluster,
         maybe_crash(CrashPoint::InsertBeforeIntent);
         wal_->append(intent);
         maybe_crash(CrashPoint::InsertAfterIntent);
-        catalog_->add_segment(collection,
-                              {cluster, name, info.n_vectors, info.n_columns, info.crc}, ids);
+        catalog_->add_segment(collection, {cluster, name, info.n_vectors, info.n_columns, info.crc},
+                              ids);
       }
     } catch (...) {
       // Not acknowledged: drop the file now; the dangling intent is discarded at next recovery.

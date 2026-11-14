@@ -6,13 +6,13 @@ What the API never carries: the secret key, plaintext vectors, queries, document
 
 ## Is there a REST API?
 
-There is no REST data API. Everything that reads or writes vectors, blobs or collections goes over gRPC. The server has a small HTTP port for operators, turned on with `--rest-port` (the Docker image turns it on at 8080). It answers `GET` only and has two paths. `/healthz` needs no key and returns `{"status":"ok"}`. `/metrics` needs an admin API key and returns counters as JSON. See [Monitoring](../operations/monitoring.md). Any other path returns 404 and any other method 405.
+There is no REST data API. Everything that reads or writes vectors, blobs or collections goes over gRPC. The server has a small HTTP port for operators, turned on with `--rest-port` (the Docker image turns it on at 8080). It answers `GET` only and has three paths. `/healthz` needs no key and returns `{"status":"ok"}` while the process lives. `/readyz` needs no key and returns `{"status":"ready"}`, or 503 with `{"status":"draining"}` once the server has been told to stop. `/metrics` needs an admin API key and returns counters as JSON. See [Monitoring](../operations/monitoring.md). Any other path returns 404 and any other method 405.
 
 ## Connecting and authenticating
 
 Use TLS. The server refuses to start without it unless it is started with `--insecure`, and then it only accepts a loopback address. Send the API key as call metadata: `authorization: Bearer <key>`. A missing or wrong key fails with `UNAUTHENTICATED`. A key whose scope is too low fails with `PERMISSION_DENIED`. A server started with `--no-auth` skips the check and is also limited to loopback.
 
-An API key has one scope. `read` may call the read methods, `write` may also call the write methods, and `admin` may call everything. The table below gives the scope each method needs. Messages may be up to 1 GiB in both directions, since one block can be tens of megabytes.
+An API key has one scope. `read` may call the read methods, `write` may also call the write methods, and `admin` may call everything. The table below gives the scope each method needs. Messages may be up to 16 MiB in both directions (`--max-message-mb`). Calls that move big data send it in parts: `Insert` and `ReplaceBlock` send one column per message, `PutBlob` and `UploadKeys` send chunks of at most 4 MiB.
 
 ## Methods
 
@@ -25,7 +25,7 @@ The service is `Ombra`. A method marked "stream" sends or receives a sequence of
 | `ListCollections` | read | `ListCollectionsRequest` to `ListCollectionsResponse` | Returns the `CollectionInfo` of every collection. |
 | `DropCollection` | admin | `DropCollectionRequest` to `DropCollectionResponse` | Deletes a collection and everything stored for it. The error field is unset on success. |
 | `UploadKeys` | write | stream `UploadKeysChunk` to `UploadKeysResponse` | Uploads the public evaluation keys in chunks. `kind` says which file the bytes belong to. |
-| `Insert` | write | stream `InsertBlock` to `InsertResponse` | Inserts blocks of vectors, one cluster per block. |
+| `Insert` | write | stream `InsertRequest` to `InsertResponse` | Inserts blocks of vectors, one cluster per block. Per block: one header, then its columns, one per message. A repeated block is a success that stores nothing. |
 | `Delete` | write | `DeleteRequest` to `DeleteResponse` | Marks the given ids deleted. |
 | `Search` | read | stream `SearchRequest` to stream `SearchResponse` | One bidirectional stream per query, in two rounds. See below. |
 | `ListBlocks` | read | `ListBlocksRequest` to `ListBlocksResponse` | Lists the blocks (storage segments) of a collection with their vector and deleted counts. No ids. |
@@ -97,7 +97,9 @@ The query ciphertext of a collection carries `dimension + sum(cardinality)` entr
 
 | Message | Fields |
 | --- | --- |
-| `InsertBlock` | `api_version`, `collection`, `cluster_id`, `ids` (one per occupied slot, in slot order), `columns` (`dimension + sum(cardinality)` envelopes in column order), `is_center` (a cluster-center block for stage 1 instead of data). |
+| `InsertRequest` | `api_version`, and one of `header` (`InsertHeader`) or `column` (one envelope). |
+| `InsertHeader` | `collection`, `cluster_id`, `ids` (one per occupied slot, in slot order, at most one block of slots), `is_center` (a cluster-center block for stage 1 instead of data). The block's columns follow, `dimension + sum(cardinality)` envelopes in column order, one per message. The next header, or the end of the stream, closes the block, and it is stored then. Fewer or more columns, or a column before a header, is `ERROR_BAD_SEQUENCE` or `ERROR_SIZE_LIMIT`. |
+| `InsertBlock` | One whole block (the header fields and `columns`). No call sends it. Local mode stores blocks in this form. |
 | `InsertResponse` | `inserted` count, optional `Error`. |
 | `DeleteRequest` | `api_version`, `collection`, `ids`. |
 | `DeleteResponse` | `deleted` count, optional `Error`. |
@@ -111,7 +113,7 @@ The query ciphertext of a collection carries `dimension + sum(cardinality)` entr
 | `SearchChosen` | `cluster_ids`, at most `LIMIT_MAX_CLUSTERS_PER_ROUND`. |
 | `SearchResponse` | One of `centers` (`SearchCenterScores`), `scores` (`SearchScores`) or `error`. |
 | `SearchCenterScores` | `score_blocks` (envelopes, each decrypts to one score per slot), `center_count`. |
-| `SearchScores` | `cluster_id`, `score_blocks`, `ids`, `last`. |
+| `SearchScores` | `cluster_id`, `score_blocks`, `ids`, `last`, `block_sizes` (the occupied slots of each score block, in block order, summing to the number of ids). |
 
 `SecurityLevel` values: `SECURITY_LEVEL_FAST`, `SECURITY_LEVEL_DECOY` and `SECURITY_LEVEL_STRICT`. See [Clusters](../how-it-works/clusters.md) for what each one does.
 
@@ -166,3 +168,4 @@ Blobs are opaque client ciphertexts. The server never parses them. A blob become
 | `ERROR_BLOCK_NOT_FOUND` | No such block in the collection. |
 | `ERROR_BLOCK_MISMATCH` | The ids of a `ReplaceBlock` are not exactly the live ids, or the cluster or columns differ. |
 | `ERROR_BLOB_NOT_FOUND` | No blob with this kind and id in the collection. |
+| `ERROR_STORAGE_FULL` | The server's disk or quota is full. Nothing was stored. The server sends this as the gRPC status `RESOURCE_EXHAUSTED`, and the client retries. |
