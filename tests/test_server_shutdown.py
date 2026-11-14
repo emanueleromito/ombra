@@ -185,7 +185,7 @@ def test_a_call_longer_than_the_grace_is_cancelled_and_leaves_nothing(srv):
 def test_second_signal_exits_at_once(srv):
     server, stub, cols = srv("--shutdown-grace-s", "300")
     reached, release = threading.Event(), threading.Event()
-    stub.Insert.future(_held_stream([b"s2-1"], cols, reached, release))
+    fut = stub.Insert.future(_held_stream([b"s2-1"], cols, reached, release))
     assert reached.wait(30)
     server._proc.send_signal(15)
     time.sleep(0.5)
@@ -195,6 +195,7 @@ def test_second_signal_exits_at_once(srv):
     assert _wait_exit(server, 15) == 1
     assert time.monotonic() - t0 < 5
     release.set()
+    fut.cancel()  # the call died with the server
     server.start()
     server.stop()
     _verify_clean(server)
