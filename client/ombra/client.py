@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from ombra._core import ClientCore, CollectionInfo, SearchHit
+from ombra.retry import RetryPolicy
 
 
 def _grpc_transport(
@@ -26,6 +27,8 @@ def _grpc_transport(
     insecure: bool,
     timeout: float | None = None,
     stream_timeout: float | None = None,
+    deadlines: Mapping[str, float] | None = None,
+    retry: RetryPolicy | None = None,
 ) -> Any:
     from ombra import _transport
 
@@ -38,6 +41,8 @@ def _grpc_transport(
         stream_timeout=(
             _transport.DEFAULT_STREAM_TIMEOUT if stream_timeout is None else stream_timeout
         ),
+        deadlines=deadlines,
+        retry=retry,
     )
 
 
@@ -59,13 +64,27 @@ class Client:
         insecure: bool = False,
         timeout: float | None = None,
         stream_timeout: float | None = None,
+        deadlines: Mapping[str, float] | None = None,
+        retry: RetryPolicy | None = None,
     ) -> None:
         """Connect to a server. TLS is used unless `insecure=True` (loopback test servers only;
         a warning is raised for any other host). `timeout` (default 120 s) is the deadline of a
-        single-answer call, `stream_timeout` (default 1800 s) that of a call that streams data or
-        searches."""
+        single-answer call that changes data, `stream_timeout` (default 1800 s) that of a call
+        that streams data or searches; small reads get 30 s and one blob 300 s. `deadlines` sets
+        single calls by name, e.g. `{"Search": 600}`. Every deadline bounds the whole call. `retry`
+        is a `ombra.RetryPolicy` (default: 4 attempts, backoff with full jitter, 120 s budget) for
+        the calls that are safe to repeat; `RetryPolicy.never()` turns retries off."""
         self._core = ClientCore(
-            _grpc_transport(address, api_key, root_certificates, insecure, timeout, stream_timeout)
+            _grpc_transport(
+                address,
+                api_key,
+                root_certificates,
+                insecure,
+                timeout,
+                stream_timeout,
+                deadlines,
+                retry,
+            )
         )
 
     @classmethod
@@ -177,13 +196,27 @@ class AsyncClient:
         insecure: bool = False,
         timeout: float | None = None,
         stream_timeout: float | None = None,
+        deadlines: Mapping[str, float] | None = None,
+        retry: RetryPolicy | None = None,
     ) -> None:
         """Connect to a server. TLS is used unless `insecure=True` (loopback test servers only;
         a warning is raised for any other host). `timeout` (default 120 s) is the deadline of a
-        single-answer call, `stream_timeout` (default 1800 s) that of a call that streams data or
-        searches."""
+        single-answer call that changes data, `stream_timeout` (default 1800 s) that of a call
+        that streams data or searches; small reads get 30 s and one blob 300 s. `deadlines` sets
+        single calls by name, e.g. `{"Search": 600}`. Every deadline bounds the whole call. `retry`
+        is a `ombra.RetryPolicy` (default: 4 attempts, backoff with full jitter, 120 s budget) for
+        the calls that are safe to repeat; `RetryPolicy.never()` turns retries off."""
         self._core = ClientCore(
-            _grpc_transport(address, api_key, root_certificates, insecure, timeout, stream_timeout)
+            _grpc_transport(
+                address,
+                api_key,
+                root_certificates,
+                insecure,
+                timeout,
+                stream_timeout,
+                deadlines,
+                retry,
+            )
         )
 
     @classmethod

@@ -18,7 +18,8 @@ from typing import Any
 import numpy as np
 
 from ombra import presets
-from ombra.collection import Collection, CollectionError, KeyKit, check_server_spec
+from ombra.collection import Collection, KeyKit, check_server_spec
+from ombra.errors import collection_error
 from ombra.search import Hit
 
 MAX_ID_BYTES = 256  # LIMIT_MAX_ID_BYTES
@@ -158,7 +159,7 @@ class ClientCore:
         pb = self._t.pb
         r = self._t.stub.GetCollection(pb.GetCollectionRequest(name=name))
         if r.WhichOneof("result") == "error":
-            raise CollectionError(r.error.code, r.error.message)
+            raise collection_error(r.error.code, r.error.message)
         spec = r.info.spec
         cards = tuple(f.cardinality for f in sorted(spec.filter_fields, key=lambda f: f.field_id))
         names = tuple(filter_fields or ())
@@ -177,7 +178,7 @@ class ClientCore:
         pb = self._t.pb
         r = self._t.stub.GetCollection(pb.GetCollectionRequest(name=name))
         if r.WhichOneof("result") == "error":
-            raise CollectionError(r.error.code, r.error.message)
+            raise collection_error(r.error.code, r.error.message)
         s = r.info.spec
         return CollectionInfo(
             name=s.name,
@@ -201,7 +202,7 @@ class ClientCore:
     def drop_collection(self, name: str) -> None:
         r = self._t.stub.DropCollection(self._t.pb.DropCollectionRequest(name=name))
         if r.error.code != 0:
-            raise CollectionError(r.error.code, r.error.message)
+            raise collection_error(r.error.code, r.error.message)
         opened = self._open.pop(name, None)
         if opened is not None:
             opened[0].close()
