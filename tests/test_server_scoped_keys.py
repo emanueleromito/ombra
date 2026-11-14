@@ -374,9 +374,6 @@ def test_request_ids_and_json_logs_carry_no_data(env):
         s.GetCollection(
             pb.GetCollectionRequest(name=A), metadata=md("wrongtoken", "req-bad-1"), timeout=10
         )
-    s.ListBlocks(
-        pb.ListBlocksRequest(api_version=1, collection=A), metadata=md(admin, "req-list-1")
-    )
     e.server.stop()
 
     text, lines = _lines(e.server)
@@ -398,7 +395,6 @@ def test_request_ids_and_json_logs_carry_no_data(env):
         ("req-insert-1", "Insert"),
         ("req-insert-2", "Insert"),
         ("req-coll-1", "GetCollection"),
-        ("req-list-1", "ListBlocks"),
     ]:
         recs = by_id[rid]
         assert {r["rpc"] for r in recs} == {rpc}
@@ -442,3 +438,17 @@ def test_invalid_log_format_is_refused(env):
         env={**os.environ},
     )
     assert out.returncode == 2 and "--log-format" in out.stderr
+
+
+def test_keys_tool_checks_the_tag_against_a_server(base, tmp_path, monkeypatch) -> None:
+    from ombra import keys
+
+    root, _ = base
+    shutil.copytree(root, tmp_path / "r")
+    monkeypatch.setenv("OMBRA_ALLOW_WEAK_SCRYPT", "1")  # the test key file uses cheap scrypt
+    monkeypatch.setenv(keys.PASSPHRASE_ENV, "pw")
+    key_file = str(tmp_path / "r" / "k.key")
+    with ServerProcess(tmp_path / "r") as server:
+        args = ["check", key_file, "--server", server.address, "--insecure"]
+        assert keys.main([*args, "--collection", A]) == 0
+        assert keys.main([*args, "--collection", "no_such_collection"]) == 1

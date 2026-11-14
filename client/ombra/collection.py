@@ -144,14 +144,15 @@ class KeyKit:
         pk = ofhe.Serialize(self._keys.publicKey, ofhe.BINARY)
         return self._BLOB_MAGIC + struct.pack("<HI", self._BLOB_VERSION, len(sk)) + sk + pk
 
-    def _restore(self, blob: bytes) -> Any:
+    @classmethod
+    def _restore(cls, blob: bytes) -> Any:
         import openfhe as ofhe
 
         head = struct.Struct("<4sHI")
         if len(blob) < head.size:
             raise ValueError("key blob is truncated")
         magic, version, n = head.unpack_from(blob)
-        if magic != self._BLOB_MAGIC or version != self._BLOB_VERSION:
+        if magic != cls._BLOB_MAGIC or version != cls._BLOB_VERSION:
             raise ValueError("key blob has an unknown format or version")
         sk_raw, pk_raw = blob[head.size : head.size + n], blob[head.size + n :]
 
@@ -165,6 +166,17 @@ class KeyKit:
             secretKey=load(sk_raw, ofhe.DeserializePrivateKeyString),
             publicKey=load(pk_raw, ofhe.DeserializePublicKeyString),
         )
+
+    @classmethod
+    def key_tag_of_blob(cls, blob: bytes) -> str:
+        """The key tag of a saved secret blob. Both keys must deserialize and carry the same tag
+        (a public key that does not belong to the secret key is refused). Returns only the tag,
+        which is public (the server stores it); nothing secret leaves."""
+        keys = cls._restore(blob)
+        tag = keys.publicKey.GetKeyTag()
+        if keys.secretKey.GetKeyTag() != tag:
+            raise ValueError("the secret key and the public key in the key file do not match")
+        return str(tag)
 
     def save(
         self,
