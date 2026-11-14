@@ -135,7 +135,6 @@ void prepare_collection_keys(CollKeys& c, storage::Store& store, const EngineCon
   } catch (const LayoutError& ex) {
     throw InvalidQuery(ex.what());
   }
-
 }
 
 }  // namespace ombra::search::detail
