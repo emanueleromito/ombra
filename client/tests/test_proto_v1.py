@@ -88,7 +88,7 @@ def test_unknown_version_is_refused(pb) -> None:
     for cls in (
         pb.CollectionSpec,
         pb.UploadKeysChunk,
-        pb.InsertBlock,
+        pb.InsertRequest,
         pb.DeleteRequest,
         pb.ListBlocksRequest,
         pb.GetBlockRequest,
@@ -104,7 +104,7 @@ def test_every_stored_message_has_api_version(pb) -> None:
     for name in (
         "CollectionSpec",
         "UploadKeysChunk",
-        "InsertBlock",
+        "InsertRequest",
         "DeleteRequest",
         "ListBlocksRequest",
         "ListBlocksResponse",

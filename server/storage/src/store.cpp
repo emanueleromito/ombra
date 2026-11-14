@@ -12,6 +12,7 @@
 #include <cstdio>
 #include <exception>
 #include <map>
+#include <optional>
 #include <set>
 #include <stdexcept>
 
@@ -236,60 +237,92 @@ std::size_t Store::drop_dead_blocks(const std::string& collection) {
 std::string Store::replace_segments(const std::string& collection,
                                     const std::vector<std::string>& old_segments,
                                     const SegmentData& neu) {
-  std::lock_guard lk(mu_);
   const auto t0 = std::chrono::steady_clock::now();
   CollectionSpec spec;
-  if (!catalog_->get_collection(collection, &spec)) throw std::runtime_error("unknown collection");
-  if (old_segments.empty()) throw BlockMismatch("no blocks to replace");
-  if (std::set<std::string>(old_segments.begin(), old_segments.end()).size() != old_segments.size())
-    throw BlockMismatch("a block is listed twice");
-  std::vector<std::string> live;
-  for (const auto& seg : old_segments) {
-    SegmentRow old;
-    if (!catalog_->segment_row(collection, seg, &old)) throw BlockNotFound("block not found");
-    if (old.cluster == spec.cluster_count) throw BlockMismatch("center blocks cannot be replaced");
-    if (neu.cluster != old.cluster) throw BlockMismatch("cluster differs from the old block's");
-    if (neu.column_envelopes.size() != old.n_columns)
-      throw BlockMismatch("column count differs from the old block's");
-    auto l = catalog_->live_ids(collection, seg);
-    live.insert(live.end(), l.begin(), l.end());
-  }
-  if (neu.ids.empty())
-    throw BlockMismatch("no ids: a block with no live vector is dropped instead");
-  if (std::set<std::string>(neu.ids.begin(), neu.ids.end()).size() != neu.ids.size() ||
-      neu.ids.size() != live.size() ||
-      std::set<std::string>(neu.ids.begin(), neu.ids.end()) !=
-          std::set<std::string>(live.begin(), live.end()))
-    throw BlockMismatch("ids are not exactly the live ids of the old blocks");
-  std::size_t bytes = 0;
-  for (const auto& c : neu.column_envelopes) {
-    check_column_for_insert(c.data(), c.size(), spec.preset, ofhe_, expect_for(spec));
-    bytes += c.size();
-  }
-
-  wal_->reset();  // see the header: nothing in the log is newer than the catalog
-  const std::string name = hex_name('s', catalog_->next_segment_id(), ".oseg");
-  const std::string path = segment_path(name);
-  maybe_crash(CrashPoint::ReplaceBeforeNewFile);
-  try {
-    SegmentInfo info = write_segment(path, neu);
-    maybe_crash(CrashPoint::ReplaceAfterNewFile);
-    catalog_->replace_segments(collection, old_segments,
-                               {neu.cluster, name, info.n_vectors, info.n_columns, info.crc},
-                               neu.ids);
-  } catch (...) {
-    if (!catalog_->has_segment(name)) {
-      ::unlink(path.c_str());
-      ::unlink((path + ".tmp").c_str());
+  // Checks the precondition against the catalog. Runs twice: before the new file is written (so a
+  // hopeless request writes nothing) and under the lock again just before the catalog switch (a
+  // delete or another replacement may have changed the blocks meanwhile). Caller holds mu_.
+  const auto validate = [&] {
+    if (!catalog_->get_collection(collection, &spec))
+      throw std::runtime_error("unknown collection");
+    if (old_segments.empty()) throw BlockMismatch("no blocks to replace");
+    if (std::set<std::string>(old_segments.begin(), old_segments.end()).size() !=
+        old_segments.size())
+      throw BlockMismatch("a block is listed twice");
+    std::vector<std::string> live;
+    for (const auto& seg : old_segments) {
+      SegmentRow old;
+      if (!catalog_->segment_row(collection, seg, &old)) throw BlockNotFound("block not found");
+      if (old.cluster == spec.cluster_count)
+        throw BlockMismatch("center blocks cannot be replaced");
+      if (neu.cluster != old.cluster) throw BlockMismatch("cluster differs from the old block's");
+      if (neu.column_envelopes.size() != old.n_columns)
+        throw BlockMismatch("column count differs from the old block's");
+      auto l = catalog_->live_ids(collection, seg);
+      live.insert(live.end(), l.begin(), l.end());
     }
+    if (neu.ids.empty())
+      throw BlockMismatch("no ids: a block with no live vector is dropped instead");
+    if (std::set<std::string>(neu.ids.begin(), neu.ids.end()).size() != neu.ids.size() ||
+        neu.ids.size() != live.size() ||
+        std::set<std::string>(neu.ids.begin(), neu.ids.end()) !=
+            std::set<std::string>(live.begin(), live.end()))
+      throw BlockMismatch("ids are not exactly the live ids of the old blocks");
+  };
+
+  // Step 1 (lock): validate and take a fresh name from the durable counter.
+  std::string name;
+  {
+    std::lock_guard lk(mu_);
+    validate();
+    name = hex_name('s', catalog_->next_segment_id(), ".oseg");
+  }
+  const std::string path = segment_path(name);
+  const auto discard_new_file = [&] {
+    ::unlink(path.c_str());
+    ::unlink((path + ".tmp").c_str());
+  };
+
+  // Step 2 (no lock): check the columns, write the new file durably under its final name. It is
+  // not in the catalog yet, so nothing refers to it; a crash leaves an unreferenced file that
+  // recovery sweeps.
+  std::size_t bytes = 0;
+  SegmentInfo info;
+  try {
+    for (const auto& c : neu.column_envelopes) {
+      check_column_for_insert(c.data(), c.size(), spec.preset, ofhe_, expect_for(spec));
+      bytes += c.size();
+    }
+    maybe_crash(CrashPoint::ReplaceBeforeNewFile);
+    info = write_segment(path, neu);
+    maybe_crash(CrashPoint::ReplaceAfterNewFile);
+  } catch (...) {
+    discard_new_file();
     throw;
   }
-  maybe_crash(CrashPoint::ReplaceAfterCatalog);
-  bool first = true;
-  for (const auto& f : old_segments) {
-    unlink_or_defer(f);
-    if (first) maybe_crash(CrashPoint::ReplaceAfterFirstUnlink);  // some old files gone
-    first = false;
+
+  // Step 3 (lock): re-validate, checkpoint the log (every record in it is already in the catalog,
+  // because log records are appended only inside a locked section that also changes the catalog),
+  // then one catalog transaction switches the blocks.
+  {
+    std::lock_guard lk(mu_);
+    try {
+      validate();
+      wal_->reset();  // see the header: nothing in the log is newer than the catalog
+      catalog_->replace_segments(collection, old_segments,
+                                 {neu.cluster, name, info.n_vectors, info.n_columns, info.crc},
+                                 neu.ids);
+    } catch (...) {
+      if (!catalog_->has_segment(name)) discard_new_file();
+      throw;
+    }
+    maybe_crash(CrashPoint::ReplaceAfterCatalog);
+    bool first = true;
+    for (const auto& f : old_segments) {
+      unlink_or_defer(f);
+      if (first) maybe_crash(CrashPoint::ReplaceAfterFirstUnlink);  // some old files gone
+      first = false;
+    }
   }
   fsync_best_effort(segments_dir());
   maybe_crash(CrashPoint::ReplaceAfterUnlink);
@@ -299,62 +332,150 @@ std::string Store::replace_segments(const std::string& collection,
 
 std::string Store::insert(const std::string& collection, std::uint32_t cluster,
                           const std::vector<std::string>& ids,
-                          const std::vector<std::vector<std::uint8_t>>& cols) {
-  std::lock_guard lk(mu_);
+                          const std::vector<std::vector<std::uint8_t>>& cols, bool* replayed) {
   const auto t0 = std::chrono::steady_clock::now();
+  if (replayed) *replayed = false;
   CollectionSpec spec;
-  if (!catalog_->get_collection(collection, &spec)) throw std::runtime_error("unknown collection");
-  if (cluster > spec.cluster_count) throw std::runtime_error("cluster out of range");
-  if (ids.empty()) throw std::runtime_error("insert: no ids");
-  std::set<std::string> seen;
-  for (const auto& id : ids)
-    if (!seen.insert(id).second || catalog_->id_exists(collection, id))
-      throw std::runtime_error("insert: duplicate id");
-  std::size_t bytes = 0;
-  for (const auto& c : cols) {
-    check_column_for_insert(c.data(), c.size(), spec.preset, ofhe_, expect_for(spec));
-    bytes += c.size();
-  }
-
-  const std::string name = hex_name('s', catalog_->next_segment_id(), ".oseg");
-  const std::string path = segment_path(name);
-  WalRecord intent;
-  intent.type = WalType::InsertIntent;
-  intent.collection = collection;
-  intent.cluster = cluster;
-  intent.segment = name;
-  intent.ids = ids;
-
-  maybe_crash(CrashPoint::InsertBeforeIntent);
-  wal_->append(intent);
-  maybe_crash(CrashPoint::InsertAfterIntent);
-  try {
-    SegmentData sd{cluster, ids, cols};
-    SegmentInfo info = write_segment(path, sd);  // rename crash points fire inside
-    catalog_->add_segment(collection, {cluster, name, info.n_vectors, info.n_columns, info.crc},
-                          ids);
-  } catch (...) {
-    // Not acknowledged: drop the file now; the dangling intent is discarded at next recovery.
-    if (!catalog_->has_segment(name)) {
-      ::unlink(path.c_str());
-      ::unlink((path + ".tmp").c_str());
+  // A stored block that this block may repeat.
+  struct Candidate {
+    SegmentRow row;
+    SegmentPin pin;  // keeps the file readable while it is compared outside the lock
+  };
+  // Caller holds mu_. Throws on a duplicate id that is not a repeat. Returns a candidate when ALL
+  // ids are stored, in one block of this cluster with this many ids and columns (the bytes are
+  // compared afterwards). nullopt: no id is stored yet.
+  const auto clash = [&]() -> std::optional<Candidate> {
+    std::string first_file;
+    std::size_t known = 0;
+    bool one_block = true;
+    for (const auto& id : ids) {
+      std::string f;
+      if (!catalog_->segment_of_id(collection, id, &f)) continue;
+      if (known++ == 0)
+        first_file = f;
+      else if (f != first_file)
+        one_block = false;
     }
+    if (known == 0) return std::nullopt;
+    Candidate c;
+    if (known != ids.size() || !one_block || !catalog_->segment_row(collection, first_file, &c.row) ||
+        c.row.cluster != cluster || c.row.n_vectors != ids.size() || c.row.n_columns != cols.size())
+      throw std::runtime_error("insert: duplicate id");
+    ++pins_[c.row.file];
+    c.pin = SegmentPin(this, {c.row.file});
+    return c;
+  };
+  // No lock. The stored file must equal the file this block would produce, byte for byte. The CRC
+  // in the catalog (it covers the cluster, the ids and every column) is compared first, so a block
+  // that only shares ids reads no file.
+  const auto finish_replay = [&](const Candidate& c) {
+    const SegmentData sd{cluster, ids, cols};
+    const auto enc = encode_segment(sd);
+    if (static_cast<std::uint32_t>(get_le(enc.data() + 6, 4)) != c.row.crc)
+      throw std::runtime_error("insert: duplicate id");
+    std::vector<std::uint8_t> stored;
+    try {
+      stored = read_file(segment_path(c.row.file));
+    } catch (const std::exception&) {
+      throw std::runtime_error("insert: duplicate id");
+    }
+    if (stored != enc) throw std::runtime_error("insert: duplicate id");
+    if (replayed) *replayed = true;
+    log_line("insert_replayed", ids.size(), enc.size(), ms_since(t0));
+    return c.row.file;
+  };
+
+  // Step 1 (lock): look at the catalog, take a fresh name from the durable counter.
+  std::string name;
+  std::optional<Candidate> early;
+  {
+    std::lock_guard lk(mu_);
+    if (!catalog_->get_collection(collection, &spec))
+      throw std::runtime_error("unknown collection");
+    if (cluster > spec.cluster_count) throw std::runtime_error("cluster out of range");
+    if (ids.empty()) throw std::runtime_error("insert: no ids");
+    std::set<std::string> seen;
+    for (const auto& id : ids)
+      if (!seen.insert(id).second) throw std::runtime_error("insert: duplicate id");
+    early = clash();
+    if (!early) name = hex_name('s', catalog_->next_segment_id(), ".oseg");
+  }
+  if (early) return finish_replay(*early);
+  const std::string path = segment_path(name);
+  const auto discard_new_file = [&] {
+    ::unlink(path.c_str());
+    ::unlink((path + ".tmp").c_str());
+  };
+
+  // Step 2 (no lock): check the columns and write the segment durably under its final name. It
+  // is not in the catalog, so nothing refers to it yet; a crash here leaves an unreferenced file
+  // that recovery sweeps (there is no log record for it either).
+  std::size_t bytes = 0;
+  SegmentInfo info;
+  try {
+    for (const auto& c : cols) {
+      check_column_for_insert(c.data(), c.size(), spec.preset, ofhe_, expect_for(spec));
+      bytes += c.size();
+    }
+    SegmentData sd{cluster, ids, cols};
+    info = write_segment(path, sd);  // rename crash points fire inside
+  } catch (...) {
+    discard_new_file();
     throw;
   }
-  maybe_crash(CrashPoint::InsertAfterCatalog);
-  WalRecord commit;
-  commit.type = WalType::InsertCommit;
-  commit.collection = collection;
-  commit.segment = name;
-  // The catalog already has the segment, so the insert is applied and acknowledged. The commit
-  // record only saves recovery a step (it logs it itself when it is missing), so a failure to
-  // append it (a full disk) must not fail the call: a retry would meet "duplicate id".
-  try {
-    wal_->append(commit);
-  } catch (const std::exception&) {
-    std::fprintf(stderr, "[ombra.storage] insert: commit record not written\n");
+
+  // Step 3 (lock): re-check against the catalog, log the intent, one catalog transaction, log the
+  // commit.
+  std::optional<Candidate> repeat;
+  {
+    std::lock_guard lk(mu_);
+    try {
+      CollectionSpec now;
+      if (!catalog_->get_collection(collection, &now))
+        throw std::runtime_error("unknown collection");
+      if (now.preset != spec.preset || now.key_tag != spec.key_tag ||
+          now.cluster_count != spec.cluster_count)
+        throw std::runtime_error("insert: duplicate id");  // dropped and re-created meanwhile
+      repeat = clash();  // another insert of these ids finished while the file was written
+      if (!repeat) {
+        WalRecord intent;
+        intent.type = WalType::InsertIntent;
+        intent.collection = collection;
+        intent.cluster = cluster;
+        intent.segment = name;
+        intent.ids = ids;
+        maybe_crash(CrashPoint::InsertBeforeIntent);
+        wal_->append(intent);
+        maybe_crash(CrashPoint::InsertAfterIntent);
+        catalog_->add_segment(collection,
+                              {cluster, name, info.n_vectors, info.n_columns, info.crc}, ids);
+      }
+    } catch (...) {
+      // Not acknowledged: drop the file now; the dangling intent is discarded at next recovery.
+      if (!catalog_->has_segment(name)) discard_new_file();
+      throw;
+    }
+    if (repeat) {
+      discard_new_file();
+    } else {
+      maybe_crash(CrashPoint::InsertAfterCatalog);
+      WalRecord commit;
+      commit.type = WalType::InsertCommit;
+      commit.collection = collection;
+      commit.segment = name;
+      // The catalog already has the segment, so the insert is applied and acknowledged. The
+      // commit record only saves recovery a step (it logs it itself when it is missing), so a
+      // failure to append it (a full disk) must not fail the call: a retry would then be a
+      // repeat of a stored block, which is a success too.
+      try {
+        wal_->append(commit);
+      } catch (const std::exception&) {
+        std::fprintf(stderr, "[ombra.storage] insert: commit record not written\n");
+      }
+      maybe_crash(CrashPoint::InsertAfterCommit);
+    }
   }
-  maybe_crash(CrashPoint::InsertAfterCommit);
+  if (repeat) return finish_replay(*repeat);
   log_line("insert", ids.size(), bytes, ms_since(t0));
   return name;
 }
@@ -378,73 +499,58 @@ void Store::remove(const std::string& collection, const std::vector<std::string>
 
 void Store::put_key_file(const std::string& collection, const std::string& kind,
                          const std::vector<std::uint8_t>& envelope) {
-  std::lock_guard lk(mu_);
-  CollectionSpec spec;
-  if (!catalog_->get_collection(collection, &spec)) throw std::runtime_error("unknown collection");
-  core::EnvelopeKind k;
-  if (kind == kKeyContext)
-    k = core::EnvelopeKind::Context;
-  else if (kind == kKeyEvalMult || kind == kKeyAutomorphism)
-    k = core::EnvelopeKind::PublicEvalKey;
-  else
-    throw std::runtime_error("unknown key file kind");
-  core::read_envelope(envelope, k, spec.preset, ofhe_);  // also refuses unknown versions
-  std::string old;
-  for (auto& [kk, f] : catalog_->key_files(collection))
-    if (kk == kind) old = f;
-  const std::string file = hex_name('k', catalog_->next_segment_id(), ".env");
-  try {
-    write_file_durable(root_ + "/keys/" + file, envelope);
-    catalog_->put_key_file(collection, kind, file);
-  } catch (...) {
-    bool registered = false;
-    try {
-      for (auto& [kk, f] : catalog_->key_files(collection))
-        if (f == file) registered = true;
-    } catch (...) {
-    }
-    if (!registered) {
-      ::unlink((root_ + "/keys/" + file).c_str());
-      ::unlink((root_ + "/keys/" + file + ".tmp").c_str());
-    }
-    throw;
-  }
-  if (!old.empty()) ::unlink((root_ + "/keys/" + old).c_str());
+  put_key_files(collection, {{kind, envelope}});
 }
 
 void Store::put_key_files(
     const std::string& collection,
     const std::vector<std::pair<std::string, std::vector<std::uint8_t>>>& files) {
-  std::lock_guard lk(mu_);
-  CollectionSpec spec;
-  if (!catalog_->get_collection(collection, &spec)) throw std::runtime_error("unknown collection");
-  for (const auto& [kind, envelope] : files) {
-    core::EnvelopeKind k;
-    if (kind == kKeyContext)
-      k = core::EnvelopeKind::Context;
-    else if (kind == kKeyEvalMult || kind == kKeyAutomorphism)
-      k = core::EnvelopeKind::PublicEvalKey;
-    else
-      throw std::runtime_error("unknown key file kind");
-    core::read_envelope(envelope, k, spec.preset, ofhe_);
-  }
-  std::map<std::string, std::string> old;
-  for (auto& [kk, f] : catalog_->key_files(collection)) old[kk] = f;
-  std::vector<std::pair<std::string, std::string>> rows;
-  std::vector<std::string> written;
-  try {
+  // Step 1 (lock): check every envelope against the collection, take the file names.
+  std::vector<std::string> names;
+  {
+    std::lock_guard lk(mu_);
+    CollectionSpec spec;
+    if (!catalog_->get_collection(collection, &spec))
+      throw std::runtime_error("unknown collection");
     for (const auto& [kind, envelope] : files) {
-      const std::string file = hex_name('k', catalog_->next_segment_id(), ".env");
-      written.push_back(file);  // before the write: a failure after the rename leaves the file
-      write_file_durable(key_dir() + "/" + file, envelope);  // temp + fsync + rename
-      rows.emplace_back(kind, file);
+      core::EnvelopeKind k;
+      if (kind == kKeyContext)
+        k = core::EnvelopeKind::Context;
+      else if (kind == kKeyEvalMult || kind == kKeyAutomorphism)
+        k = core::EnvelopeKind::PublicEvalKey;
+      else
+        throw std::runtime_error("unknown key file kind");
+      core::read_envelope(envelope, k, spec.preset, ofhe_);  // also refuses unknown versions
     }
-    catalog_->put_key_files(collection, rows);
-  } catch (...) {
-    for (const auto& f : written) {
+    for (std::size_t i = 0; i < files.size(); ++i)
+      names.push_back(hex_name('k', catalog_->next_segment_id(), ".env"));
+  }
+  const auto discard = [&] {
+    for (const auto& f : names) {
       ::unlink((key_dir() + "/" + f).c_str());
       ::unlink((key_dir() + "/" + f + ".tmp").c_str());
     }
+  };
+  // Step 2 (no lock): write every file durably (temp, fsync, rename). Nothing refers to them yet.
+  try {
+    for (std::size_t i = 0; i < files.size(); ++i)
+      write_file_durable(key_dir() + "/" + names[i], files[i].second);
+  } catch (...) {
+    discard();
+    throw;
+  }
+  // Step 3 (lock): one catalog transaction registers all of them; the replaced files go.
+  std::lock_guard lk(mu_);
+  std::map<std::string, std::string> old;
+  std::vector<std::pair<std::string, std::string>> rows;
+  try {
+    if (!catalog_->get_collection(collection, nullptr))
+      throw std::runtime_error("unknown collection");  // dropped meanwhile
+    for (auto& [kk, f] : catalog_->key_files(collection)) old[kk] = f;
+    for (std::size_t i = 0; i < files.size(); ++i) rows.emplace_back(files[i].first, names[i]);
+    catalog_->put_key_files(collection, rows);
+  } catch (...) {
+    discard();
     throw;
   }
   for (const auto& [kind, file] : rows) {
@@ -455,29 +561,44 @@ void Store::put_key_files(
 
 void Store::put_blob(const std::string& collection, std::uint32_t kind, const std::string& id,
                      const std::vector<std::uint8_t>& payload) {
-  std::lock_guard lk(mu_);
   const auto t0 = std::chrono::steady_clock::now();
   if (!is_blob_kind(kind)) throw BlobKindError("unknown blob kind");
   if (!is_blob_bucket(payload.size())) throw BlobSizeError("blob size is not a bucket size");
-  if (!catalog_->get_collection(collection, nullptr))
-    throw std::runtime_error("unknown collection");
-  const std::string file = hex_name('b', catalog_->next_segment_id(), ".oblob");
+  // Step 1 (lock): the collection must exist; take the file name.
+  std::string file;
+  {
+    std::lock_guard lk(mu_);
+    if (!catalog_->get_collection(collection, nullptr))
+      throw std::runtime_error("unknown collection");
+    file = hex_name('b', catalog_->next_segment_id(), ".oblob");
+  }
   const std::string path = blob_dir() + "/" + file;
-  std::string old;
-  bool had = false;
+  // Step 2 (no lock): write the file durably. BlobBeforeRename / BlobAfterRename fire inside.
   try {
-    write_blob_file(path, kind, payload);  // BlobBeforeRename / BlobAfterRename fire inside
-    had = catalog_->put_blob(collection, kind, id, file, payload.size(), &old);
+    write_blob_file(path, kind, payload);
   } catch (...) {
-    std::string f;
-    if (!catalog_->get_blob(collection, kind, id, &f, nullptr) || f != file) {
-      ::unlink(path.c_str());
-      ::unlink((path + ".tmp").c_str());
-    }
+    ::unlink(path.c_str());
+    ::unlink((path + ".tmp").c_str());
     throw;
   }
-  maybe_crash(CrashPoint::BlobAfterCatalog);
-  if (had) ::unlink((blob_dir() + "/" + old).c_str());
+  // Step 3 (lock): one catalog transaction inserts or replaces the row; the replaced file goes.
+  {
+    std::lock_guard lk(mu_);
+    std::string old;
+    bool had = false;
+    try {
+      had = catalog_->put_blob(collection, kind, id, file, payload.size(), &old);
+    } catch (...) {
+      std::string f;
+      if (!catalog_->get_blob(collection, kind, id, &f, nullptr) || f != file) {
+        ::unlink(path.c_str());
+        ::unlink((path + ".tmp").c_str());
+      }
+      throw;
+    }
+    maybe_crash(CrashPoint::BlobAfterCatalog);
+    if (had) ::unlink((blob_dir() + "/" + old).c_str());
+  }
   fsync_best_effort(blob_dir());
   log_line("put_blob", 1, payload.size(), ms_since(t0));
 }
@@ -535,9 +656,19 @@ std::vector<std::string> Store::tombstones(const std::string& collection) const 
 }
 
 SegmentData Store::read_segment(const std::string& collection, const std::string& segment) const {
-  std::lock_guard lk(mu_);
   CollectionSpec spec;
-  if (!catalog_->get_collection(collection, &spec)) throw std::runtime_error("unknown collection");
+  SegmentPin pin;
+  {
+    std::lock_guard lk(mu_);
+    if (!catalog_->get_collection(collection, &spec))
+      throw std::runtime_error("unknown collection");
+    // Pin the file, so that a replacement that commits while it is read cannot unlink it; the
+    // read itself (tens of MB) runs without the lock.
+    if (catalog_->segment_row(collection, segment, nullptr)) {
+      ++pins_[segment];
+      pin = SegmentPin(this, {segment});
+    }
+  }
   return ombra::storage::read_segment(segment_path(segment), spec.preset, ofhe_);
 }
 

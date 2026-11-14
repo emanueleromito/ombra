@@ -361,6 +361,15 @@ bool Catalog::id_exists(const std::string& collection, const std::string& id) co
   return q.step();
 }
 
+bool Catalog::segment_of_id(const std::string& collection, const std::string& id,
+                            std::string* file) const {
+  Stmt q(db_, "SELECT segment FROM vectors WHERE collection=? AND id=?");
+  q.text(1, collection).blob(2, id);
+  if (!q.step()) return false;
+  if (file) *file = q.col_text(0);
+  return true;
+}
+
 void Catalog::tombstone(const std::string& collection, const std::vector<std::string>& ids) {
   Tx tx(db_);
   Stmt s(db_,

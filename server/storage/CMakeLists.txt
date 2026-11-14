@@ -30,7 +30,7 @@ target_link_libraries(ombra_verify PRIVATE ombra_storage)
 add_executable(ombra_backup tools/ombra_backup.cpp)
 target_link_libraries(ombra_backup PRIVATE ombra_storage)
 
-foreach(t segment wal catalog recovery blob seeded verify backup diskfull)
+foreach(t segment wal catalog recovery blob seeded verify backup diskfull concurrency)
   add_executable(ombra_storage_${t}_test tests/${t}_test.cpp)
   target_link_libraries(ombra_storage_${t}_test PRIVATE ombra_storage)
   add_test(NAME storage_${t} COMMAND ombra_storage_${t}_test)

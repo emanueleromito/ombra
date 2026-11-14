@@ -105,6 +105,7 @@ void write_file_durable(const std::string& path, const std::vector<std::uint8_t>
       }
       off += static_cast<std::size_t>(w);
     }
+    maybe_delay_write();
     if (fs_fault_hit() || ::fsync(f.fd) != 0) throw_io_error("fsync", tmp);
   }
   if (before_rename) before_rename();

@@ -99,11 +99,16 @@ static void insert_case(CrashPoint p, bool expect_present, bool expect_crash) {
     else
       CHECK(has_none(have, kIdsB));  // all-or-nothing
   }
-  // The recovered store accepts the same ids again iff the insert was absent.
+  // The recovered store accepts the same ids again iff the insert was absent. A present block
+  // is repeated as a no-op when the bytes are identical (idempotent insert) and refused when the
+  // ids come with other columns.
   Store s(d.path, kOfhe);
-  if (expect_present)
-    CHECK_THROWS(s.insert("docs", 1, kIdsB, cols(5)));
-  else
+  if (expect_present) {
+    CHECK_THROWS(s.insert("docs", 1, kIdsB, cols(9)));
+    bool replayed = false;
+    s.insert("docs", 1, kIdsB, cols(5), &replayed);
+    CHECK(replayed);
+  } else
     s.insert("docs", 1, kIdsB, cols(5));
 }
 

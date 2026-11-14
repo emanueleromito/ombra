@@ -73,6 +73,8 @@ class Catalog {
   void add_segment(const std::string& collection, const SegmentRow& seg,
                    const std::vector<std::string>& ids);
   bool id_exists(const std::string& collection, const std::string& id) const;
+  // The segment file that holds `id` (tombstoned or not); false if the id is unknown.
+  bool segment_of_id(const std::string& collection, const std::string& id, std::string* file) const;
   // Tombstone the ids that exist; unknown ids are ignored; idempotent.
   void tombstone(const std::string& collection, const std::vector<std::string>& ids);
   std::vector<std::string> tombstones(const std::string& collection) const;

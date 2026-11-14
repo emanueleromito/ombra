@@ -8,6 +8,8 @@
 
 #include <atomic>
 #include <cerrno>
+#include <chrono>
+#include <thread>
 
 namespace ombra::storage {
 
@@ -80,6 +82,18 @@ inline bool fs_fault_hit() {
   if (fs_fault_countdown().fetch_sub(1) != 1) return false;
   errno = fs_fault_errno().load();
   return true;
+}
+
+// Slow-disk injection for the concurrency tests: every durable file write sleeps this many
+// milliseconds before its fsync (0 = off, one relaxed atomic load).
+inline std::atomic<int>& write_delay_ms_storage() {
+  static std::atomic<int> d{0};
+  return d;
+}
+inline void set_write_delay_ms(int ms) { write_delay_ms_storage().store(ms); }
+inline void maybe_delay_write() {
+  const int ms = write_delay_ms_storage().load(std::memory_order_relaxed);
+  if (ms > 0) std::this_thread::sleep_for(std::chrono::milliseconds(ms));
 }
 
 }  // namespace ombra::storage
