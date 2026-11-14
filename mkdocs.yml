@@ -80,6 +80,7 @@ nav:
       - security/threat-model.md
       - security/what-the-server-learns.md
       - security/parameters.md
+      - security/api-keys.md
       - security/out-of-scope.md
   - Performance:
       - performance/latency-and-throughput.md
@@ -90,6 +91,7 @@ nav:
       - reference/python-api.md
       - reference/grpc-api.md
       - reference/configuration.md
+      - reference/cli.md
       - reference/presets.md
       - reference/file-formats.md
   - Operations:

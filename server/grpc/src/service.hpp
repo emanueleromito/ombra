@@ -12,6 +12,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <string_view>
 
 #include "ombra/search/session.hpp"
 #include "ombra/server/auth.hpp"
@@ -53,6 +54,10 @@ class OmbraService final : public ombra::v1::Ombra::Service {
         limits_(limits),
         sessions_(limits.max_sessions, limits.max_sessions_per_key) {}
 
+  // Shutdown: from now on every new call is refused with UNAVAILABLE (clients retry elsewhere or
+  // later). Calls already running are not touched.
+  void begin_drain() { draining_.store(true); }
+
   grpc::Status CreateCollection(grpc::ServerContext*, const v1::CreateCollectionRequest*,
                                 v1::CreateCollectionResponse*) override;
   grpc::Status GetCollection(grpc::ServerContext*, const v1::GetCollectionRequest*,
@@ -63,7 +68,7 @@ class OmbraService final : public ombra::v1::Ombra::Service {
                               v1::DropCollectionResponse*) override;
   grpc::Status UploadKeys(grpc::ServerContext*, grpc::ServerReader<v1::UploadKeysChunk>*,
                           v1::UploadKeysResponse*) override;
-  grpc::Status Insert(grpc::ServerContext*, grpc::ServerReader<v1::InsertBlock>*,
+  grpc::Status Insert(grpc::ServerContext*, grpc::ServerReader<v1::InsertRequest>*,
                       v1::InsertResponse*) override;
   grpc::Status Delete(grpc::ServerContext*, const v1::DeleteRequest*, v1::DeleteResponse*) override;
   grpc::Status Search(grpc::ServerContext*,
@@ -93,7 +98,7 @@ class OmbraService final : public ombra::v1::Ombra::Service {
                                   v1::DropCollectionResponse*);
   grpc::Status run_UploadKeys(grpc::ServerContext*, grpc::ServerReader<v1::UploadKeysChunk>*,
                               v1::UploadKeysResponse*);
-  grpc::Status run_Insert(grpc::ServerContext*, grpc::ServerReader<v1::InsertBlock>*,
+  grpc::Status run_Insert(grpc::ServerContext*, grpc::ServerReader<v1::InsertRequest>*,
                           v1::InsertResponse*);
   grpc::Status run_Delete(grpc::ServerContext*, const v1::DeleteRequest*, v1::DeleteResponse*);
   grpc::Status run_Search(grpc::ServerContext*,
@@ -111,6 +116,8 @@ class OmbraService final : public ombra::v1::Ombra::Service {
                            grpc::ServerWriter<v1::GetBlobResponse>*);
   grpc::Status run_DeleteBlobs(grpc::ServerContext*, const v1::DeleteBlobsRequest*,
                                v1::DeleteBlobsResponse*);
+  // OK, or PERMISSION_DENIED if the call's API key is scoped to another collection (auth.hpp).
+  grpc::Status check_collection(grpc::ServerContext* ctx, std::string_view name);
   template <class Resp, class Fn>
   grpc::Status guarded(grpc::ServerContext* ctx, Rpc rpc, Resp* resp, Fn&& fn);
 
@@ -127,7 +134,8 @@ class OmbraService final : public ombra::v1::Ombra::Service {
   SessionLimiter sessions_;
   Watchdog watchdog_;
   LogLimiter refused_log_{std::chrono::seconds(5)};  // failed-login log lines
-  std::atomic<std::size_t> key_uploads_{0};          // uploads staging key files right now
+  std::atomic<bool> draining_{false};
+  std::atomic<std::size_t> key_uploads_{0};  // uploads staging key files right now
   std::mutex load_mu_;
   std::set<std::string> loaded_;  // collections whose keys the engine holds, guarded by load_mu_
 };

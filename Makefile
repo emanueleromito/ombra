@@ -25,7 +25,7 @@ build: ## Build C++/CUDA locally (needs CUDA)
 	cmake -S . -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=Debug -DOMBRA_ENABLE_CUDA=ON "-DCMAKE_CUDA_ARCHITECTURES=$(CUDA_ARCHS)"
 	cmake --build $(BUILD_DIR) -j
 
-build-cpu: ## Build C++ code without CUDA (for CPU-only tests)
+build-cpu: ## Build C++ code without CUDA, with a CPU-only ombra_server (tests and development)
 	cmake -S . -B $(BUILD_DIR)-cpu -DCMAKE_BUILD_TYPE=Debug -DOMBRA_ENABLE_CUDA=OFF
 	cmake --build $(BUILD_DIR)-cpu -j
 
@@ -39,7 +39,7 @@ test-gpu: ## Run GPU tests on Modal (A10)
 test-openfhe: ## Run tests marked openfhe on Modal (CPU only, pinned image)
 	modal run modal_app.py::test_openfhe
 
-test-openfhe-local: ## Run tests marked openfhe here, no Modal (needs OpenFHE 1.6.1; the CI image has it)
+test-openfhe-local: build-cpu ## Run tests marked openfhe here, no Modal (needs OpenFHE 1.6.1; the CI image has it)
 	cmake -S ci/drivers -B $(BUILD_DIR)-openfhe -DCMAKE_BUILD_TYPE=Release -DOMBRA_DRIVER_OUT=$(CURDIR)/$(BUILD_DIR)
 	cmake --build $(BUILD_DIR)-openfhe -j
 	OMBRA_REQUIRE_NATIVE=1 cmake -S client -B $(BUILD_DIR)-native -DCMAKE_BUILD_TYPE=Release \
@@ -47,7 +47,7 @@ test-openfhe-local: ## Run tests marked openfhe here, no Modal (needs OpenFHE 1.
 		-DPython_EXECUTABLE=$$($(PYTHON) -c 'import sys; print(sys.executable)')
 	cmake --build $(BUILD_DIR)-native -j
 	cp $(BUILD_DIR)-native/_native*.so client/ombra/
-	$(PYTHON) -m pytest -m openfhe -v
+	OMBRA_SERVER_BIN=$(CURDIR)/$(BUILD_DIR)-cpu/server/grpc/ombra_server $(PYTHON) -m pytest -m openfhe -v
 
 bench: ## Run benchmarks on Modal (A100); TASK=<name> to pick one
 	modal run modal_app.py::bench --task $(TASK)

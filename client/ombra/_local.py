@@ -662,52 +662,99 @@ class LocalServer:
             ) from None
 
     # ---- insert, delete ---------------------------------------------------------------------
-    def Insert(self, blocks: Iterable[Any]) -> Any:
+    def Insert(self, parts: Iterable[Any]) -> Any:
+        """Same stream as the server: per block one header, then its columns, one per message."""
         pb, n, name, c = self.pb, 0, "", None
-        try:
-            count = 0
-            for b in blocks:
-                self._version(b.api_version)
-                if count == 0:
-                    name = b.collection
-                    c = self._coll(name)
-                    if c.ctx is None:
-                        raise Refuse(pb.ERROR_KEYS_MISSING, "evaluation keys are not uploaded")
-                elif b.collection != name:
-                    raise Refuse(pb.ERROR_INVALID_ARGUMENT, "collection changed in one stream")
-                count += 1
-                spec = c.spec
-                if b.cluster_id > spec.cluster_count:
-                    raise Refuse(pb.ERROR_INVALID_ARGUMENT, "cluster id out of range")
-                if b.is_center != (b.cluster_id == spec.cluster_count):
-                    raise Refuse(pb.ERROR_INVALID_ARGUMENT, "is_center must match the center id")
-                if len(b.ids) == 0:
-                    raise Refuse(pb.ERROR_INVALID_ARGUMENT, "block has no ids")
-                if len(b.ids) > c.ctx.batch_size:
-                    raise Refuse(pb.ERROR_SIZE_LIMIT, "block has more ids than slots")
+        cur: Any = None  # the block under assembly
+        want = 0
+        started = 0
+
+        def close() -> None:
+            nonlocal cur, n
+            if cur is None:
+                return
+            if len(cur.columns) != want:
+                raise Refuse(
+                    pb.ERROR_BAD_SEQUENCE, "the block has fewer columns than the layout needs"
+                )
+            for col in cur.columns:
+                self._column(c, col)
+            if not self._is_repeat(c, cur):  # a repeated block is a success that stores nothing
                 known = {i for s in c.segments.values() for i in s.ids}
-                seen: set[bytes] = set()
-                for i in b.ids:
-                    if not i:
-                        raise Refuse(pb.ERROR_INVALID_ARGUMENT, "empty id")
-                    if len(i) > MAX_ID:
-                        raise Refuse(pb.ERROR_SIZE_LIMIT, "id is too long")
-                    if i in seen or i in known:
-                        raise Refuse(pb.ERROR_INVALID_ARGUMENT, "duplicate id")
-                    seen.add(bytes(i))
-                cards = sum(f.cardinality for f in spec.filter_fields)
-                want = spec.dimension + (0 if b.is_center else cards)
-                if len(b.columns) != want:
-                    raise Refuse(pb.ERROR_INVALID_ARGUMENT, "wrong number of columns")
-                for col in b.columns:
-                    self._column(c, col)
-                self._put_segment(c, b)
-                n += len(b.ids)
-            if count == 0:
+                if any(i in known for i in cur.ids):
+                    raise Refuse(pb.ERROR_INVALID_ARGUMENT, "duplicate id")
+                self._put_segment(c, cur)
+            n += len(cur.ids)
+            cur = None
+
+        try:
+            for m in parts:
+                self._version(m.api_version)
+                which = m.WhichOneof("part")
+                if which == "header":
+                    close()
+                    h = m.header
+                    if started == 0:
+                        name = h.collection
+                        c = self._coll(name)
+                        if c.ctx is None:
+                            raise Refuse(pb.ERROR_KEYS_MISSING, "evaluation keys are not uploaded")
+                    elif h.collection != name:
+                        raise Refuse(pb.ERROR_INVALID_ARGUMENT, "collection changed in one stream")
+                    started += 1
+                    spec = c.spec
+                    if h.cluster_id > spec.cluster_count:
+                        raise Refuse(pb.ERROR_INVALID_ARGUMENT, "cluster id out of range")
+                    if h.is_center != (h.cluster_id == spec.cluster_count):
+                        raise Refuse(
+                            pb.ERROR_INVALID_ARGUMENT, "is_center must match the center id"
+                        )
+                    if len(h.ids) == 0:
+                        raise Refuse(pb.ERROR_INVALID_ARGUMENT, "block has no ids")
+                    if len(h.ids) > c.ctx.batch_size:
+                        raise Refuse(pb.ERROR_SIZE_LIMIT, "block has more ids than slots")
+                    seen: set[bytes] = set()
+                    for i in h.ids:
+                        if not i:
+                            raise Refuse(pb.ERROR_INVALID_ARGUMENT, "empty id")
+                        if len(i) > MAX_ID:
+                            raise Refuse(pb.ERROR_SIZE_LIMIT, "id is too long")
+                        if i in seen:
+                            raise Refuse(pb.ERROR_INVALID_ARGUMENT, "duplicate id")
+                        seen.add(bytes(i))
+                    cards = sum(f.cardinality for f in spec.filter_fields)
+                    want = spec.dimension + (0 if h.is_center else cards)
+                    cur = pb.InsertBlock(
+                        api_version=m.api_version,
+                        collection=name,
+                        cluster_id=h.cluster_id,
+                        is_center=h.is_center,
+                    )
+                    cur.ids.extend(h.ids)
+                elif which == "column":
+                    if cur is None:
+                        raise Refuse(pb.ERROR_BAD_SEQUENCE, "a column before the header")
+                    if len(cur.columns) >= want:
+                        raise Refuse(pb.ERROR_SIZE_LIMIT, "more columns than the layout has")
+                    cur.columns.append(m.column)
+                else:
+                    raise Refuse(pb.ERROR_INVALID_ARGUMENT, "empty message")
+            if started == 0:
                 raise Refuse(pb.ERROR_BAD_SEQUENCE, "no blocks")
+            close()
         except Refuse as e:
             return pb.InsertResponse(inserted=n, error=self._err(e))
         return pb.InsertResponse(inserted=n)
+
+    @staticmethod
+    def _is_repeat(c: _Coll, b: Any) -> bool:
+        """True if a stored block of the same cluster has exactly these ids and columns."""
+        return any(
+            s.cluster_id == b.cluster_id
+            and list(s.ids) == list(b.ids)
+            and list(s.columns) == list(b.columns)
+            for s in c.segments.values()
+        )
 
     def _put_segment(self, c: _Coll, b: Any) -> str:
         seg = f"s{c.next_seg:08d}"
@@ -1036,6 +1083,7 @@ class LocalServer:
                             b = c.segments[seg]
                             if b.cluster_id == cl:
                                 msg.score_blocks.append(self._score(c, seg, leaves, True))
+                                msg.block_sizes.append(len(b.ids))
                                 msg.ids.extend(b.ids)
                     yield pb.SearchResponse(scores=msg)
         except Refuse as e:

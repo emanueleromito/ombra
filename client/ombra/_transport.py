@@ -3,25 +3,122 @@
 
 from __future__ import annotations
 
+import contextvars
+import random
+import secrets
+import time
 import warnings
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from ombra._proto import load_stubs
+from ombra.errors import OmbraError, from_rpc_error, set_last_request_id
+from ombra.retry import Replayable, RetryPolicy, call_with_retry
 
-# Largest message the client sends: one InsertBlock carries d (+ filter) column ciphertexts of
-# about 0.8 MB each at the biggest preset (d = 768: ~600 MB), so the send limit stays high.
-MAX_SEND_MESSAGE = 1 << 30
+# Largest message the client sends. Every stream is sent in parts (Insert, ReplaceBlock: one column
+# of about 0.8 MB at the biggest preset; PutBlob and UploadKeys: chunks of at most 4 MiB; Insert
+# header: at most one block of ids, about 2 MB), so this equals the server's receive limit.
+MAX_SEND_MESSAGE = 16 << 20
+# Requests that carry an id list (Delete, DeleteBlobs) are split so each one stays well under the
+# server's receive limit: at most this many id bytes per request.
+ID_BYTES_PER_REQUEST = 8 << 20
+
+
+def id_batches(ids, max_bytes: int = ID_BYTES_PER_REQUEST):
+    """Split `ids` into lists whose total length is at most `max_bytes` (each list non-empty)."""
+    batch: list[bytes] = []
+    size = 0
+    for i in ids:
+        b = bytes(i)
+        if batch and size + len(b) + 4 > max_bytes:
+            yield batch
+            batch, size = [], 0
+        batch.append(b)
+        size += len(b) + 4  # field tag and length prefix
+    if batch:
+        yield batch
+
+
 # Largest message the client accepts from a server. Server answers are one ciphertext or blob chunk
 # (<= 4 MiB), one SearchScores (a few blocks and <= 100,000 ids of 256 bytes) or a ListBlocks
 # catalog (~50 bytes a block); 64 MiB covers all of them (audit A-23).
 MAX_RECEIVE_MESSAGE = 64 << 20
-# Per-call deadlines in seconds: single-answer calls, and calls that stream data or search.
-DEFAULT_TIMEOUT = 120.0
-DEFAULT_STREAM_TIMEOUT = 1800.0
-_STREAMING = frozenset(
-    {"UploadKeys", "Insert", "Search", "GetBlock", "ReplaceBlock", "PutBlob", "GetBlob"}
-)
+# Default deadlines in seconds. `timeout` / `stream_timeout` of the constructor replace the two
+# general ones; `deadlines={"Search": 600}` replaces one call; a `timeout=` keyword on a single
+# stub call beats both. A deadline bounds the whole call, so for a stream it bounds the stream.
+DEFAULT_TIMEOUT = 120.0  # calls with one request and one answer that change data
+DEFAULT_STREAM_TIMEOUT = 1800.0  # calls that stream big data or search
+DEFAULT_BLOB_TIMEOUT = 300.0  # one blob is at most 16 MiB
+DEFAULT_METADATA_TIMEOUT = 30.0  # small reads
+_METADATA = frozenset({"GetCollection", "ListCollections", "ListBlocks"})
+_BLOB = frozenset({"PutBlob", "GetBlob"})
+_STREAMING = frozenset({"UploadKeys", "Insert", "Search", "GetBlock", "ReplaceBlock"})
+_UNARY = frozenset({"CreateCollection", "DropCollection", "Delete", "DeleteBlobs"})
+ALL_RPCS = _METADATA | _BLOB | _STREAMING | _UNARY
+# Streams of answers that are read to the end inside the retry loop, so a break in the middle is
+# repeated as a whole (the answers are bounded: one block or one blob).
+_COLLECT = frozenset({"GetBlock", "GetBlob"})
+# Calls whose retry is driven by the caller, not by the stub wrapper: Search by the stream
+# (it must replay the same requests) and CreateCollection by `Collection.create`.
+_CALLER_RETRIES = frozenset({"Search", "CreateCollection"})
+
+
+def may_retry(rpc: str) -> bool:
+    """The one place that decides which calls are repeated after a retryable error.
+
+    A call is listed only if doing it twice leaves the same state: reads, Search, Delete (an id
+    that is already gone is ignored), PutBlob (atomic replace), DeleteBlobs and UploadKeys (atomic
+    replace with the same keys) and Insert: the server treats a block whose ids are all stored in
+    one block with byte-identical columns as a success that stores nothing, so a repeat after a
+    lost answer neither duplicates nor fails (the call site sends the same encrypted bytes, as a
+    `Replayable`). ReplaceBlock is NOT listed: after a lost answer the old blocks are gone, so a
+    repeat is refused as ERROR_BLOCK_NOT_FOUND although the first try worked.
+    """
+    return rpc in {
+        "GetCollection",
+        "ListCollections",
+        "ListBlocks",
+        "GetBlock",
+        "GetBlob",
+        "Search",
+        "Insert",
+        "Delete",
+        "PutBlob",
+        "DeleteBlobs",
+        "UploadKeys",
+    }
+
+
+def default_deadlines(timeout: float, stream_timeout: float) -> dict[str, float]:
+    """The deadline of every call: `timeout` for data-changing single calls (but short for small
+    reads), `stream_timeout` for big streams and searches, five minutes for one blob."""
+    out: dict[str, float] = {}
+    for rpc in ALL_RPCS:
+        if rpc in _METADATA:
+            out[rpc] = min(DEFAULT_METADATA_TIMEOUT, timeout)
+        elif rpc in _BLOB:
+            out[rpc] = min(DEFAULT_BLOB_TIMEOUT, stream_timeout)
+        elif rpc in _STREAMING:
+            out[rpc] = stream_timeout
+        else:
+            out[rpc] = timeout
+    return out
+
+
 _LOOPBACK = frozenset({"localhost", "127.0.0.1", "::1"})
+
+
+class _Attempts:
+    """The request id of one logical call and how many attempts used it so far."""
+
+    def __init__(self) -> None:
+        self.request_id = secrets.token_hex(8)  # random; 16 hex characters
+        self.n = 0
+
+
+_ATTEMPTS: contextvars.ContextVar[_Attempts | None] = contextvars.ContextVar(
+    "ombra_attempts", default=None
+)
 
 
 def _host(address: str) -> str:
@@ -43,21 +140,84 @@ def _warn_if_not_loopback(address: str) -> None:
         )
 
 
-class _DeadlineStub:
-    """Gives every call of the generated stub a deadline unless the caller sets one."""
+class ResilientStub:
+    """Wraps the generated stub: every call gets a deadline, gRPC errors become `OmbraError`s, and
+    calls that are safe to repeat are retried under a `RetryPolicy` (see `may_retry`).
 
-    def __init__(self, stub: Any, timeout: float, stream_timeout: float) -> None:
-        self._stub, self._timeout, self._stream = stub, timeout, stream_timeout
+    A call that sends a request stream is repeated only if the stream is a `Replayable`.
+    """
+
+    def __init__(
+        self,
+        stub: Any,
+        deadlines: Mapping[str, float],
+        policy: RetryPolicy,
+        *,
+        clock: Callable[[], float] = time.monotonic,
+        sleep: Callable[[float], None] = time.sleep,
+        rand: Callable[[], float] = random.random,
+    ) -> None:
+        self._stub, self._deadlines, self.retry_policy = stub, dict(deadlines), policy
+        self._clock, self._sleep, self._rand = clock, sleep, rand
+
+    def retry_runner(self, rpc: str, fn: Callable[[], Any]) -> Any:
+        """Run `fn` under this stub's policy (used by callers that drive their own retries). All
+        attempts send the same `x-request-id`, with `x-attempt` counting up from 1."""
+        token = _ATTEMPTS.set(_Attempts())
+        try:
+            return call_with_retry(
+                fn,
+                rpc=rpc,
+                policy=self.retry_policy,
+                clock=self._clock,
+                sleep=self._sleep,
+                rand=self._rand,
+            )
+        finally:
+            _ATTEMPTS.reset(token)
 
     def __getattr__(self, name: str) -> Any:
+        if name.startswith("_"):
+            raise AttributeError(name)
         method = getattr(self._stub, name)
-        limit = self._stream if name in _STREAMING else self._timeout
+        limit = self._deadlines.get(name, DEFAULT_TIMEOUT)
+
+        def once(args: tuple, kwargs: dict) -> Any:
+            real = [iter(a) if isinstance(a, Replayable) else a for a in args]
+            # One id per call, kept across the retries of that call (see retry_runner).
+            state = _ATTEMPTS.get() or _Attempts()
+            state.n += 1
+            rid = state.request_id
+            set_last_request_id(rid)
+            kwargs = {
+                **kwargs,
+                "metadata": (("x-request-id", rid), ("x-attempt", str(state.n))),
+            }
+            try:
+                res = method(*real, **kwargs)
+                return list(res) if name in _COLLECT else res
+            except OmbraError:
+                raise
+            except Exception as exc:
+                mapped = from_rpc_error(exc, name, rid)
+                if mapped is None:
+                    raise
+                raise mapped from exc
 
         def call(*args: Any, **kwargs: Any) -> Any:
             kwargs.setdefault("timeout", limit)
-            return method(*args, **kwargs)
+            if name in _CALLER_RETRIES or not may_retry(name):
+                return once(args, kwargs)
+            streams_in = any(not isinstance(a, Replayable) and _is_iterator(a) for a in args)
+            if streams_in:  # a one-shot request stream cannot be sent again
+                return once(args, kwargs)
+            return self.retry_runner(name, lambda: once(args, kwargs))
 
         return call
+
+
+def _is_iterator(value: Any) -> bool:
+    return hasattr(value, "__next__")
 
 
 class GrpcTransport:
@@ -70,11 +230,20 @@ class GrpcTransport:
         *,
         timeout: float = DEFAULT_TIMEOUT,
         stream_timeout: float = DEFAULT_STREAM_TIMEOUT,
+        deadlines: Mapping[str, float] | None = None,
+        retry: RetryPolicy | None = None,
     ) -> None:
         import grpc
 
         if timeout <= 0 or stream_timeout <= 0:
             raise ValueError("timeouts must be positive")
+        per_call = default_deadlines(timeout, stream_timeout)
+        for rpc, seconds in (deadlines or {}).items():
+            if rpc not in ALL_RPCS:
+                raise ValueError(f"unknown call name in deadlines: {rpc!r}")
+            if seconds <= 0:
+                raise ValueError("timeouts must be positive")
+            per_call[rpc] = seconds
         options = [
             ("grpc.max_send_message_length", MAX_SEND_MESSAGE),
             ("grpc.max_receive_message_length", MAX_RECEIVE_MESSAGE),
@@ -94,7 +263,9 @@ class GrpcTransport:
                 )
             self.channel = grpc.secure_channel(address, creds, options=options)
         self.pb, pbg = load_stubs()
-        self.stub = _DeadlineStub(pbg.OmbraStub(self.channel), timeout, stream_timeout)
+        self.stub = ResilientStub(
+            pbg.OmbraStub(self.channel), per_call, RetryPolicy() if retry is None else retry
+        )
         import openfhe
 
         self.openfhe_version = openfhe.__version__

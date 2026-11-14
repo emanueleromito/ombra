@@ -39,6 +39,8 @@ const char* reason(int status) {
       return "Method Not Allowed";
     case 408:
       return "Request Timeout";
+    case 503:
+      return "Service Unavailable";
     case 431:
       return "Request Header Fields Too Large";
     default:

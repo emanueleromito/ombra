@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
-// Search engine API, what the gRPC service calls. Needs OpenFHE and CUDA.
+// Search engine API, what the gRPC service calls. Needs OpenFHE and CUDA. Without CUDA a CPU-only
+// engine (session_cpu.cpp) has the same API: keys are loaded and checked the same way, and
+// open_session throws GpuUnavailable. It is for tests and development.
 //
 //   SearchEngine engine(store, config);        // GPU cluster cache, one compute stream
 //   engine.load_collection("docs");            // context, EvalMult and automorphism keys
@@ -65,6 +67,14 @@ class CollectionNotFound : public SearchError {  // ERROR_COLLECTION_NOT_FOUND
 };
 
 class ResourceExhausted : public SearchError {  // ERROR_SIZE_LIMIT: too many sessions for the GPU
+ public:
+  using SearchError::SearchError;
+};
+
+// Thrown by the CPU-only build (OMBRA_ENABLE_CUDA=OFF) wherever the GPU is needed, that is when a
+// search session is opened. The message is fixed and safe to send to the client. The GPU build
+// never throws it.
+class GpuUnavailable : public SearchError {  // ERROR_INTERNAL with this message (see service.cpp)
  public:
   using SearchError::SearchError;
 };

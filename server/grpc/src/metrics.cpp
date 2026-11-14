@@ -32,6 +32,9 @@ std::string metrics_json(const Metrics& m, const Gauges& g) {
   }
   s += "},\"auth\":{\"unauthenticated\":" + u(m.unauthenticated()) +
        ",\"permission_denied\":" + u(m.permission_denied()) + "}";
+  // Only the CPU-only build (tests and development) adds this key, so the GPU build's output is
+  // unchanged.
+  if (!g.gpu_available) s += ",\"gpu_available\":false";
   s += ",\"gpu_memory\":{\"used_bytes\":" + u(g.gpu_used_bytes) +
        ",\"total_bytes\":" + u(g.gpu_total_bytes) + "}";
   const std::uint64_t req = g.cache_hits + g.cache_misses;

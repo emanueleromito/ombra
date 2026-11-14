@@ -4,6 +4,7 @@
 //                [--tls-cert F --tls-key F] [--rest-port N [--rest-host H]]
 //                [--insecure] [--no-auth]
 //                [--max-message-mb N] [--memory-quota-mb N] [--max-threads N]
+//                [--shutdown-grace-s N]
 //                [--max-sessions N] [--max-sessions-per-key N] [--session-budget-mb N]
 //                [--search-idle-s N] [--search-total-s N] [--max-rounds N]
 //                [--max-collections N] [--max-cluster-count N] [--max-blobs N]
@@ -12,7 +13,9 @@
 // ombra_server --version
 //
 // The ombra.v1 gRPC server over the storage engine and the GPU search engine, with TLS,
-// API keys and a REST admin port.
+// API keys and a REST admin port. A build with OMBRA_ENABLE_CUDA=OFF (tests and development only)
+// has no GPU: every call works except Search, which answers with an error that says so, and
+// /metrics reports gpu_available false.
 //
 // Safe defaults: the server refuses to start without TLS unless --insecure is given, and without an
 // API key file (D/api_keys.v1, made with --create-api-key) unless --no-auth is given. Both flags
@@ -28,8 +31,14 @@
 // collection, the blocks whose vectors are all deleted; it logs counts only.
 //
 // Prints "ombra_server listening on HOST:PORT" on stdout once the port is bound (PORT 0 picks a
-// free port), then, with --rest-port, "ombra_server rest listening on HOST:PORT". Shuts down on
-// SIGINT or SIGTERM.
+// free port), then, with --rest-port, "ombra_server rest listening on HOST:PORT".
+//
+// Shutdown. On the first SIGTERM or SIGINT the server (1) reports not ready at once (GET /readyz
+// answers 503; /healthz stays 200 while the process lives), (2) stops accepting new calls (they get
+// UNAVAILABLE, which clients retry), (3) lets running calls finish for --shutdown-grace-s seconds
+// (default 30), then cancels the rest (a cancelled call is not acknowledged and never stores the
+// block it was still receiving), and (4) exits 0. A second SIGTERM or SIGINT skips the wait and
+// exits 1 at once; every acknowledged write is already durable and recovery sweeps the rest.
 #include <grpcpp/grpcpp.h>
 #include <sys/stat.h>
 
@@ -49,6 +58,7 @@
 #include "ombra/search/session.hpp"
 #include "ombra/server/auth.hpp"
 #include "ombra/server/limits.hpp"
+#include "ombra/server/log.hpp"
 #include "ombra/server/metrics.hpp"
 #include "ombra/server/policy.hpp"
 #include "ombra/storage/store.hpp"
@@ -66,8 +76,12 @@
 namespace {
 
 std::atomic<bool> g_stop{false};
+std::atomic<int> g_signals{0};  // SIGTERM/SIGINT received so far; the second one forces the exit
 std::atomic<bool> g_reload{false};
-extern "C" void on_signal(int) { g_stop.store(true); }
+extern "C" void on_signal(int) {
+  g_signals.fetch_add(1);
+  g_stop.store(true);
+}
 extern "C" void on_hup(int) { g_reload.store(true); }
 
 using ombra::server::is_loopback_listen;
@@ -96,6 +110,9 @@ ombra::server::Gauges collect_gauges(ombra::storage::Store& store,
     }
   }
   ombra::server::gpu_memory(&g.gpu_used_bytes, &g.gpu_total_bytes);
+#ifdef OMBRA_NO_GPU
+  g.gpu_available = false;
+#endif
   const auto cm = engine.cache_metrics();
   g.cache_hits = cm.hits;
   g.cache_misses = cm.misses;
@@ -119,13 +136,16 @@ constexpr const char* kArgHandshakeTimeoutMs = "grpc.server_handshake_timeout_ms
 
 int main(int argc, char** argv) {
   std::string data_dir, listen, ofhe = OMBRA_OPENFHE_VERSION;
-  std::string tls_cert, tls_key, scope_arg, rest_host;
+  std::string tls_cert, tls_key, scope_arg, rest_host, key_collection, log_format_arg;
   std::uint64_t gpu_mb = 4096, host_mb = 2048;
   std::uint64_t compact_ms = 60000;
-  // Messages carry whole blocks (tens of MB at the larger preset). The C++ API has one receive
-  // limit for the whole server, so it is the size of the largest legitimate message; it is applied
-  // after authentication, and the ResourceQuota bounds all buffered messages together.
-  std::uint64_t max_message_mb = 1024, memory_quota_mb = 4096, max_threads = 128;
+  // The C++ API has one receive limit for the whole server. No message is larger than a column or
+  // a 4 MiB chunk of a key or blob (Insert, ReplaceBlock, PutBlob and UploadKeys are streams of
+  // parts), so 16 MiB holds the largest one with room: an unseeded column of the largest preset
+  // is under 1 MiB, an id list of one block at most 2.2 MB. The limit is applied after
+  // authentication, and the ResourceQuota bounds all buffered messages together.
+  std::uint64_t max_message_mb = 16, memory_quota_mb = 2048, max_threads = 128;
+  std::uint64_t shutdown_grace_s = 30;
   std::uint64_t session_budget_mb = 0, rest_workers = 4, rest_max_conns = 32;
   std::uint64_t max_blob_mb = 16384, max_key_upload_mb = 2048;
   std::uint64_t search_idle_s = 60, search_total_s = 600;
@@ -170,7 +190,9 @@ int main(int argc, char** argv) {
     else if (a == "--compact-interval-ms")
       compact_ms = num(0, std::uint64_t{1} << 40);
     else if (a == "--max-message-mb")
-      max_message_mb = num(4, 2000);
+      max_message_mb = num(8, 2000);  // at least a 4 MiB chunk plus its framing, with room
+    else if (a == "--shutdown-grace-s")
+      shutdown_grace_s = num(0, 86400);
     else if (a == "--memory-quota-mb")
       memory_quota_mb = num(64, std::uint64_t{1} << 24);
     else if (a == "--max-threads")
@@ -212,6 +234,10 @@ int main(int argc, char** argv) {
       rest_host = next();
     else if (a == "--scope")
       scope_arg = next();
+    else if (a == "--collection")
+      key_collection = next();
+    else if (a == "--log-format")
+      log_format_arg = next();
     else if (a == "--create-api-key")
       create_key = true;
     else if (a == "--insecure")
@@ -224,21 +250,32 @@ int main(int argc, char** argv) {
     }
   }
 
+  if (!log_format_arg.empty()) {
+    ombra::server::log::Format lf;
+    if (!ombra::server::log::parse_format(log_format_arg, &lf)) {
+      std::fprintf(stderr, "invalid value for --log-format: expected text or json\n");
+      return 2;
+    }
+    ombra::server::log::set_format(lf);
+  }
+
   if (create_key) {
     ombra::server::Scope scope;
     if (data_dir.empty() || !ombra::server::parse_scope(scope_arg, &scope)) {
       std::fprintf(stderr,
-                   "usage: ombra_server --create-api-key --scope admin|read|write --data-dir D\n");
+                   "usage: ombra_server --create-api-key --scope admin|read|write --data-dir D "
+                   "[--collection NAME (read or write only)]\n");
       return 2;
     }
     try {
       std::string id;
-      const std::string token = ombra::server::create_api_key(data_dir, scope, &id);
+      const std::string token = ombra::server::create_api_key(data_dir, scope, &id, key_collection);
       // The only place a token is ever shown.
       std::printf("%s\n", token.c_str());
       std::fflush(stdout);
-      std::fprintf(stderr, "created %s API key %s (shown once; only its salted hash is stored)\n",
-                   scope_arg.c_str(), id.c_str());
+      std::fprintf(stderr, "created %s API key %s%s (shown once; only its salted hash is stored)\n",
+                   scope_arg.c_str(), id.c_str(),
+                   key_collection.empty() ? "" : " for one collection");
     } catch (const std::exception& e) {
       std::fprintf(stderr, "fatal: %s\n", e.what());
       return 1;
@@ -278,8 +315,13 @@ int main(int argc, char** argv) {
       return 2;
     }
   }
-  if (!tls) std::fprintf(stderr, "WARNING: --insecure: connections are NOT encrypted\n");
-  if (no_auth) std::fprintf(stderr, "WARNING: --no-auth: anyone who can connect has full access\n");
+#ifdef OMBRA_NO_GPU
+  ombra::server::log::warn(
+      "this server was built without GPU support (for tests and development): Search fails, "
+      "every other call works");
+#endif
+  if (!tls) ombra::server::log::warn("--insecure: connections are NOT encrypted");
+  if (no_auth) ombra::server::log::warn("--no-auth: anyone who can connect has full access");
   // The REST port is checked on the host it really binds (audit A-18), and defaults to loopback.
   const std::string rhost = rest_host.empty() ? "127.0.0.1" : rest_host;
   if ((!tls || no_auth) && !is_loopback_listen(listen)) {
@@ -412,9 +454,10 @@ int main(int argc, char** argv) {
             std::size_t dropped = 0;
             for (const auto& c : store.list_collections()) dropped += store.drop_dead_blocks(c);
             if (dropped > 0)
-              std::fprintf(stderr, "[ombra.server] compaction dropped=%zu\n", dropped);
+              ombra::server::log::info("compaction",
+                                       {{"dropped", static_cast<std::uint64_t>(dropped)}});
           } catch (const std::exception& e) {
-            std::fprintf(stderr, "[ombra.server] compaction failed: %s\n", e.what());
+            ombra::server::log::error("compaction failed", {{"error", e.what()}});
           }
         }
       });
@@ -425,18 +468,37 @@ int main(int argc, char** argv) {
         // SIGHUP: pick up revoked or new API keys. A broken file keeps the loaded keys.
         try {
           keys->reload(ombra::server::ApiKeyStore::path_in(data_dir));
-          std::fprintf(stderr, "[ombra.server] reloaded API keys count=%zu\n", keys->size());
+          ombra::server::log::info("reloaded API keys",
+                                   {{"count", static_cast<std::uint64_t>(keys->size())}});
         } catch (const std::exception& e) {
-          std::fprintf(stderr,
-                       "[ombra.server] API key reload failed, keeping the loaded keys: %s\n",
-                       e.what());
+          ombra::server::log::error("API key reload failed, keeping the loaded keys",
+                                    {{"error", e.what()}});
         }
       }
     }
+    // Shutdown (see the header comment). Not ready first, so a load balancer stops sending.
+    ombra::server::log::info("shutdown requested: not ready, draining",
+                             {{"grace_s", static_cast<std::uint64_t>(shutdown_grace_s)}});
+    if (rest) rest->begin_drain();
+    service.begin_drain();
     if (compactor.joinable()) compactor.join();
-    if (rest) rest->stop();
-    server->Shutdown(std::chrono::system_clock::now() + std::chrono::seconds(2));
+    std::atomic<bool> drained{false};
+    // gRPC: no new calls from now on; running calls have until the deadline, then they are
+    // cancelled. Shutdown returns when every handler has returned.
+    std::thread drain([&] {
+      server->Shutdown(std::chrono::system_clock::now() + std::chrono::seconds(shutdown_grace_s));
+      drained.store(true);
+    });
+    while (!drained.load() && g_signals.load() < 2)
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    if (!drained.load()) {
+      ombra::server::log::warn("second signal: exiting now, running calls are cut");
+      std::_Exit(1);  // acknowledged writes are durable; recovery sweeps unfinished ones
+    }
+    drain.join();
     server->Wait();
+    if (rest) rest->stop();
+    ombra::server::log::info("shutdown complete");
   } catch (const std::exception& e) {
     std::fprintf(stderr, "fatal: %s\n", e.what());
     return 1;

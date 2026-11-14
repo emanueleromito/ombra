@@ -24,6 +24,18 @@ struct WalRecord {
   std::vector<std::string> ids;
 };
 
+// Result of a read-only scan of a log file (ombra_verify). Nothing is repaired or truncated.
+struct WalScan {
+  bool header_ok = true;  // false: shorter than the 6-byte header
+  bool bad_magic = false;
+  std::uint16_t version = kWalVersion;  // != kWalVersion: unknown version, records not scanned
+  std::size_t records = 0;              // valid records before the first bad frame
+  std::size_t tail_bytes = 0;           // bytes after the last valid record (a torn tail)
+  bool mid_corruption = false;  // a valid frame follows a bad one: the server refuses to start
+  std::size_t bad_names = 0;    // records whose segment name the server would refuse
+};
+WalScan scan_wal_file(const std::string& path);
+
 class Wal {
  public:
   explicit Wal(std::string path);  // creates the file if missing; refuses an unknown version

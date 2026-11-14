@@ -30,6 +30,7 @@ from typing import Any
 import numpy as np
 from ombra import params as ombra_params
 from ombra import query as oq
+from ombra._proto import insert_requests
 from ombra.file_format import Kind, read_envelope, write_envelope
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -400,7 +401,7 @@ class OmbraClient:
         self.check(self.stub.DropCollection(self.pb.DropCollectionRequest(name=name)).error)
 
     def insert(self, blocks: list[Any]) -> int:
-        r = self.stub.Insert(iter(blocks))
+        r = self.stub.Insert(insert_requests(self.pb, blocks))
         self.check(r.error)
         return r.inserted
 

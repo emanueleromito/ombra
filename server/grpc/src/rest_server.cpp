@@ -19,6 +19,7 @@
 #include <stdexcept>
 
 #include "ombra/server/http.hpp"
+#include "ombra/server/log.hpp"
 
 namespace ombra::server {
 
@@ -134,9 +135,9 @@ void RestServer::worker() {
     try {
       serve(fd);
     } catch (const std::exception& e) {
-      std::fprintf(stderr, "[ombra.server] rest request failed: %s\n", e.what());
+      log::error("rest request failed", {{"error", e.what()}});
     } catch (...) {
-      std::fprintf(stderr, "[ombra.server] rest request failed: unknown error\n");
+      log::error("rest request failed", {{"error", "unknown error"}});
     }
     ::close(fd);
     std::lock_guard lk(qmu_);
@@ -228,6 +229,13 @@ void RestServer::serve(int fd) {
     write_all(http_response(200, "{\"status\":\"ok\"}"));
     return;
   }
+  if (req.path == "/readyz") {  // ready to take calls; 503 once shutdown has begun
+    if (draining_.load())
+      write_all(http_response(503, "{\"status\":\"draining\"}"));
+    else
+      write_all(http_response(200, "{\"status\":\"ready\"}"));
+    return;
+  }
   if (req.path == "/metrics") {
     std::string key_id;
     switch (authorize(keys_, req.authorization, Scope::Admin, &key_id)) {
@@ -237,7 +245,7 @@ void RestServer::serve(int fd) {
         return;
       case AuthResult::PermissionDenied:
         metrics_.count_permission_denied();
-        std::fprintf(stderr, "[ombra.server] rest denied path=/metrics key=%s\n", key_id.c_str());
+        log::warn("rest denied", {{"path", "/metrics"}, {"key_id", key_id}});
         write_all(http_response(403, "{\"error\":\"permission denied\"}"));
         return;
       case AuthResult::Ok:

@@ -13,6 +13,7 @@ dependencies = ["numpy>=1.26,<3", "cryptography>=42,<51", "faiss-cpu>=1.8,<2"]
 
 [project.scripts]
 ombra-recall = "ombra.recall:main"
+ombra-keys = "ombra.keys:main"
 
 [project.optional-dependencies]
 # ombra-openfhe is openfhe-python 1.6.1.0 with OpenFHE inside, built for every platform of the

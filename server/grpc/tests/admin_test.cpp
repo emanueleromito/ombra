@@ -10,9 +10,11 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include "ombra/server/auth.hpp"
 #include "ombra/server/http.hpp"
+#include "ombra/server/log.hpp"
 #include "ombra/server/metrics.hpp"
 
 #define CHECK(c)                                                                \
@@ -146,7 +148,7 @@ static void test_key_file() {
 
   // Refused files: wrong version, group-readable, malformed line.
   const std::string bad = (dir / "bad").string();
-  { std::ofstream(bad) << "OMBRA-API-KEYS v2\n"; }
+  { std::ofstream(bad) << "OMBRA-API-KEYS v3\n"; }
   ::chmod(bad.c_str(), 0600);
   bool threw = false;
   try {
@@ -173,6 +175,163 @@ static void test_key_file() {
   }
   CHECK(threw);
   fs::remove_all(dir);
+}
+
+static bool loads(const std::string& path) {
+  try {
+    ApiKeyStore::load(path);
+    return true;
+  } catch (const std::exception&) {
+    return false;
+  }
+}
+
+static std::string write_key_file(const fs::path& p, const std::string& text, mode_t mode = 0600) {
+  { std::ofstream(p) << text; }
+  ::chmod(p.c_str(), mode);
+  return p.string();
+}
+
+static const std::string kSalt(32, 'a'), kHash(64, 'b');
+
+static void test_key_file_v2() {
+  const fs::path dir = fs::temp_directory_path() / ("ombra_v2_test_" + std::to_string(::getpid()));
+  fs::remove_all(dir);
+  fs::create_directories(dir);
+  const std::string d = dir.string();
+
+  // Parsing: v1 stays three fields; v2 has an optional fourth, the collection.
+  const std::string f = (dir / "f").string();
+  write_key_file(f, "OMBRA-API-KEYS v1\n" + kSalt + " " + kHash + " read\n");
+  CHECK(loads(f));
+  write_key_file(f, "OMBRA-API-KEYS v1\n" + kSalt + " " + kHash + " read docs\n");
+  CHECK(!loads(f));  // a v1 file has no collection field
+  write_key_file(f, "OMBRA-API-KEYS v2\n" + kSalt + " " + kHash + " read\n" + kSalt + " " + kHash +
+                        " write docs\n");
+  CHECK(loads(f));
+  CHECK(loads(write_key_file(f, "OMBRA-API-KEYS v2\n")));
+  // Refusals.
+  const std::string line = kSalt + " " + kHash;
+  for (const char* bad :
+       {" read docs extra\n", " admin docs\n", " bogus docs\n", " read docs docs\n"}) {
+    write_key_file(f, "OMBRA-API-KEYS v2\n" + line + bad);
+    CHECK(!loads(f));
+  }
+  write_key_file(f, "OMBRA-API-KEYS v2\n" + kSalt.substr(1) + " " + kHash + " read docs\n");
+  CHECK(!loads(f));  // short salt
+  write_key_file(f, "OMBRA-API-KEYS v2\n" + line + " read " + std::string(129, 'x') + "\n");
+  CHECK(!loads(f));  // name too long
+  write_key_file(f, std::string("OMBRA-API-KEYS v2\n") + line +
+                        " read bad\x01"
+                        "name\n");
+  CHECK(!loads(f));  // control character
+  write_key_file(f, "OMBRA-API-KEYS v2\n" + line + " read docs\n", 0640);
+  CHECK(!loads(f));  // group-readable
+  write_key_file(f, "OMBRA-API-KEYS v2 \n");
+  CHECK(!loads(f));  // header must match exactly
+  write_key_file(f, "OMBRA-API-KEYS v1\n" + line + " read\n", 0604);
+  CHECK(!loads(f));  // others-readable
+
+  // Creation: unscoped keys keep a v1 file.
+  std::string id_s;
+  const std::string t1 = create_api_key(d, Scope::Write);
+  const std::string t2 = create_api_key(d, Scope::Read);
+  CHECK(fs::exists(dir / "api_keys.v1") && !fs::exists(dir / "api_keys.v2"));
+  CHECK(slurp((dir / "api_keys.v1").string()).rfind("OMBRA-API-KEYS v1\n", 0) == 0);
+  CHECK(ApiKeyStore::path_in(d) == (dir / "api_keys.v1").string());
+  const std::string v1_before = slurp((dir / "api_keys.v1").string());
+
+  // Refusals at creation: admin cannot be scoped, bad names. Nothing is written.
+  bool threw = false;
+  try {
+    create_api_key(d, Scope::Admin, nullptr, "docs");
+  } catch (const std::exception&) {
+    threw = true;
+  }
+  CHECK(threw);
+  for (const char* name : {"two words", "tab\tname", "bad\nname"}) {
+    threw = false;
+    try {
+      create_api_key(d, Scope::Read, nullptr, name);
+    } catch (const std::exception&) {
+      threw = true;
+    }
+    CHECK(threw);
+  }
+  CHECK(slurp((dir / "api_keys.v1").string()) == v1_before && !fs::exists(dir / "api_keys.v2"));
+
+  // First scoped key: migrate to v2, old entries copied byte for byte, v1 set aside.
+  const std::string ts = create_api_key(d, Scope::Read, &id_s, "docs");
+  const std::string p2 = (dir / "api_keys.v2").string();
+  CHECK(fs::exists(p2) && !fs::exists(dir / "api_keys.v1"));
+  CHECK(fs::exists(dir / "api_keys.v1.migrated"));
+  CHECK(ApiKeyStore::path_in(d) == p2);
+  struct stat st {};
+  CHECK(::stat(p2.c_str(), &st) == 0 && (st.st_mode & 0777) == 0600);
+  const std::string text = slurp(p2);
+  CHECK(text.rfind("OMBRA-API-KEYS v2\n", 0) == 0);
+  CHECK(text.find(v1_before.substr(v1_before.find('\n') + 1)) != std::string::npos);
+  CHECK(text.find(ts) == std::string::npos);  // no token on disk
+  const ApiKeyStore store = ApiKeyStore::load(p2);
+  CHECK(store.size() == 3);
+  CHECK(store.verify(t1)->collection.empty() && store.verify(t1)->scope == Scope::Write);
+  CHECK(store.verify(t2)->collection.empty());
+  const auto vs = store.verify(ts);
+  CHECK(vs && vs->collection == "docs" && vs->scope == Scope::Read && vs->id == id_s);
+  CHECK(vs->allows_collection("docs") && !vs->allows_collection("other") &&
+        !vs->allows_collection("") && !vs->allows_collection("docs2"));
+  CHECK(store.verify(t1)->allows_collection("anything"));
+
+  // A v2 file is never downgraded: an unscoped key is appended to v2.
+  const std::string t3 = create_api_key(d, Scope::Admin);
+  CHECK(!fs::exists(dir / "api_keys.v1"));
+  CHECK(slurp(p2).rfind("OMBRA-API-KEYS v2\n", 0) == 0);
+  ApiKeyStore live = ApiKeyStore::load(p2);
+  CHECK(live.size() == 4 && live.verify(t3)->scope == Scope::Admin);
+  // Reload picks up a new scoped key.
+  const std::string t4 = create_api_key(d, Scope::Write, nullptr, "notes");
+  CHECK(!live.verify(t4));
+  live.reload(p2);
+  CHECK(live.verify(t4)->collection == "notes");
+
+  // authorize_who: the scoped key's scope and collection.
+  Verified who;
+  CHECK(authorize_who(&live, "Bearer " + ts, Scope::Read, &who) == AuthResult::Ok &&
+        who.collection == "docs");
+  CHECK(authorize_who(&live, "Bearer " + ts, Scope::Write, &who) == AuthResult::PermissionDenied &&
+        who.collection == "docs");
+  CHECK(authorize_who(&live, "nope", Scope::Read, &who) == AuthResult::Unauthenticated);
+  CHECK(authorize_who(nullptr, "", Scope::Read, &who) == AuthResult::Ok && who.collection.empty());
+
+  // A first scoped key into an empty directory creates v2 directly.
+  const std::string d2 = (dir / "fresh").string();
+  create_api_key(d2, Scope::Read, nullptr, "docs");
+  CHECK(fs::exists(fs::path(d2) / "api_keys.v2") && !fs::exists(fs::path(d2) / "api_keys.v1"));
+  fs::remove_all(dir);
+}
+
+static void test_log() {
+  using namespace ombra::server::log;
+  const std::vector<Field> f = {{"count", std::uint64_t{3}}, {"ms", 1.5}, {"note", "a b"}};
+  CHECK(format_line(Format::Text, Level::Info, "T", "insert", f) ==
+        "[ombra.server] insert count=3 ms=1.50 note=\"a b\"");
+  CHECK(format_line(Format::Json, Level::Warn, "2026-01-02T03:04:05.006Z", "insert", f) ==
+        "{\"ts\":\"2026-01-02T03:04:05.006Z\",\"level\":\"warn\",\"msg\":\"insert\","
+        "\"count\":3,\"ms\":1.50,\"note\":\"a b\"}");
+  // JSON escaping: quotes, backslash, newline, control characters.
+  CHECK(format_line(Format::Json, Level::Info, "T", "m", {{"e", "a\"b\\c\nd\x01"}}) ==
+        "{\"ts\":\"T\",\"level\":\"info\",\"msg\":\"m\",\"e\":\"a\\\"b\\\\c\\nd\\u0001\"}");
+  Format fm;
+  CHECK(parse_format("json", &fm) && fm == Format::Json && parse_format("text", &fm) &&
+        fm == Format::Text);
+  CHECK(!parse_format("", &fm) && !parse_format("JSON", &fm) && !parse_format("xml", &fm));
+  // Request ids.
+  CHECK(valid_request_id("abc-DEF_1.2") && valid_request_id(std::string(64, 'a')));
+  CHECK(!valid_request_id("") && !valid_request_id(std::string(65, 'a')) &&
+        !valid_request_id("a b") && !valid_request_id("a\nb") && !valid_request_id("a/b") &&
+        !valid_request_id("\xc3\xa9") && !valid_request_id("a\"b"));
+  const std::string r1 = new_request_id(), r2 = new_request_id();
+  CHECK(r1.size() == 16 && valid_request_id(r1) && r1 != r2);
 }
 
 static void test_http() {
@@ -235,6 +394,8 @@ int main() {
   test_sha256();
   test_scopes();
   test_key_file();
+  test_key_file_v2();
+  test_log();
   test_http();
   test_metrics();
   return 0;

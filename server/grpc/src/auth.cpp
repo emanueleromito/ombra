@@ -227,7 +227,16 @@ Scope required_scope(Rpc r) {
   return Scope::Admin;
 }
 
+bool valid_key_collection(std::string_view name) {
+  if (name.empty() || name.size() > 128) return false;
+  for (const char c : name)
+    if (c <= 0x20 || c >= 0x7f) return false;
+  return true;
+}
+
 std::string ApiKeyStore::path_in(const std::string& data_dir) {
+  const auto v2 = std::filesystem::path(data_dir) / kFileNameV2;
+  if (std::filesystem::exists(v2)) return v2.string();
   return (std::filesystem::path(data_dir) / kFileName).string();
 }
 
@@ -239,21 +248,34 @@ ApiKeyStore ApiKeyStore::load(const std::string& path) {
         "the API key file must not be accessible by group or others (chmod 600)");
   std::ifstream in(path);
   std::string line;
-  if (!std::getline(in, line) || line != kHeader)
+  if (!std::getline(in, line))
+    throw std::runtime_error("the API key file has an unknown version header");
+  const bool v2 = line == kHeaderV2;
+  if (!v2 && line != kHeader)
     throw std::runtime_error("the API key file has an unknown version header");
   ApiKeyStore store;
   auto entries = std::make_shared<Entries>();
   while (std::getline(in, line)) {
     if (line.empty()) continue;
     std::istringstream ls(line);
-    std::string salt_hex, hash_hex, scope_s, extra;
-    if (!(ls >> salt_hex >> hash_hex >> scope_s) || (ls >> extra))
+    std::string salt_hex, hash_hex, scope_s, coll, extra;
+    if (!(ls >> salt_hex >> hash_hex >> scope_s))
       throw std::runtime_error("malformed line in the API key file");
+    // v2 only: an optional fourth field, the collection. Nothing may follow.
+    const bool has_coll = v2 && static_cast<bool>(ls >> coll);
+    if (ls >> extra) throw std::runtime_error("malformed line in the API key file");
     Entry e;
     if (!from_hex(salt_hex, e.salt.data(), e.salt.size()) ||
         !from_hex(hash_hex, e.hash.data(), e.hash.size()) || !parse_scope(scope_s, &e.scope))
       throw std::runtime_error("malformed line in the API key file");
-    entries->push_back(e);
+    if (has_coll) {
+      // Admin keys cannot be scoped (an admin can drop any collection), so such a line is refused
+      // instead of being read as a broader key than the file says.
+      if (!valid_key_collection(coll) || e.scope == Scope::Admin)
+        throw std::runtime_error("malformed line in the API key file");
+      e.collection = coll;
+    }
+    entries->push_back(std::move(e));
   }
   store.entries_ = std::move(entries);
   return store;
@@ -278,36 +300,53 @@ std::optional<Verified> ApiKeyStore::verify(std::string_view token) const {
   for (const Entry& e : *entries) {
     const auto h = salted_hash(e.salt, token);
     const bool match = constant_time_equal(h.data(), e.hash.data(), h.size());
-    if (match && !found) found = Verified{to_hex(e.hash.data(), 4), e.scope};
+    if (match && !found) found = Verified{to_hex(e.hash.data(), 4), e.scope, e.collection};
   }
   return found;
 }
 
-std::string create_api_key(const std::string& data_dir, Scope scope, std::string* key_id) {
+std::string create_api_key(const std::string& data_dir, Scope scope, std::string* key_id,
+                           const std::string& collection) {
   namespace fs = std::filesystem;
+  if (!collection.empty()) {
+    if (scope == Scope::Admin)
+      throw std::runtime_error("an admin key cannot be scoped to a collection");
+    if (!valid_key_collection(collection))
+      throw std::runtime_error("the collection name cannot be used in a key file");
+  }
   fs::create_directories(data_dir);
-  const std::string path = ApiKeyStore::path_in(data_dir);
+  const fs::path v1 = fs::path(data_dir) / ApiKeyStore::kFileName;
+  const fs::path v2 = fs::path(data_dir) / ApiKeyStore::kFileNameV2;
   // One creator at a time: the read-modify-write below would otherwise lose a concurrent key.
+  // The lock file keeps its v1 name so that every creator, old or new, takes the same lock.
   struct Lock {
     int fd;
     ~Lock() {
       if (fd >= 0) ::close(fd);  // closing releases the flock
     }
-  } lock{::open((path + ".lock").c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0600)};
+  } lock{::open((v1.string() + ".lock").c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0600)};
   if (lock.fd < 0 || ::flock(lock.fd, LOCK_EX) != 0)
     throw std::runtime_error("cannot lock the API key file");
+  // Which file: an existing v2 file stays v2 (never downgraded); a v1 file (or none) stays v1
+  // until the first collection-scoped key, which makes it v2 with the old entries copied as they
+  // are (a v1 line is a valid v2 line).
+  const bool have_v2 = fs::exists(v2);
+  const bool want_v2 = have_v2 || !collection.empty();
+  const fs::path src = have_v2 ? v2 : v1;
+  const std::string path = (want_v2 ? v2 : v1).string();
   std::string content;
-  if (fs::exists(path)) {
-    std::ifstream in(path);
+  if (fs::exists(src)) {
+    std::ifstream in(src);
     std::string first;
-    if (!std::getline(in, first) || first != ApiKeyStore::kHeader)
+    const char* want = have_v2 ? ApiKeyStore::kHeaderV2 : ApiKeyStore::kHeader;
+    if (!std::getline(in, first) || first != want)
       throw std::runtime_error("the existing API key file has an unknown version header");
-    content = first + "\n";
+    content = std::string(want_v2 ? ApiKeyStore::kHeaderV2 : ApiKeyStore::kHeader) + "\n";
     std::string line;
     while (std::getline(in, line))
       if (!line.empty()) content += line + "\n";
   } else {
-    content = std::string(ApiKeyStore::kHeader) + "\n";
+    content = std::string(want_v2 ? ApiKeyStore::kHeaderV2 : ApiKeyStore::kHeader) + "\n";
   }
 
   std::uint8_t raw[32];
@@ -317,7 +356,7 @@ std::string create_api_key(const std::string& data_dir, Scope scope, std::string
   const std::string token = to_hex(raw, sizeof raw);
   const auto hash = salted_hash(salt, token);
   content += to_hex(salt.data(), salt.size()) + " " + to_hex(hash.data(), hash.size()) + " " +
-             scope_name(scope) + "\n";
+             scope_name(scope) + (collection.empty() ? "" : " " + collection) + "\n";
   if (key_id) *key_id = to_hex(hash.data(), 4);
 
   const std::string tmp = path + ".tmp";
@@ -340,6 +379,10 @@ std::string create_api_key(const std::string& data_dir, Scope scope, std::string
     ::unlink(tmp.c_str());
     throw std::runtime_error("cannot write the API key file");
   }
+  // Migration: the v1 file is set aside, not deleted, so it cannot be read again by mistake and
+  // the operator can still see what it held.
+  if (want_v2 && !have_v2 && fs::exists(v1))
+    ::rename(v1.string().c_str(), (v1.string() + ".migrated").c_str());
   const int dfd = ::open(data_dir.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
   if (dfd >= 0) {
     ::fsync(dfd);
@@ -348,15 +391,26 @@ std::string create_api_key(const std::string& data_dir, Scope scope, std::string
   return token;
 }
 
-AuthResult authorize(const ApiKeyStore* store, std::string_view authorization, Scope need,
-                     std::string* key_id) {
-  if (store == nullptr) return AuthResult::Ok;
+AuthResult authorize_who(const ApiKeyStore* store, std::string_view authorization, Scope need,
+                         Verified* who) {
+  if (store == nullptr) {
+    if (who) *who = Verified{"", Scope::Admin, ""};
+    return AuthResult::Ok;
+  }
   constexpr std::string_view kPrefix = "Bearer ";
   if (authorization.substr(0, kPrefix.size()) != kPrefix) return AuthResult::Unauthenticated;
   const auto v = store->verify(authorization.substr(kPrefix.size()));
   if (!v) return AuthResult::Unauthenticated;
-  if (key_id) *key_id = v->id;
+  if (who) *who = *v;
   return scope_allows(v->scope, need) ? AuthResult::Ok : AuthResult::PermissionDenied;
+}
+
+AuthResult authorize(const ApiKeyStore* store, std::string_view authorization, Scope need,
+                     std::string* key_id) {
+  Verified who;
+  const AuthResult r = authorize_who(store, authorization, need, &who);
+  if (key_id && r != AuthResult::Unauthenticated) *key_id = who.id;
+  return r;
 }
 
 }  // namespace ombra::server

@@ -5,8 +5,25 @@
 //
 // Guarantee: an acknowledged write (insert() or remove() returned) survives a crash or power
 // loss. A write that was not acknowledged is either fully there (segment, all its ids, catalog
-// rows) or fully absent (no rows, no segment file); never partial. Single writer: methods are
-// serialised by a mutex. Logs carry sizes, counts and timings only.
+// rows) or fully absent (no rows, no segment file); never partial. Logs carry sizes, counts and
+// timings only.
+//
+// Locking. One mutex (mu_) serialises everything that touches the catalog or the log, but it is
+// NOT held while a big file is written or synced. insert, replace_segments, put_blob and
+// put_key_files work in three steps: (1) under the lock: check, take a fresh name from the durable
+// counter; (2) without the lock: write and fsync the new file under that final name (nothing
+// refers to it, so a crash leaves only an unreferenced file, which recovery sweeps); (3) under the
+// lock: check again (the catalog may have changed), append the log intent, run ONE catalog
+// transaction, append the log commit. Log records are appended only inside a locked step that also
+// changes the catalog, so "every record in the log is in the catalog" still holds whenever the
+// lock is free, which is what the log checkpoints (reset) in drop_dead_blocks, replace_segments
+// and drop_collection rely on. A failed or refused write removes its own file. Short operations
+// (remove, drop, drop_dead_blocks, deletes of blobs) stay inside one locked section: they write
+// only a log record or a catalog transaction and unlink files.
+//
+// An insert that repeats a stored block (all ids stored in one block of the same cluster, byte-
+// identical columns) is a success that changes nothing: a client may repeat an insert whose
+// acknowledgement it did not get. Any other overlap with stored ids throws "insert: duplicate id".
 //
 // Searches vs. block removal: a search takes snapshot() once per round. It sees the block list and
 // the tombstones of one instant and pins those segment files. drop_dead_blocks() and
@@ -122,9 +139,12 @@ class Store {
   // reserved id of the cluster-center blocks (d columns, no filter columns). Returns the segment
   // name once the write is acknowledged (durable). Throws on duplicate or tombstoned ids, unknown
   // collection or cluster, or a column envelope that does not match the collection's preset.
+  // *replayed (optional) is set to true when the block repeated a stored one (nothing was written;
+  // the stored block's name is returned).
   std::string insert(const std::string& collection, std::uint32_t cluster,
                      const std::vector<std::string>& ids,
-                     const std::vector<std::vector<std::uint8_t>>& column_envelopes);
+                     const std::vector<std::vector<std::uint8_t>>& column_envelopes,
+                     bool* replayed = nullptr);
   // Names of all collections, sorted.
   std::vector<std::string> list_collections() const;
   // Removes a collection with all its rows, segment files and key files. Returns false if it does

@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 # gRPC server. The request policy (limits, spec validation, preset headroom) is plain C++ and
-# tested on the CPU. The service and the ombra_server executable need CUDA (the search engine) and
-# gRPC for C++ (Ubuntu 22.04: libgrpc++-dev libprotobuf-dev protobuf-compiler
-# protobuf-compiler-grpc); without either, only the policy is built and the CPU build is unchanged.
+# tested on the CPU. The service and the ombra_server executable need a search engine (the GPU one
+# with CUDA, or the CPU-only one of server/search when OpenFHE is installed; its Search fails with
+# a clear error) and gRPC for C++ (Ubuntu 22.04: libgrpc++-dev libprotobuf-dev protobuf-compiler
+# protobuf-compiler-grpc); without either, only the policy is built.
 
 # ---- Preset table, generated from the preset JSON (no hand-picked numbers) ----------
 set(OMBRA_PRESET_JSON ${CMAKE_CURRENT_SOURCE_DIR}/../../core/params/ckks_presets.json)
@@ -45,7 +46,7 @@ target_link_libraries(server_policy_test PRIVATE ombra_server_policy)
 add_test(NAME server_policy COMMAND server_policy_test)
 
 # ---- API keys, metrics, HTTP parsing: plain C++ (own SHA-256, no OpenSSL), CPU tests ---------
-add_library(ombra_server_admin STATIC src/auth.cpp src/metrics.cpp src/http.cpp src/limits.cpp)
+add_library(ombra_server_admin STATIC src/log.cpp src/auth.cpp src/metrics.cpp src/http.cpp src/limits.cpp)
 target_include_directories(ombra_server_admin PUBLIC include)
 find_package(Threads REQUIRED)
 target_link_libraries(ombra_server_admin PUBLIC Threads::Threads)
@@ -59,7 +60,7 @@ target_link_libraries(server_admin_test PRIVATE ombra_server_admin)
 add_test(NAME server_admin COMMAND server_admin_test)
 
 # ---- gRPC service and executable ----------------------------------------------------------------
-if(NOT OMBRA_ENABLE_CUDA)
+if(NOT OMBRA_ENABLE_CUDA AND NOT TARGET ombra_search)
   return()
 endif()
 
@@ -107,9 +108,14 @@ target_include_directories(ombra_proto SYSTEM PUBLIC ${_pb_dir})
 target_link_libraries(ombra_proto PUBLIC ${_grpc_libs} protobuf::libprotobuf Threads::Threads)
 
 # cudaMemGetInfo for /metrics. CMake 3.22 has no CUDA20 dialect, so CUDA_STANDARD 17 as elsewhere.
-add_library(ombra_gpu_info STATIC src/gpu_info.cu)
+if(OMBRA_ENABLE_CUDA)
+  add_library(ombra_gpu_info STATIC src/gpu_info.cu)
+  set_target_properties(ombra_gpu_info PROPERTIES CUDA_SEPARABLE_COMPILATION OFF CUDA_STANDARD 17)
+else()
+  # CPU-only build: reports that there is no GPU.
+  add_library(ombra_gpu_info STATIC src/gpu_info_cpu.cpp)
+endif()
 target_include_directories(ombra_gpu_info PUBLIC src)
-set_target_properties(ombra_gpu_info PROPERTIES CUDA_SEPARABLE_COMPILATION OFF CUDA_STANDARD 17)
 
 # The REST port speaks TLS with OpenSSL, which gRPC already depends on.
 find_package(OpenSSL REQUIRED)
@@ -119,6 +125,9 @@ target_include_directories(ombra_server PRIVATE src)
 target_link_libraries(ombra_server PRIVATE ombra_server_policy ombra_server_admin ombra_gpu_info
                                            ombra_search ombra_proto OpenSSL::SSL OpenSSL::Crypto)
 target_compile_definitions(ombra_server PRIVATE OMBRA_VERSION="${PROJECT_VERSION}")
+if(NOT OMBRA_ENABLE_CUDA)
+  target_compile_definitions(ombra_server PRIVATE OMBRA_NO_GPU=1)
+endif()
 # Default OpenFHE version of the stored envelopes (overridable with --openfhe-version). The
 # variable of core/'s find_package is directory-scoped, so look the package up again here.
 find_package(OpenFHE QUIET)

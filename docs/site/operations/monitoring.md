@@ -12,6 +12,14 @@ curl --cacert server.crt https://localhost:8080/healthz
 
 returns `{"status":"ok"}` and needs no API key. The HTTP port uses the same TLS certificate as gRPC, so drop `--cacert` only if the server runs with `--insecure`. It only tells you that the process is up. It does not check the GPU or the data.
 
+## Readiness check
+
+```bash
+curl --cacert server.crt https://localhost:8080/readyz
+```
+
+returns `{"status":"ready"}` while the server takes calls, and status 503 with `{"status":"draining"}` from the moment it gets SIGTERM until it exits. Use `/readyz` for a load balancer or a Kubernetes readiness probe, so traffic stops before the server does. Use `/healthz` for the liveness probe: it stays 200 while the server drains, so the server is not restarted in the middle of a shutdown.
+
 ## Metrics
 
 ```bash
@@ -37,16 +45,34 @@ Counters reset when the server restarts. A latency histogram or percentiles are 
 
 ## Logs
 
-Logs go to stderr. In Docker, read them with `docker compose logs ombra`. Each line starts with `[ombra.server]`, followed by what happened and numbers. Examples of the shape, with made-up numbers:
+Logs go to stderr. In Docker, read them with `docker compose logs ombra`. By default each line starts with `[ombra.server]`, followed by what happened and `name=value` pairs. With `--log-format json` each line is one JSON object instead. Examples of the shape, with made-up numbers:
 
 ```text
 [ombra.server] insert count=8192 bytes=104857600 ms=412.30
 [ombra.server] search_round count=3 bytes=52428800 ms=95.10
 [ombra.server] compaction dropped=2
-[ombra.server] refused rpc=Search reason=unauthenticated
+[ombra.server] refused reason=unauthenticated not_logged=0 request_id=4f1c0a9e22b7d310 rpc=Search
 ```
 
-`count` is a number of items, `bytes` a size and `ms` the time of the call. The server logs a line for each write and each search round, for refused calls (with the first characters of the key's hash, not the token), for REST requests denied by scope, for compaction, and for internal errors. A line never contains an id, a collection name, a value or a token.
+The same insert as JSON:
+
+```json
+{"ts":"2026-01-15T10:20:30.123Z","level":"info","msg":"insert","count":8192,"bytes":104857600,"ms":412.30,"request_id":"4f1c0a9e22b7d310","rpc":"Insert","key_id":"a1b2c3d4"}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `ts` | UTC time with milliseconds (JSON only). |
+| `level` | `info`, `warn` or `error` (JSON only; in text, warnings and errors have a prefix). |
+| `msg` | What happened. |
+| `request_id` | The id of the call, see [Request ids](../reference/configuration.md#request-ids). Every line of one call has the same one. Lines that belong to no call have none. |
+| `rpc` | The call name, for lines of a call. |
+| `key_id` | The first 8 hex characters of the API key's stored hash. It names the key without revealing it. Missing when the key was not accepted. |
+| `count`, `bytes`, `ms`, `reason`, `error` | Numbers and fixed reasons. `error` is the text of an internal error. |
+
+Lines written by the storage and search code (they start with `[ombra.storage]` or `[ombra.search]`) are plain text in both formats and carry no request id.
+
+`count` is a number of items, `bytes` a size and `ms` the time of the call. The server logs a line for each write and each search round, for refused calls (with the first characters of the key's hash, not the token), for REST requests denied by scope, for compaction, and for internal errors. A line never contains an id, a collection name, a value or a token. A key limited to another collection is refused with `reason=collection`.
 
 On start, the server prints the gRPC address (and the REST address) to stdout, and warns on stderr when it runs with `--insecure` or `--no-auth`. The Docker entrypoint also prints one line when it makes a certificate or an API key on the first start, and never the key itself.
 

@@ -55,12 +55,14 @@ class Metrics {
 struct Gauges {
   std::uint64_t collections = 0, vectors_live = 0, vectors_deleted = 0, blocks = 0;
   std::uint64_t gpu_used_bytes = 0, gpu_total_bytes = 0;
+  bool gpu_available = true;  // false in the CPU-only build (tests and development)
   std::uint64_t cache_hits = 0, cache_misses = 0, cache_evictions = 0;
 };
 
 // The body of GET /metrics. Keys: collections, vectors_live, vectors_deleted, blocks, rpc{<name>:
 // {requests, errors, latency_ms{sum, count, max}}}, auth{unauthenticated, permission_denied},
-// gpu_memory{used_bytes, total_bytes}, cache{hits, misses, evictions, hit_rate}.
+// gpu_memory{used_bytes, total_bytes},
+// cache{hits, misses, evictions, hit_rate}. The CPU-only build adds gpu_available:false.
 std::string metrics_json(const Metrics& m, const Gauges& g);
 
 }  // namespace ombra::server

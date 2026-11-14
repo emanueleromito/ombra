@@ -173,3 +173,105 @@ def export_key_file(
 
 def import_key_file(path: str | os.PathLike[str], passphrase: str) -> KeyMaterial:
     return import_key_bytes(Path(path).read_bytes(), passphrase)
+
+
+# ---- backup and check (the `ombra-keys` tool) ------------------------------------------------
+@dataclass(frozen=True)
+class KeyCheck:
+    """What `check_key_file` found. The tag is public (the server stores it); no secret."""
+
+    key_tag: str
+    kdf_n: int
+
+
+def _fsync_dir(directory: Path) -> None:
+    if not hasattr(os, "O_DIRECTORY"):  # Windows: no directory fsync
+        return
+    fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def _check_structure(data: bytes) -> int:
+    """Check magic, version and KDF parameters of a key file's bytes, without the passphrase.
+    Returns the scrypt n."""
+    if len(data) < _HEADER_LEN + 16 + MASTER_KEY_LEN + 1:
+        raise KeyFileError("truncated key file")
+    magic, version, kdf, n, r, p = _HEADER.unpack_from(data)
+    if magic != MAGIC:
+        raise KeyFileError("bad magic, not an Ombra key file")
+    if version != KEYFILE_VERSION:
+        raise KeyFileError(f"unknown key file version {version}")
+    if kdf != KDF_SCRYPT:
+        raise KeyFileError(f"unknown key derivation {kdf}")
+    _check_kdf_params(n, r, p)
+    return n
+
+
+def check_key_file(path: str | os.PathLike[str], passphrase: str) -> KeyCheck:
+    """Open a key file (or a backup of one) with the passphrase and check it all the way: the
+    authentication tag, then the secret key and the public key deserialize with OpenFHE and carry
+    the same key tag. Needs OpenFHE. Raises KeyFileError; the message never has key material."""
+    data = Path(path).read_bytes()
+    n = _check_structure(data)
+    material = import_key_bytes(data, passphrase)
+    from ombra.collection import KeyKit  # imports OpenFHE lazily
+
+    try:
+        tag = KeyKit.key_tag_of_blob(material.secret_key)
+    except (ValueError, ImportError) as exc:
+        raise KeyFileError(f"the key file content is not usable: {exc}") from None
+    return KeyCheck(key_tag=tag, kdf_n=n)
+
+
+def backup_key_file(
+    source: str | os.PathLike[str],
+    destination: str | os.PathLike[str],
+    *,
+    passphrase: str | None = None,
+    force: bool = False,
+) -> None:
+    """Copy a key file to `destination` atomically: a temporary file next to it (mode 0600),
+    fsync, then a rename (with `force`) or a hard link that fails if the name exists (without).
+    The copy is the same bytes as the source and is checked afterwards: its structure always,
+    and with `passphrase` also a full `check_key_file`. The source is never changed."""
+    src, dst = Path(source), Path(destination)
+    data = src.read_bytes()
+    _check_structure(data)  # refuse to back up something that is not a key file
+    if dst.exists() and not force:
+        raise KeyFileError(_BACKUP_EXISTS)
+    fd, tmp = tempfile.mkstemp(dir=dst.parent, prefix=f".{dst.name}.", suffix=".tmp")
+    try:
+        if hasattr(os, "fchmod"):
+            os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+            f.flush()
+            os.fsync(f.fileno())
+        if Path(tmp).read_bytes() != data:
+            raise KeyFileError("the copy differs from the source")
+        if force:
+            os.replace(tmp, dst)
+        else:
+            try:
+                os.link(tmp, dst)  # atomic, fails if the name appeared in the meantime
+            except FileExistsError:
+                raise KeyFileError(_BACKUP_EXISTS) from None
+            os.unlink(tmp)
+        _fsync_dir(dst.parent)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+    # Check the copy as it is on disk now.
+    if dst.read_bytes() != data:
+        raise KeyFileError("the copy differs from the source")
+    if passphrase is not None:
+        check_key_file(dst, passphrase)
+
+
+_BACKUP_EXISTS = "backup destination already exists; pass --force to replace it"

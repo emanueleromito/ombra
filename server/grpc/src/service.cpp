@@ -11,7 +11,9 @@
 #include <type_traits>
 #include <unordered_set>
 
+#include "ombra/server/log.hpp"
 #include "ombra/server/policy.hpp"
+#include "ombra/storage/fsutil.hpp"
 
 namespace ombra::server {
 
@@ -46,6 +48,7 @@ static_assert(static_cast<int>(v1::ERROR_INTERNAL) == static_cast<int>(Err::Inte
 static_assert(static_cast<int>(v1::ERROR_BLOCK_NOT_FOUND) == static_cast<int>(Err::BlockNotFound));
 static_assert(static_cast<int>(v1::ERROR_BLOCK_MISMATCH) == static_cast<int>(Err::BlockMismatch));
 static_assert(static_cast<int>(v1::ERROR_BLOB_NOT_FOUND) == static_cast<int>(Err::BlobNotFound));
+static_assert(static_cast<int>(v1::ERROR_STORAGE_FULL) == static_cast<int>(Err::StorageFull));
 static_assert(static_cast<std::uint64_t>(v1::LIMIT_BLOB_BUCKET_0) == storage::kBlobBuckets[0]);
 static_assert(static_cast<std::uint64_t>(v1::LIMIT_BLOB_BUCKET_1) == storage::kBlobBuckets[1]);
 static_assert(static_cast<std::uint64_t>(v1::LIMIT_BLOB_BUCKET_2) == storage::kBlobBuckets[2]);
@@ -60,8 +63,17 @@ double ms_since(Clock::time_point t0) {
 }
 
 // Logs: counts, sizes and timings only.
+// Inside an RPC the log helper adds request_id, rpc and key_id (log.hpp).
 void log_line(const char* what, std::size_t a, std::size_t b, double ms) {
-  std::fprintf(stderr, "[ombra.server] %s count=%zu bytes=%zu ms=%.2f\n", what, a, b, ms);
+  log::info(what, {{"count", static_cast<std::uint64_t>(a)},
+                   {"bytes", static_cast<std::uint64_t>(b)},
+                   {"ms", ms}});
+}
+
+std::string bearer_of(const grpc::ServerContext* ctx) {
+  const auto it = ctx->client_metadata().find("authorization");
+  if (it == ctx->client_metadata().end()) return {};
+  return std::string(it->second.data(), it->second.size());
 }
 
 void fill(v1::Error* e, const Status& s) {
@@ -75,6 +87,10 @@ Status err(Err c, const char* m) { return Status{c, m}; }
 Status classify_current() {
   try {
     throw;
+  } catch (const storage::DiskFullError&) {
+    // Nothing was stored; the same call may succeed once space is freed (guarded() turns this
+    // into RESOURCE_EXHAUSTED).
+    return {Err::StorageFull, "the server's storage is full"};
   } catch (const storage::BlockNotFound&) {
     return {Err::BlockNotFound, "block not found"};
   } catch (const storage::BlobSizeError&) {
@@ -93,8 +109,12 @@ Status classify_current() {
     return {Err::CollectionNotFound, e.what()};
   } catch (const search::InvalidQuery& e) {
     return {Err::InvalidArgument, e.what()};
+  } catch (const search::GpuUnavailable& e) {
+    // CPU-only build. No existing ErrorCode fits (the request is valid and the client can change
+    // nothing), so ERROR_INTERNAL with the fixed, safe message that says why.
+    return {Err::Internal, e.what()};
   } catch (const search::SearchError& e) {
-    std::fprintf(stderr, "[ombra.server] internal error: %s\n", e.what());
+    log::error("internal error", {{"error", e.what()}});
     return {Err::Internal, "internal error"};
   } catch (const std::exception& e) {
     const std::string w = e.what();
@@ -108,10 +128,10 @@ Status classify_current() {
     if (has("seeded column") || has("seeded:"))
       return {Err::InvalidArgument, "stored column does not match the collection"};
     if (has("unknown collection")) return {Err::CollectionNotFound, "unknown collection"};
-    std::fprintf(stderr, "[ombra.server] internal error: %s\n", e.what());
+    log::error("internal error", {{"error", e.what()}});
     return {Err::Internal, "internal error"};
   } catch (...) {
-    std::fprintf(stderr, "[ombra.server] internal error: unknown exception\n");
+    log::error("internal error", {{"error", "unknown exception"}});
     return {Err::Internal, "internal error"};
   }
 }
@@ -191,11 +211,30 @@ void OmbraService::forget(const std::string& c) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Collection scope of API keys
+//
+// guarded() has checked the key and its scope. A key scoped to one collection (api_keys.v2) may use
+// only that collection, so every handler calls this with the name from the request before it looks
+// the collection up, stores anything or parses a key. The answer is the same whether the collection
+// exists or not, so a scoped key cannot probe for other names. The key is verified again from the
+// call's metadata (a few hashes), which keeps the check stateless and closed: no key, no access.
+grpc::Status OmbraService::check_collection(grpc::ServerContext* ctx, std::string_view name) {
+  Verified who;
+  const AuthResult a = authorize_who(keys_, bearer_of(ctx), Scope::Read, &who);
+  if (a == AuthResult::Ok && who.allows_collection(name)) return grpc::Status::OK;
+  metrics_.count_permission_denied();
+  log::warn("refused", {{"reason", "collection"}});
+  return grpc::Status(grpc::StatusCode::PERMISSION_DENIED,
+                      "the API key is not allowed to use this collection");
+}
+
+// ---------------------------------------------------------------------------------------------
 // Collections
 
-grpc::Status OmbraService::run_CreateCollection(grpc::ServerContext*,
+grpc::Status OmbraService::run_CreateCollection(grpc::ServerContext* ctx,
                                                 const v1::CreateCollectionRequest* req,
                                                 v1::CreateCollectionResponse* resp) {
+  if (auto d = check_collection(ctx, req->spec().name()); !d.ok()) return d;
   const auto spec = to_storage(req->spec());
   Status st = validate_spec(spec);
   if (!st.ok()) {
@@ -243,9 +282,10 @@ static void fill_info(storage::Store& store, const storage::CollectionSpec& spec
   info->set_keys_uploaded(keys);
 }
 
-grpc::Status OmbraService::run_GetCollection(grpc::ServerContext*,
+grpc::Status OmbraService::run_GetCollection(grpc::ServerContext* ctx,
                                              const v1::GetCollectionRequest* req,
                                              v1::GetCollectionResponse* resp) {
+  if (auto d = check_collection(ctx, req->name()); !d.ok()) return d;
   try {
     storage::CollectionSpec spec;
     if (!store_.get_collection(req->name(), &spec))
@@ -258,11 +298,14 @@ grpc::Status OmbraService::run_GetCollection(grpc::ServerContext*,
   return grpc::Status::OK;
 }
 
-grpc::Status OmbraService::run_ListCollections(grpc::ServerContext*,
+grpc::Status OmbraService::run_ListCollections(grpc::ServerContext* ctx,
                                                const v1::ListCollectionsRequest*,
                                                v1::ListCollectionsResponse* resp) {
+  Verified who;
+  (void)authorize_who(keys_, bearer_of(ctx), Scope::Read, &who);
   try {
     for (const auto& n : store_.list_collections()) {
+      if (!who.allows_collection(n)) continue;  // a scoped key sees only its own collection
       storage::CollectionSpec spec;
       if (store_.get_collection(n, &spec)) fill_info(store_, spec, resp->add_collections());
     }
@@ -273,9 +316,10 @@ grpc::Status OmbraService::run_ListCollections(grpc::ServerContext*,
   return grpc::Status::OK;
 }
 
-grpc::Status OmbraService::run_DropCollection(grpc::ServerContext*,
+grpc::Status OmbraService::run_DropCollection(grpc::ServerContext* ctx,
                                               const v1::DropCollectionRequest* req,
                                               v1::DropCollectionResponse* resp) {
+  if (auto d = check_collection(ctx, req->name()); !d.ok()) return d;
   try {
     if (!store_.drop_collection(req->name()))
       fill(resp->mutable_error(), err(Err::CollectionNotFound, "collection not found"));
@@ -294,7 +338,7 @@ grpc::Status OmbraService::run_DropCollection(grpc::ServerContext*,
 // against the collection (envelopes, key tag, security floor, layout: SearchEngine::prepare_keys),
 // and only then stored (one catalog transaction) and installed. A refused upload leaves no key
 // file, no catalog row and the collection's loaded keys as they were.
-grpc::Status OmbraService::run_UploadKeys(grpc::ServerContext*,
+grpc::Status OmbraService::run_UploadKeys(grpc::ServerContext* ctx,
                                           grpc::ServerReader<v1::UploadKeysChunk>* in,
                                           v1::UploadKeysResponse* resp) {
   const auto t0 = Clock::now();
@@ -316,7 +360,8 @@ grpc::Status OmbraService::run_UploadKeys(grpc::ServerContext*,
       if (ok) n.fetch_sub(1);
     }
   } slot(key_uploads_, limits_.max_concurrent_key_uploads);
-  if (!slot.ok) return fail(Err::SizeLimit, "too many key uploads in progress");
+  if (!slot.ok)
+    return grpc::Status(grpc::StatusCode::RESOURCE_EXHAUSTED, "too many key uploads in progress");
   std::string coll;
   int cur_kind = 0;  // kind of the file being assembled, 0 if none
   std::vector<std::uint8_t> buf;
@@ -332,6 +377,8 @@ grpc::Status OmbraService::run_UploadKeys(grpc::ServerContext*,
         if (c.collection().empty())
           return fail(Err::InvalidArgument, "collection is required on the first chunk");
         coll = c.collection();
+        // Before anything is staged or any key bytes are read.
+        if (auto d = check_collection(ctx, coll); !d.ok()) return d;
         if (!store_.get_collection(coll, nullptr))
           return fail(Err::CollectionNotFound, "collection not found");
       } else if (!c.collection().empty() && c.collection() != coll) {
@@ -366,6 +413,7 @@ grpc::Status OmbraService::run_UploadKeys(grpc::ServerContext*,
         buf.clear();
       }
     }
+    if (ctx->IsCancelled()) return grpc::Status(grpc::StatusCode::CANCELLED, "call cancelled");
     if (chunks == 0) return fail(Err::BadSequence, "no chunks");
     if (cur_kind != 0)
       return fail(Err::BadSequence, "stream ended before the last chunk of a key file");
@@ -393,7 +441,13 @@ grpc::Status OmbraService::run_UploadKeys(grpc::ServerContext*,
 // ---------------------------------------------------------------------------------------------
 // Insert and Delete
 
-grpc::Status OmbraService::run_Insert(grpc::ServerContext*, grpc::ServerReader<v1::InsertBlock>* in,
+// Insert is a client stream of parts: one header per block, then the block's columns in column
+// order, one per message (the layout of ReplaceBlock). A header or the end of the stream closes the
+// block before it, and only then is it stored, as one atomic block. A cancelled call (the client
+// went away, or the server's shutdown grace ran out) never stores the block under assembly. A
+// block that repeats a stored one is a success that stores nothing (see Store::insert).
+grpc::Status OmbraService::run_Insert(grpc::ServerContext* ctx,
+                                      grpc::ServerReader<v1::InsertRequest>* in,
                                       v1::InsertResponse* resp) {
   const auto t0 = Clock::now();
   std::uint64_t inserted = 0;
@@ -405,55 +459,88 @@ grpc::Status OmbraService::run_Insert(grpc::ServerContext*, grpc::ServerReader<v
   std::string coll;
   storage::CollectionSpec spec;
   const PresetInfo* preset = nullptr;
-  std::size_t blocks = 0, bytes = 0;
+  std::size_t blocks = 0, headers = 0, bytes = 0, replayed = 0;
+  // The block under assembly.
+  bool open = false;
+  std::uint32_t cluster = 0;
+  std::size_t want_cols = 0;
+  std::vector<std::string> ids;
+  std::vector<std::vector<std::uint8_t>> cols;
   try {
-    v1::InsertBlock b;
-    while (in->Read(&b)) {
-      if (b.api_version() != kApiVersion)
-        return fail(Err::UnsupportedVersion, "unsupported api_version");
-      if (blocks == 0) {
-        coll = b.collection();
-        if (!store_.get_collection(coll, &spec))
-          return fail(Err::CollectionNotFound, "collection not found");
-        preset = find_preset(spec.preset);
-        if (!preset) return fail(Err::Internal, "internal error");
-        if (!keys_present(coll)) return fail(Err::KeysMissing, "evaluation keys are not uploaded");
-      } else if (b.collection() != coll) {
-        return fail(Err::InvalidArgument, "collection changed within one insert stream");
-      }
-      ++blocks;
-      if (b.cluster_id() > spec.cluster_count)
-        return fail(Err::InvalidArgument, "cluster id out of range");
-      if (b.is_center() != (b.cluster_id() == spec.cluster_count))
-        return fail(Err::InvalidArgument,
-                    "is_center must be set exactly for the center cluster id");
-      if (b.ids_size() == 0) return fail(Err::InvalidArgument, "block has no ids");
-      if (static_cast<std::size_t>(b.ids_size()) > preset->batch_size)
-        return fail(Err::SizeLimit, "block has more ids than slots");
-      std::unordered_set<std::string> seen;
-      for (const auto& id : b.ids()) {
-        if (id.empty()) return fail(Err::InvalidArgument, "empty id");
-        if (id.size() > kMaxIdBytes) return fail(Err::SizeLimit, "id is too long");
-        if (!seen.insert(id).second) return fail(Err::InvalidArgument, "duplicate id");
-      }
-      const std::size_t want_cols = spec.dimension + (b.is_center() ? 0 : sum_cardinality(spec));
-      if (static_cast<std::size_t>(b.columns_size()) != want_cols)
-        return fail(Err::InvalidArgument, "wrong number of columns for the collection's layout");
-
-      std::vector<std::string> ids(b.ids().begin(), b.ids().end());
-      std::vector<std::vector<std::uint8_t>> cols;
-      cols.reserve(want_cols);
-      for (const auto& c : b.columns()) {
-        if (c.size() > kMaxColumnBytes) return fail(Err::SizeLimit, "column is too large");
-        cols.emplace_back(c.begin(), c.end());
-        bytes += c.size();
-      }
-      store_.insert(coll, b.cluster_id(), ids, cols);
+    // Stores the open block. Empty status: nothing open, or stored.
+    const auto close_block = [&]() -> Status {
+      if (!open) return {};
+      if (cols.size() != want_cols)
+        return {Err::BadSequence, "the block has fewer columns than the layout needs"};
+      bool repeat = false;
+      store_.insert(coll, cluster, ids, cols, &repeat);
       inserted += ids.size();
+      replayed += repeat ? 1 : 0;
+      ++blocks;
+      open = false;
+      ids.clear();
+      cols.clear();
+      return {};
+    };
+    v1::InsertRequest m;
+    while (in->Read(&m)) {
+      if (m.api_version() != kApiVersion)
+        return fail(Err::UnsupportedVersion, "unsupported api_version");
+      if (m.part_case() == v1::InsertRequest::kHeader) {
+        if (const Status st = close_block(); !st.ok()) return fail(st.code, st.message.c_str());
+        const auto& h = m.header();
+        if (headers++ == 0) {
+          coll = h.collection();
+          if (auto d = check_collection(ctx, coll); !d.ok())
+            return d;  // before any block is stored
+          if (!store_.get_collection(coll, &spec))
+            return fail(Err::CollectionNotFound, "collection not found");
+          preset = find_preset(spec.preset);
+          if (!preset) return fail(Err::Internal, "internal error");
+          if (!keys_present(coll))
+            return fail(Err::KeysMissing, "evaluation keys are not uploaded");
+        } else if (h.collection() != coll) {
+          return fail(Err::InvalidArgument, "collection changed within one insert stream");
+        }
+        if (h.cluster_id() > spec.cluster_count)
+          return fail(Err::InvalidArgument, "cluster id out of range");
+        if (h.is_center() != (h.cluster_id() == spec.cluster_count))
+          return fail(Err::InvalidArgument,
+                      "is_center must be set exactly for the center cluster id");
+        if (h.ids_size() == 0) return fail(Err::InvalidArgument, "block has no ids");
+        if (static_cast<std::size_t>(h.ids_size()) > preset->batch_size)
+          return fail(Err::SizeLimit, "block has more ids than slots");
+        std::unordered_set<std::string> seen;
+        for (const auto& id : h.ids()) {
+          if (id.empty()) return fail(Err::InvalidArgument, "empty id");
+          if (id.size() > kMaxIdBytes) return fail(Err::SizeLimit, "id is too long");
+          if (!seen.insert(id).second) return fail(Err::InvalidArgument, "duplicate id");
+        }
+        ids.assign(h.ids().begin(), h.ids().end());
+        cluster = h.cluster_id();
+        want_cols = spec.dimension + (h.is_center() ? 0 : sum_cardinality(spec));
+        cols.clear();
+        cols.reserve(want_cols);
+        open = true;
+      } else if (m.part_case() == v1::InsertRequest::kColumn) {
+        if (!open) return fail(Err::BadSequence, "a column before the header");
+        if (cols.size() >= want_cols)
+          return fail(Err::SizeLimit, "more columns than the collection's layout has");
+        if (m.column().size() > kMaxColumnBytes) return fail(Err::SizeLimit, "column is too large");
+        cols.emplace_back(m.column().begin(), m.column().end());
+        bytes += m.column().size();
+      } else {
+        return fail(Err::InvalidArgument, "empty message");
+      }
     }
-    if (blocks == 0) return fail(Err::BadSequence, "no blocks");
+    // The end of the stream is a half-close, or a cancel. A cancelled call must not store the
+    // block under assembly, and must not be acknowledged.
+    if (ctx->IsCancelled()) return grpc::Status(grpc::StatusCode::CANCELLED, "call cancelled");
+    if (headers == 0) return fail(Err::BadSequence, "no blocks");
+    if (const Status st = close_block(); !st.ok()) return fail(st.code, st.message.c_str());
     resp->set_inserted(inserted);
     log_line("insert", inserted, bytes, ms_since(t0));
+    if (replayed > 0) log_line("insert_repeated_blocks", replayed, 0, 0);
   } catch (...) {
     resp->set_inserted(inserted);
     fill(resp->mutable_error(), classify_current());
@@ -461,8 +548,9 @@ grpc::Status OmbraService::run_Insert(grpc::ServerContext*, grpc::ServerReader<v
   return grpc::Status::OK;
 }
 
-grpc::Status OmbraService::run_Delete(grpc::ServerContext*, const v1::DeleteRequest* req,
+grpc::Status OmbraService::run_Delete(grpc::ServerContext* ctx, const v1::DeleteRequest* req,
                                       v1::DeleteResponse* resp) {
+  if (auto d = check_collection(ctx, req->collection()); !d.ok()) return d;
   const auto t0 = Clock::now();
   const auto fail = [&](Err c, const char* m) {
     fill(resp->mutable_error(), err(c, m));
@@ -519,10 +607,14 @@ grpc::Status OmbraService::run_Search(
   if (req.step_case() != v1::SearchRequest::kStart)
     return send_error(err(Err::BadSequence, "the first message must be SearchStart"));
 
+  // The collection scope of the key, before a slot is taken or anything is looked up.
+  if (auto d = check_collection(ctx, req.start().collection()); !d.ok()) return d;
+
   // One slot per open stream, globally and per API key; released when the handler returns, which
   // also frees the session's device memory.
   SessionLimiter::Ticket ticket = sessions_.try_acquire(key_id);
-  if (!ticket.valid()) return send_error(err(Err::SizeLimit, "too many concurrent searches"));
+  if (!ticket.valid())  // overload, retryable: a status, not an in-stream error
+    return grpc::Status(grpc::StatusCode::RESOURCE_EXHAUSTED, "too many concurrent searches");
 
   std::unique_ptr<search::SearchSession> session;
   storage::CollectionSpec spec;
@@ -547,6 +639,9 @@ grpc::Status OmbraService::run_Search(
     session =
         engine_.open_session(st.collection(), st.key_tag(),
                              std::vector<std::uint8_t>(q.begin(), q.end()), st.filter_leaves());
+  } catch (const search::ResourceExhausted&) {  // the GPU has no memory for one more session
+    return grpc::Status(grpc::StatusCode::RESOURCE_EXHAUSTED,
+                        "too many concurrent searches for the server's GPU memory");
   } catch (...) {
     return send_error(classify_current());
   }
@@ -615,6 +710,7 @@ grpc::Status OmbraService::run_Search(
           for (const auto& b : results) {
             if (b.cluster != group[i]) continue;
             s->add_score_blocks(to_str(b.envelope));
+            s->add_block_sizes(static_cast<std::uint32_t>(b.ids.size()));
             for (const auto& id : b.ids) s->add_ids(id);
             ++blocks;
             bytes += b.envelope.size();
@@ -634,8 +730,10 @@ grpc::Status OmbraService::run_Search(
 // ---------------------------------------------------------------------------------------------
 // Blocks
 
-grpc::Status OmbraService::run_ListBlocks(grpc::ServerContext*, const v1::ListBlocksRequest* req,
+grpc::Status OmbraService::run_ListBlocks(grpc::ServerContext* ctx,
+                                          const v1::ListBlocksRequest* req,
                                           v1::ListBlocksResponse* resp) {
+  if (auto d = check_collection(ctx, req->collection()); !d.ok()) return d;
   resp->set_api_version(kApiVersion);
   try {
     if (req->api_version() != kApiVersion) {
@@ -657,8 +755,9 @@ grpc::Status OmbraService::run_ListBlocks(grpc::ServerContext*, const v1::ListBl
   return grpc::Status::OK;
 }
 
-grpc::Status OmbraService::run_GetBlock(grpc::ServerContext*, const v1::GetBlockRequest* req,
+grpc::Status OmbraService::run_GetBlock(grpc::ServerContext* ctx, const v1::GetBlockRequest* req,
                                         grpc::ServerWriter<v1::GetBlockResponse>* out) {
+  if (auto d = check_collection(ctx, req->collection()); !d.ok()) return d;
   const auto t0 = Clock::now();
   const auto send_error = [&](const Status& s) {
     v1::GetBlockResponse r;
@@ -704,7 +803,7 @@ grpc::Status OmbraService::run_GetBlock(grpc::ServerContext*, const v1::GetBlock
   return grpc::Status::OK;
 }
 
-grpc::Status OmbraService::run_ReplaceBlock(grpc::ServerContext*,
+grpc::Status OmbraService::run_ReplaceBlock(grpc::ServerContext* ctx,
                                             grpc::ServerReader<v1::ReplaceBlockRequest>* in,
                                             v1::ReplaceBlockResponse* resp) {
   const auto t0 = Clock::now();
@@ -729,12 +828,18 @@ grpc::Status OmbraService::run_ReplaceBlock(grpc::ServerContext*,
         if (have_header) return fail(Err::BadSequence, "second header");
         have_header = true;
         coll = m.header().collection();
+        // Before anything of the block is read into memory or stored.
+        if (auto d = check_collection(ctx, coll); !d.ok()) return d;
         for (const auto& s : m.header().segments()) segments.push_back(s);
         if (segments.empty() || segments.size() > kMaxClustersPerRound)
           return fail(Err::InvalidArgument, "between 1 and 4096 blocks must be listed");
         if (!store_.get_collection(coll, &rspec))
           return fail(Err::CollectionNotFound, "collection not found");
         max_columns = rspec.dimension + sum_cardinality(rspec);  // a data block's column count
+        const PresetInfo* hp = find_preset(rspec.preset);
+        if (!hp) return fail(Err::Internal, "internal error");
+        if (static_cast<std::size_t>(m.header().ids_size()) > hp->batch_size)
+          return fail(Err::SizeLimit, "block has more ids than slots");
         for (const auto& id : m.header().ids()) {
           if (id.empty() || id.size() > kMaxIdBytes)
             return fail(Err::InvalidArgument, "invalid id");
@@ -752,6 +857,7 @@ grpc::Status OmbraService::run_ReplaceBlock(grpc::ServerContext*,
         return fail(Err::InvalidArgument, "empty message");
       }
     }
+    if (ctx->IsCancelled()) return grpc::Status(grpc::StatusCode::CANCELLED, "call cancelled");
     if (!have_header) return fail(Err::BadSequence, "no header");
     storage::CollectionSpec spec;
     if (!store_.get_collection(coll, &spec))
@@ -780,7 +886,7 @@ grpc::Status OmbraService::run_ReplaceBlock(grpc::ServerContext*,
 // ---------------------------------------------------------------------------------------------
 // Blob store. Blobs are opaque bytes; ids and bytes are never logged.
 
-grpc::Status OmbraService::run_PutBlob(grpc::ServerContext*,
+grpc::Status OmbraService::run_PutBlob(grpc::ServerContext* ctx,
                                        grpc::ServerReader<v1::PutBlobRequest>* in,
                                        v1::PutBlobResponse* resp) {
   const auto t0 = Clock::now();
@@ -804,6 +910,8 @@ grpc::Status OmbraService::run_PutBlob(grpc::ServerContext*,
         have_header = true;
         const auto& h = m.header();
         coll = h.collection();
+        // Before the id, the size or any payload is looked at or kept.
+        if (auto d = check_collection(ctx, coll); !d.ok()) return d;
         id = h.id();
         kind = static_cast<std::uint32_t>(h.kind());
         size = h.size();
@@ -824,6 +932,7 @@ grpc::Status OmbraService::run_PutBlob(grpc::ServerContext*,
         return fail(Err::InvalidArgument, "empty message");
       }
     }
+    if (ctx->IsCancelled()) return grpc::Status(grpc::StatusCode::CANCELLED, "call cancelled");
     if (!have_header) return fail(Err::BadSequence, "no header");
     if (payload.size() != size)
       return fail(Err::InvalidArgument, "less data than the header's size");
@@ -844,8 +953,9 @@ grpc::Status OmbraService::run_PutBlob(grpc::ServerContext*,
   return grpc::Status::OK;
 }
 
-grpc::Status OmbraService::run_GetBlob(grpc::ServerContext*, const v1::GetBlobRequest* req,
+grpc::Status OmbraService::run_GetBlob(grpc::ServerContext* ctx, const v1::GetBlobRequest* req,
                                        grpc::ServerWriter<v1::GetBlobResponse>* out) {
+  if (auto d = check_collection(ctx, req->collection()); !d.ok()) return d;
   const auto t0 = Clock::now();
   const auto send_error = [&](const Status& s) {
     v1::GetBlobResponse r;
@@ -885,8 +995,10 @@ grpc::Status OmbraService::run_GetBlob(grpc::ServerContext*, const v1::GetBlobRe
   return grpc::Status::OK;
 }
 
-grpc::Status OmbraService::run_DeleteBlobs(grpc::ServerContext*, const v1::DeleteBlobsRequest* req,
+grpc::Status OmbraService::run_DeleteBlobs(grpc::ServerContext* ctx,
+                                           const v1::DeleteBlobsRequest* req,
                                            v1::DeleteBlobsResponse* resp) {
+  if (auto d = check_collection(ctx, req->collection()); !d.ok()) return d;
   const auto t0 = Clock::now();
   const auto fail = [&](Err c, const char* m) {
     fill(resp->mutable_error(), err(c, m));
@@ -923,43 +1035,57 @@ grpc::Status ApiKeyAuthProcessor::Process(const InputMetadata& auth_metadata, gr
   if (authorize(keys_, token, Scope::Read) == AuthResult::Unauthenticated) {
     metrics_.count_unauthenticated();
     std::uint64_t suppressed = 0;
-    if (log_.allow(&suppressed))
-      std::fprintf(
-          stderr,
-          "[ombra.server] refused call before its body reason=unauthenticated (+%llu not logged)\n",
-          static_cast<unsigned long long>(suppressed));
+    if (log_.allow(&suppressed)) {
+      // The request id of the refused call, if the client sent a valid one (never trusted
+      // otherwise).
+      std::string rid;
+      const auto rit = auth_metadata.find("x-request-id");
+      if (rit != auth_metadata.end() &&
+          log::valid_request_id(std::string_view(rit->second.data(), rit->second.size())))
+        rid.assign(rit->second.data(), rit->second.size());
+      else
+        rid = log::new_request_id();
+      log::warn("refused call before its body",
+                {{"reason", "unauthenticated"},
+                 {"request_id", rid},
+                 {"not_logged", static_cast<std::uint64_t>(suppressed)}});
+    }
     return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "missing or invalid API key");
   }
   return grpc::Status::OK;  // the header stays visible to the handler, which checks the scope
 }
 
-namespace {
-
-std::string bearer_of(const grpc::ServerContext* ctx) {
-  const auto it = ctx->client_metadata().find("authorization");
-  if (it == ctx->client_metadata().end()) return {};
-  return std::string(it->second.data(), it->second.size());
-}
-
-}  // namespace
-
 template <class Resp, class Fn>
 grpc::Status OmbraService::guarded(grpc::ServerContext* ctx, Rpc rpc, Resp* resp, Fn&& fn) {
+  // Request id: the client's, if it is valid (bounded, [A-Za-z0-9._-]); else a random one. It is
+  // sent back in the initial metadata and put on every log line of this call.
+  std::string rid;
+  {
+    const auto it = ctx->client_metadata().find("x-request-id");
+    if (it != ctx->client_metadata().end() &&
+        log::valid_request_id(std::string_view(it->second.data(), it->second.size())))
+      rid.assign(it->second.data(), it->second.size());
+    else
+      rid = log::new_request_id();
+  }
+  ctx->AddInitialMetadata("x-request-id", rid);
+  log::CallScope scope(rid, rpc_name(rpc));
+  if (draining_.load())
+    return grpc::Status(grpc::StatusCode::UNAVAILABLE, "the server is shutting down");
   std::string key_id;
   const AuthResult a = authorize(keys_, bearer_of(ctx), required_scope(rpc), &key_id);
+  if (a != AuthResult::Unauthenticated) scope.set_key_id(key_id);
   if (a == AuthResult::Unauthenticated) {
     metrics_.count_unauthenticated();
     std::uint64_t suppressed = 0;
     if (refused_log_.allow(&suppressed))  // one line per interval, not one per attempt
-      std::fprintf(stderr,
-                   "[ombra.server] refused rpc=%s reason=unauthenticated (+%llu not logged)\n",
-                   rpc_name(rpc), static_cast<unsigned long long>(suppressed));
+      log::warn("refused", {{"reason", "unauthenticated"},
+                            {"not_logged", static_cast<std::uint64_t>(suppressed)}});
     return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "missing or invalid API key");
   }
   if (a == AuthResult::PermissionDenied) {
     metrics_.count_permission_denied();
-    std::fprintf(stderr, "[ombra.server] refused rpc=%s reason=scope key=%s\n", rpc_name(rpc),
-                 key_id.c_str());
+    log::warn("refused", {{"reason", "scope"}});
     return grpc::Status(grpc::StatusCode::PERMISSION_DENIED, "the API key's scope is too low");
   }
   const auto t0 = Clock::now();
@@ -968,6 +1094,14 @@ grpc::Status OmbraService::guarded(grpc::ServerContext* ctx, Rpc rpc, Resp* resp
     st = fn(key_id);
   else
     st = fn();
+  if constexpr (requires(const Resp* r) { r->has_error(); }) {
+    // A full disk is an overload, not a request error: RESOURCE_EXHAUSTED (retryable) instead of
+    // an answer. Nothing was stored (every write is all-or-nothing).
+    if (st.ok() && resp->has_error() && resp->error().code() == v1::ERROR_STORAGE_FULL) {
+      metrics_.record(rpc, true, ms_since(t0));
+      return grpc::Status(grpc::StatusCode::RESOURCE_EXHAUSTED, "the server's storage is full");
+    }
+  }
   bool failed = !st.ok();
   if constexpr (requires(const Resp* r) { r->has_error(); }) failed = failed || resp->has_error();
   metrics_.record(rpc, failed, ms_since(t0));
@@ -1011,7 +1145,7 @@ grpc::Status OmbraService::UploadKeys(grpc::ServerContext* ctx,
 }
 
 grpc::Status OmbraService::Insert(grpc::ServerContext* ctx,
-                                  grpc::ServerReader<v1::InsertBlock>* req,
+                                  grpc::ServerReader<v1::InsertRequest>* req,
                                   v1::InsertResponse* resp) {
   return guarded(ctx, Rpc::Insert, resp, [&] { return run_Insert(ctx, req, resp); });
 }
