@@ -1,0 +1,12 @@
+# HTTP request parser: methods, versions, headers the parser looks at.
+get="GET "
+post="POST "
+v11=" HTTP/1.1"
+v10=" HTTP/1.0"
+crlf2="\x0d\x0a\x0d\x0a"
+crlf="\x0d\x0a"
+auth="Authorization: Bearer tok-synthetic"
+te="Transfer-Encoding: chunked"
+cl="Content-Length: 0"
+cl4="Content-Length: 4"
+metrics="/metrics"
