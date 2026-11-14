@@ -44,7 +44,9 @@ def key_file(tmp_path, kit, monkeypatch):
 def test_backup_copies_atomically_and_checks(tmp_path, key_file, capsys) -> None:
     dst = tmp_path / "backup" / "k.bak"
     dst.parent.mkdir()
-    assert keys.main(["backup", str(key_file), str(dst), "--passphrase-file", _pwfile(tmp_path)]) == 0
+    assert (
+        keys.main(["backup", str(key_file), str(dst), "--passphrase-file", _pwfile(tmp_path)]) == 0
+    )
     assert dst.read_bytes() == key_file.read_bytes()
     assert stat.S_IMODE(dst.stat().st_mode) == 0o600
     assert [p.name for p in dst.parent.iterdir()] == ["k.bak"]  # no temp file left
@@ -88,7 +90,9 @@ def test_check_ok_offline_with_tag(tmp_path, key_file, kit, capsys, monkeypatch)
     assert keys.main(["check", str(key_file)]) == 0  # no tag: only the file is checked
 
 
-def test_check_wrong_tag_wrong_passphrase_corrupt_file(tmp_path, key_file, kit, monkeypatch, capsys):
+def test_check_wrong_tag_wrong_passphrase_corrupt_file(
+    tmp_path, key_file, kit, monkeypatch, capsys
+):
     monkeypatch.setenv(keys.PASSPHRASE_ENV, PW)
     assert keys.main(["check", str(key_file), "--tag", "some other tag"]) == 1
     assert "does not match" in capsys.readouterr().err

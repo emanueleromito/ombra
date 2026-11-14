@@ -28,7 +28,7 @@ if [ ! -f "$TLS/server.crt" ] || [ ! -f "$TLS/server.key" ]; then
   echo "ombra: made a self-signed certificate in $TLS/server.crt (give it to clients as the CA)" >&2
 fi
 
-if [ ! -f "$DATA/api_keys.v1" ]; then
+if [ ! -f "$DATA/api_keys.v1" ] && [ ! -f "$DATA/api_keys.v2" ]; then
   (umask 077 && ombra_server --create-api-key --scope admin --data-dir "$DATA" > "$DATA/admin_api_key")
   echo "ombra: first start, wrote an admin API key to $DATA/admin_api_key" >&2
 fi

@@ -9,8 +9,8 @@
 #include <filesystem>
 #include <fstream>
 #include <sstream>
-#include <vector>
 #include <string>
+#include <vector>
 
 #include "ombra/server/auth.hpp"
 #include "ombra/server/http.hpp"
@@ -177,7 +177,6 @@ static void test_key_file() {
   fs::remove_all(dir);
 }
 
-
 static bool loads(const std::string& path) {
   try {
     ApiKeyStore::load(path);
@@ -213,7 +212,8 @@ static void test_key_file_v2() {
   CHECK(loads(write_key_file(f, "OMBRA-API-KEYS v2\n")));
   // Refusals.
   const std::string line = kSalt + " " + kHash;
-  for (const char* bad : {" read docs extra\n", " admin docs\n", " bogus docs\n", " read docs docs\n"}) {
+  for (const char* bad :
+       {" read docs extra\n", " admin docs\n", " bogus docs\n", " read docs docs\n"}) {
     write_key_file(f, "OMBRA-API-KEYS v2\n" + line + bad);
     CHECK(!loads(f));
   }
@@ -221,7 +221,9 @@ static void test_key_file_v2() {
   CHECK(!loads(f));  // short salt
   write_key_file(f, "OMBRA-API-KEYS v2\n" + line + " read " + std::string(129, 'x') + "\n");
   CHECK(!loads(f));  // name too long
-  write_key_file(f, std::string("OMBRA-API-KEYS v2\n") + line + " read bad\x01" "name\n");
+  write_key_file(f, std::string("OMBRA-API-KEYS v2\n") + line +
+                        " read bad\x01"
+                        "name\n");
   CHECK(!loads(f));  // control character
   write_key_file(f, "OMBRA-API-KEYS v2\n" + line + " read docs\n", 0640);
   CHECK(!loads(f));  // group-readable

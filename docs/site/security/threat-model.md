@@ -41,7 +41,7 @@ The server holds only what the client sends it: ciphertexts, the crypto context 
 - The secret key and the key file stay on the client. No server message has a field for a secret key, and the server never logs one.
 - OpenFHE is correct, and the parameters in [Parameters and security level](parameters.md) give at least 128-bit security.
 - The network is hostile. The server refuses to start without TLS and without API keys unless you pass `--insecure` or `--no-auth`, and those two flags only work on loopback addresses. API keys have scopes (admin, read, write).
-- The server is single-tenant. An API key has a scope, not a collection: any read key reads every collection and blob on the server, and any write key can overwrite or delete data in any of them. Run one server per trust domain.
+- The server is single-tenant. An API key has a scope and may be limited to one collection (see [API keys](api-keys.md)). A key without a limit reads every collection and blob on the server, and a write key can overwrite or delete data in any of them. Limited keys do not separate load or disk use. Run one server per trust domain.
 - The client machine is not compromised. Whoever reads the key file and its passphrase reads everything.
 
 We do not assume the server is physically secure, that its operators are trustworthy, or that its disks and memory are private. Everything the server stores is a ciphertext, a sealed blob, or one of the plaintext items listed in [What the server learns](what-the-server-learns.md).

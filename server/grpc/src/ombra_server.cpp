@@ -57,8 +57,8 @@
 #include "gpu_info.hpp"
 #include "ombra/search/session.hpp"
 #include "ombra/server/auth.hpp"
-#include "ombra/server/log.hpp"
 #include "ombra/server/limits.hpp"
+#include "ombra/server/log.hpp"
 #include "ombra/server/metrics.hpp"
 #include "ombra/server/policy.hpp"
 #include "ombra/storage/store.hpp"
@@ -273,8 +273,7 @@ int main(int argc, char** argv) {
       // The only place a token is ever shown.
       std::printf("%s\n", token.c_str());
       std::fflush(stdout);
-      std::fprintf(stderr,
-                   "created %s API key %s%s (shown once; only its salted hash is stored)\n",
+      std::fprintf(stderr, "created %s API key %s%s (shown once; only its salted hash is stored)\n",
                    scope_arg.c_str(), id.c_str(),
                    key_collection.empty() ? "" : " for one collection");
     } catch (const std::exception& e) {
@@ -455,7 +454,8 @@ int main(int argc, char** argv) {
             std::size_t dropped = 0;
             for (const auto& c : store.list_collections()) dropped += store.drop_dead_blocks(c);
             if (dropped > 0)
-              ombra::server::log::info("compaction", {{"dropped", static_cast<std::uint64_t>(dropped)}});
+              ombra::server::log::info("compaction",
+                                       {{"dropped", static_cast<std::uint64_t>(dropped)}});
           } catch (const std::exception& e) {
             ombra::server::log::error("compaction failed", {{"error", e.what()}});
           }

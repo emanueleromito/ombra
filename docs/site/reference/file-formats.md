@@ -11,7 +11,7 @@ Every file Ombra writes starts with a magic string and a version number, so a pr
 | [Stored blob](#server-files) | server | `OBLB` | {{ cpp("server/storage/include/ombra/storage/blob.hpp", "kBlobVersion") }} |
 | [Write-ahead log](#server-files) | server | `OWAL` | {{ cpp("server/storage/include/ombra/storage/wal.hpp", "kWalVersion") }} |
 | [Catalog](#server-files) | server | SQLite file, `schema_version` in its `meta` table | {{ cpp("server/storage/include/ombra/storage/catalog.hpp", "kCatalogSchemaVersion") }} |
-| [API key file](#server-files) | server | first line `OMBRA-API-KEYS v1` | 1 |
+| [API key file](#server-files) | server | first line `OMBRA-API-KEYS v1` or `OMBRA-API-KEYS v2` | 1, and 2 for keys limited to a collection |
 
 A format changes only with a version bump. The version of a file never depends on the version of the package that wrote it.
 
@@ -102,5 +102,7 @@ The server keeps everything in its data directory, laid out as in [Backups](../o
 **Catalog** (`catalog.db`): a SQLite database with the collections, segments, blobs and tombstones. Its `meta` table holds `schema_version` and `api_version`. The server upgrades an older schema when it opens it, and refuses a newer one. The current schema version is {{ cpp("server/storage/include/ombra/storage/catalog.hpp", "kCatalogSchemaVersion") }}.
 
 **API key file** (`api_keys.v1`): text, mode 0600. The first line is `OMBRA-API-KEYS v1`, then one line per key with a salt, a salted SHA-256 hash and a scope. It holds no token.
+
+**API key file, version 2** (`api_keys.v2`): the same, with an optional fourth field on a line, the collection the key is limited to. The first line is `OMBRA-API-KEYS v2`. A line is `<salt, 32 hex> <hash, 64 hex> <scope> [<collection>]`, separated by single spaces. The collection is 1 to 128 printable ASCII characters without a space. An `admin` line with a collection, a fifth field, a bad hex string, an unknown scope or a file that group or others can read is refused, and so is a v1 file with a fourth field. The server reads both versions: it opens `api_keys.v2` if it exists, else `api_keys.v1`. It writes v1 until you create the first key with `--collection`. Then it writes v2 with the old keys copied unchanged and renames the old file to `api_keys.v1.migrated`. A v2 file is never turned back into v1. Version 1 files keep working with no change.
 
 **Collection format**: a collection is the set of the files above plus its catalog rows. The wire version is the `api_version` field, 1, stored with every collection spec. See the [gRPC API](grpc-api.md).

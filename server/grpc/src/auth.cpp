@@ -248,7 +248,8 @@ ApiKeyStore ApiKeyStore::load(const std::string& path) {
         "the API key file must not be accessible by group or others (chmod 600)");
   std::ifstream in(path);
   std::string line;
-  if (!std::getline(in, line)) throw std::runtime_error("the API key file has an unknown version header");
+  if (!std::getline(in, line))
+    throw std::runtime_error("the API key file has an unknown version header");
   const bool v2 = line == kHeaderV2;
   if (!v2 && line != kHeader)
     throw std::runtime_error("the API key file has an unknown version header");
@@ -258,7 +259,8 @@ ApiKeyStore ApiKeyStore::load(const std::string& path) {
     if (line.empty()) continue;
     std::istringstream ls(line);
     std::string salt_hex, hash_hex, scope_s, coll, extra;
-    if (!(ls >> salt_hex >> hash_hex >> scope_s)) throw std::runtime_error("malformed line in the API key file");
+    if (!(ls >> salt_hex >> hash_hex >> scope_s))
+      throw std::runtime_error("malformed line in the API key file");
     // v2 only: an optional fourth field, the collection. Nothing may follow.
     const bool has_coll = v2 && static_cast<bool>(ls >> coll);
     if (ls >> extra) throw std::runtime_error("malformed line in the API key file");

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
-// The server's one logging helper. Text lines (default) or JSON lines (--log-format json) on stderr.
+// The server's one logging helper. Text lines (default) or JSON lines (--log-format json) on
+// stderr.
 //
 // Rules (server/CLAUDE.md): a log line carries counts, sizes, timings, the 8-hex API key id and the
 // request id. Never a collection name, an id, ciphertext, a value or a token. Callers pass only

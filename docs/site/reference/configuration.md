@@ -6,7 +6,7 @@ The server is the `ombra_server` binary. The tools `ombra_verify` and `ombra_bac
 
 ```text
 ombra_server --data-dir D --listen HOST:PORT --tls-cert F --tls-key F [options]
-ombra_server --create-api-key --scope admin|read|write --data-dir D
+ombra_server --create-api-key --scope admin|read|write --data-dir D [--collection NAME]
 ombra_server --version
 ```
 
@@ -19,6 +19,8 @@ ombra_server --version
 | `--no-auth` | off | Skips the API key check. Prints a warning. Only accepted on a loopback address. |
 | `--create-api-key` | off | Creates an API key, prints it once on stdout and exits. Needs `--scope` and `--data-dir`. |
 | `--scope S` | none | Scope of the key to create: `admin`, `read` or `write`. |
+| `--collection NAME` | none | With `--create-api-key`: limits the key to one collection. Only for `read` and `write` keys. See [API keys](../security/api-keys.md). |
+| `--log-format F` | `text` | `text` or `json`. See [Logs](#logs). |
 | `--rest-port N` | off | Starts the HTTP port for `/healthz`, `/readyz` and `/metrics`. 0 picks a free port. |
 | `--rest-host H` | the host of `--listen` | IPv4 address of the HTTP port. It uses the same TLS certificate as gRPC. |
 | `--gpu-budget-mb N` | 4096 | GPU memory the block cache may use, in MiB. |
@@ -30,7 +32,7 @@ ombra_server --version
 | `--openfhe-version V` | the build's | OpenFHE version written into stored files and checked when reading them. |
 | `--version` | | Prints the version and exits. |
 
-Without `--tls-cert` and `--tls-key` the server refuses to start unless you pass `--insecure`. Without an API key file in the data directory it refuses to start unless you pass `--no-auth`. The key file is named `api_keys.v1`, and the server also refuses a file that group or others can read.
+Without `--tls-cert` and `--tls-key` the server refuses to start unless you pass `--insecure`. Without an API key file in the data directory it refuses to start unless you pass `--no-auth`. The key file is `api_keys.v1`, or `api_keys.v2` once a key is limited to a collection (see [API keys](../security/api-keys.md)), and the server also refuses a file that group or others can read.
 
 On start the server prints `ombra_server listening on HOST:PORT` to stdout, and with `--rest-port` also `ombra_server rest listening on HOST:PORT`. 
 
@@ -40,9 +42,17 @@ On the first SIGTERM or SIGINT the server does four things. It reports not ready
 
 When a limit is reached the server answers `RESOURCE_EXHAUSTED`, which the client retries: all search slots are in use (`--max-sessions`), too many key uploads are running, the GPU has no memory for one more search, or the disk is full. A full disk is also reported as `ERROR_STORAGE_FULL`. Nothing is stored in that case.
 
+### Logs
+
+The server writes one line per event to stderr. With `--log-format json` each line is a JSON object; the default is text. The fields are listed in [Monitoring](../operations/monitoring.md#logs).
+
+### Request ids
+
+Every call has a request id. The server uses the `x-request-id` metadata value of the call if it is 1 to 64 characters from `A-Z a-z 0-9 . _ -`, and makes a random 16-character one otherwise. It returns the id in the `x-request-id` response metadata and puts it on every log line of the call. The Python client sends a random id with each call, keeps it across retries (with `x-attempt` counting the tries) and sets it as `request_id` on the `OmbraError`. Quote it when you ask an operator about a failed call.
+
 ### API keys
 
-An API key is an access token for the gRPC and HTTP ports. It is not an FHE key, and the server never sees the client's secret key. `--create-api-key` prints the token once. The file keeps only a salted SHA-256 hash, so a lost token cannot be recovered and you create a new one. The three scopes are described on the [gRPC API](grpc-api.md) page. A key has a scope but no collection: the server is single-tenant, so any read key reads every collection and any write key can change any of them.
+An API key is an access token for the gRPC and HTTP ports. It is not an FHE key, and the server never sees the client's secret key. `--create-api-key` prints the token once. The file keeps only a salted SHA-256 hash, so a lost token cannot be recovered and you create a new one. The three scopes are described on the [gRPC API](grpc-api.md) page. A key has a scope and, if you create it with `--collection`, one collection. Without `--collection` the key works on every collection. Send SIGHUP to the server to load new or revoked keys without a restart.
 
 ```bash
 ombra_server --create-api-key --scope read --data-dir /data

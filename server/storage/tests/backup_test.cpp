@@ -99,6 +99,15 @@ int main() {
     CHECK(rep.api_keys && fs::exists(dst.path + "/b/api_keys.v1"));
   }
 
+  {  // api_keys.v2 (collection-scoped keys) is carried over too.
+    TempDir src, dst;
+    fill_store(src.path);
+    std::ofstream(src.path + "/api_keys.v2") << "OMBRA-API-KEYS v2\n";
+    BackupReport rep;
+    backup_data_dir(src.path, dst.path + "/b", rep);
+    CHECK(rep.api_keys && fs::exists(dst.path + "/b/api_keys.v2"));
+  }
+
   {  // Refusals: not empty, inside the source, not a data directory, corrupt source file.
     TempDir src, dst;
     fill_store(src.path);

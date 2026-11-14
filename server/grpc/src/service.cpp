@@ -491,7 +491,8 @@ grpc::Status OmbraService::run_Insert(grpc::ServerContext* ctx,
         const auto& h = m.header();
         if (headers++ == 0) {
           coll = h.collection();
-          if (auto d = check_collection(ctx, coll); !d.ok()) return d;  // before any block is stored
+          if (auto d = check_collection(ctx, coll); !d.ok())
+            return d;  // before any block is stored
           if (!store_.get_collection(coll, &spec))
             return fail(Err::CollectionNotFound, "collection not found");
           preset = find_preset(spec.preset);
@@ -729,7 +730,8 @@ grpc::Status OmbraService::run_Search(
 // ---------------------------------------------------------------------------------------------
 // Blocks
 
-grpc::Status OmbraService::run_ListBlocks(grpc::ServerContext* ctx, const v1::ListBlocksRequest* req,
+grpc::Status OmbraService::run_ListBlocks(grpc::ServerContext* ctx,
+                                          const v1::ListBlocksRequest* req,
                                           v1::ListBlocksResponse* resp) {
   if (auto d = check_collection(ctx, req->collection()); !d.ok()) return d;
   resp->set_api_version(kApiVersion);
@@ -993,7 +995,8 @@ grpc::Status OmbraService::run_GetBlob(grpc::ServerContext* ctx, const v1::GetBl
   return grpc::Status::OK;
 }
 
-grpc::Status OmbraService::run_DeleteBlobs(grpc::ServerContext* ctx, const v1::DeleteBlobsRequest* req,
+grpc::Status OmbraService::run_DeleteBlobs(grpc::ServerContext* ctx,
+                                           const v1::DeleteBlobsRequest* req,
                                            v1::DeleteBlobsResponse* resp) {
   if (auto d = check_collection(ctx, req->collection()); !d.ok()) return d;
   const auto t0 = Clock::now();
@@ -1033,7 +1036,8 @@ grpc::Status ApiKeyAuthProcessor::Process(const InputMetadata& auth_metadata, gr
     metrics_.count_unauthenticated();
     std::uint64_t suppressed = 0;
     if (log_.allow(&suppressed)) {
-      // The request id of the refused call, if the client sent a valid one (never trusted otherwise).
+      // The request id of the refused call, if the client sent a valid one (never trusted
+      // otherwise).
       std::string rid;
       const auto rit = auth_metadata.find("x-request-id");
       if (rit != auth_metadata.end() &&

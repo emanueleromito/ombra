@@ -178,7 +178,7 @@ def import_key_file(path: str | os.PathLike[str], passphrase: str) -> KeyMateria
 # ---- backup and check (the `ombra-keys` tool) ------------------------------------------------
 @dataclass(frozen=True)
 class KeyCheck:
-    """What `check_key_file` found. The tag is public (the server stores it); no secret goes here."""
+    """What `check_key_file` found. The tag is public (the server stores it); no secret."""
 
     key_tag: str
     kdf_n: int

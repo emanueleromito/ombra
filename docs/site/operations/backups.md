@@ -6,6 +6,25 @@ Two things need a backup, and they live in different places. The server's data d
 
 Back up each collection's key file, and its passphrase, on the client side. Without the key file the data on the server cannot be decrypted by anyone, and there is no recovery. Keep the copy somewhere other than the server. The file is passphrase-protected, see the [key file format](../reference/file-formats.md#key-file), so it is safe to store like any other sensitive file. A backup of the server data without the key file is useless, and a key file without the server data has nothing to open.
 
+### Copy and check a key file
+
+`ombra-keys` (also `python -m ombra.keys`) copies a key file and checks it. It never takes the passphrase as an argument, because arguments show in the process list. Give it a prompt, an environment variable, a file or a file descriptor.
+
+```bash
+# Copy atomically (temporary file, fsync, rename), mode 0600. It refuses to replace an existing
+# file unless you pass --force, and then checks the copy.
+ombra-keys backup my.key /mnt/offsite/my.key.2026-01-15 --check-passphrase
+
+# Open a key file or a backup and compare its key tag with the one on the server
+OMBRA_KEY_PASSPHRASE=... OMBRA_API_KEY=... \
+  ombra-keys check /mnt/offsite/my.key.2026-01-15 --server ombra.example.com:443 --collection docs
+
+# Offline: compare with a key tag you wrote down
+ombra-keys check /mnt/offsite/my.key.2026-01-15 --tag "$KEY_TAG"
+```
+
+`check` opens the file, checks that the secret key and the public key in it work and have the same key tag, and prints `OK` with that tag. The key tag is not secret: the server stores it. The tool never prints a key or the passphrase. Run `check` on every backup after you make it, and after each restore test. The exit code is 0 for OK and 1 for a failed check. See the [Python API](../reference/python-api.md#ombra-keys) for the options.
+
 ## The server data directory
 
 In Docker this is the `ombra-data` volume, mounted at `/data`. Outside Docker it is whatever you pass as `--data-dir`.
@@ -17,7 +36,7 @@ In Docker this is the `ombra-data` volume, mounted at `/data`. Outside Docker it
 | `segments/` | One file per block: the encrypted vectors of a cluster. |
 | `blobs/` | One file per encrypted blob: records and documents. |
 | `keys/` | The public evaluation keys of each collection. |
-| `api_keys.v1` | The salted hashes of the API keys. |
+| `api_keys.v1` or `api_keys.v2` | The salted hashes of the API keys. Version 2 is used once a key is limited to a collection, see [API keys](../security/api-keys.md). |
 | `tls/` | The self-signed certificate and its key (Docker image). |
 | `admin_api_key` | The admin token made on the first start (Docker image). |
 
@@ -36,7 +55,7 @@ docker run --rm -v ombra_ombra-data:/data -v "$PWD/backup":/backup \
 
 Outside Docker: `ombra_backup --data-dir /var/lib/ombra --out /backups/ombra-2026-01-15`. The output directory must not exist or be empty, and must not lie inside the data directory. When it finishes it has checked every copied file, the same way [`ombra_verify`](../reference/cli.md#ombra_verify) does, and it fails if one is corrupt. A failed run leaves the output directory empty. The volume name has the compose project name as a prefix, `ombra_ombra-data` for the shipped file. Check yours with `docker volume ls`.
 
-The copy has `catalog.db`, `segments/`, `blobs/`, `keys/` and `api_keys.v1`. It has no write-ahead log, no `tls/` and no `admin_api_key`. Copy those two from the volume if you want them, for example with the tar command below. Without `tls/` the image makes a new certificate on its first start, and clients need the new one. Without `admin_api_key` you cannot read the admin token again, see [Docker and compose](docker.md).
+The copy has `catalog.db`, `segments/`, `blobs/`, `keys/` and the API key file (`api_keys.v1` or `api_keys.v2`). It has no write-ahead log, no `tls/` and no `admin_api_key`. Copy those two from the volume if you want them, for example with the tar command below. Without `tls/` the image makes a new certificate on its first start, and clients need the new one. Without `admin_api_key` you cannot read the admin token again, see [Docker and compose](docker.md).
 
 !!! deep-dive "Why the copy is consistent while the server writes"
     The catalog is the one record of what exists. SQLite copies it in one read snapshot, so it is the catalog of a single instant. The server writes a segment, blob or key file completely to disk before the catalog row that names it, and never reuses a file name, so every file the catalog copy names existed at that instant and cannot change afterwards. `ombra_backup` opens all of them right after the snapshot. An open file stays readable even if the server removes it a moment later, for example when a client replaces a block.

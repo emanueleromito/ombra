@@ -44,7 +44,7 @@ PERMISSION_DENIED = grpc.StatusCode.PERMISSION_DENIED
 
 @pytest.fixture(scope="module")
 def base(tmp_path_factory):
-    """(data root with collections A (keys uploaded, 8 vectors) and B (empty), columns of a block)."""
+    """(data root with collections A (keys uploaded) and B (empty), columns of one block)."""
     from ombra import Client
 
     root = tmp_path_factory.mktemp("base")
@@ -213,7 +213,11 @@ def test_scoped_keys(env):
     assert [c.spec.name for c in lst.collections] == [A]
     lst = s.ListCollections(pb.ListCollectionsRequest(), metadata=md(admin))
     assert sorted(c.spec.name for c in lst.collections) == [B, A]
-    denied(s.CreateCollection, pb.CreateCollectionRequest(spec=pb.CollectionSpec(name=B)), metadata=md(read_a))
+    denied(
+        s.CreateCollection,
+        pb.CreateCollectionRequest(spec=pb.CollectionSpec(name=B)),
+        metadata=md(read_a),
+    )
     denied(  # the scope is read: no insert even into A
         s.Insert, insert_stream(e.cols, A, [b"r-1"]), metadata=md(read_a), timeout=20
     )
@@ -227,7 +231,8 @@ def test_scoped_keys(env):
     newspec.name = "other_collection"
     denied(s.CreateCollection, pb.CreateCollectionRequest(spec=newspec), metadata=md(write_a))
     assert "other_collection" not in [
-        c.spec.name for c in s.ListCollections(pb.ListCollectionsRequest(), metadata=md(admin)).collections
+        c.spec.name
+        for c in s.ListCollections(pb.ListCollectionsRequest(), metadata=md(admin)).collections
     ]
 
     n_a, n_b = n_blocks(e, admin, A), n_blocks(e, admin, B)
@@ -255,7 +260,11 @@ def test_scoped_keys(env):
 
     denied(s.PutBlob, blob_msgs(B), metadata=md(write_a), timeout=20)
     assert not s.PutBlob(blob_msgs(A), metadata=md(write_a), timeout=20).error.code
-    gb = list(s.GetBlob(pb.GetBlobRequest(api_version=1, collection=B, kind=1, id=b"blob-1"), metadata=md(admin)))
+    gb = list(
+        s.GetBlob(
+            pb.GetBlobRequest(api_version=1, collection=B, kind=1, id=b"blob-1"), metadata=md(admin)
+        )
+    )
     assert gb[0].error.code == 14  # not stored in B
 
     def replace(name):
@@ -272,7 +281,9 @@ def test_scoped_keys(env):
         )
 
     denied(lambda: list(s.Search(search(B), metadata=md(read_a), timeout=20)))
-    denied(s.Delete, pb.DeleteRequest(api_version=1, collection=B, ids=[b"i"]), metadata=md(write_a))
+    denied(
+        s.Delete, pb.DeleteRequest(api_version=1, collection=B, ids=[b"i"]), metadata=md(write_a)
+    )
     denied(
         s.DeleteBlobs,
         pb.DeleteBlobsRequest(api_version=1, collection=B, kind=1, ids=[b"i"]),
@@ -301,7 +312,10 @@ def test_scoped_keys(env):
     # Drop needs admin (scoped keys are never admin); an unscoped admin may drop.
     denied(s.DropCollection, pb.DropCollectionRequest(name=A), metadata=md(write_a))
     denied(s.DropCollection, pb.DropCollectionRequest(name=B), metadata=md(write_a))
-    assert [c.spec.name for c in s.ListCollections(pb.ListCollectionsRequest(), metadata=md(admin)).collections].count(A) == 1
+    assert [
+        c.spec.name
+        for c in s.ListCollections(pb.ListCollectionsRequest(), metadata=md(admin)).collections
+    ].count(A) == 1
 
 
 def test_sighup_reload_with_a_new_scoped_key(env):
@@ -358,7 +372,9 @@ def test_request_ids_and_json_logs_carry_no_data(env):
         except grpc.RpcError:  # gRPC itself may refuse some values
             continue
         assert rid_of(c) != bad and re.fullmatch(r"[0-9a-f]{16}", rid_of(c))
-    _, c2 = s.GetCollection.with_call(pb.GetCollectionRequest(name=A), metadata=md(admin), timeout=10)
+    _, c2 = s.GetCollection.with_call(
+        pb.GetCollectionRequest(name=A), metadata=md(admin), timeout=10
+    )
     assert re.fullmatch(r"[0-9a-f]{16}", rid_of(c2))
 
     # A mix of calls with their own ids: success, refusals (scope, collection), bad key.

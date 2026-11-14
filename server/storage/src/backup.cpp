@@ -203,9 +203,12 @@ void attempt(const std::string& root, const std::string& out, BackupReport& rep)
   for (const char* dir : {"segments", "blobs", "keys"}) fsync_path(out + "/" + dir);
 
   // 3. the API key file (atomically replaced by the server, so any read sees a whole file)
-  if (fs::exists(root + "/api_keys.v1")) {
-    rep.bytes += copy_file(root + "/api_keys.v1", out + "/api_keys.v1");
-    rep.api_keys = true;
+  // v1, or v2 (written once a collection-scoped key exists; the server reads v2 first).
+  for (const char* name : {"api_keys.v1", "api_keys.v2"}) {
+    if (fs::exists(root + "/" + name)) {
+      rep.bytes += copy_file(root + "/" + name, out + "/" + name);
+      rep.api_keys = true;
+    }
   }
   fsync_path(out);
 }
