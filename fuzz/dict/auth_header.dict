@@ -1,0 +1,7 @@
+# Authorization header values and flag syntax.
+bearer="Bearer tok-synthetic"
+prefix="Bearer "
+basic="Basic "
+loopback="127.0.0.1:8080"
+v6="[::1]:8080"
+max_u64="18446744073709551615"

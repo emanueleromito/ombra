@@ -67,6 +67,34 @@ jobs:
       - run: make build-cpu
       - run: make test
 
+  sanitizers:
+    name: Sanitizers and fuzzing
+    needs: image
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ${{ needs.image.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - run: make test-asan
+      - run: make fuzz FUZZ_SECONDS=60
+      - name: Keep the input of a failed fuzz run
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: fuzz-artifacts
+          path: build-fuzz/fuzz-artifacts
+          if-no-files-found: ignore
+
   openfhe:
     name: OpenFHE tests
     needs: image

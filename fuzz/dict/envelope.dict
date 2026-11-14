@@ -1,0 +1,11 @@
+# File envelope: magic, versions, kinds, the synthetic preset and OpenFHE version of the harness.
+magic="OMBR"
+v1="\x01\x00"
+v2="\x02\x00"
+kind_ctx="\x01\x00"
+kind_ct="\x02\x00"
+kind_key="\x03\x00"
+kind_seeded="\x04\x00"
+preset="m0_compact_n8192"
+ofhe="1.4.0-test"
+len_max="\xff\x00"

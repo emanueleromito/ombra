@@ -1,0 +1,6 @@
+# Blob file (magic OBLB, container version 1), kinds 1 and 2, the smallest bucket size.
+magic="OBLB"
+v1="\x01\x00"
+kind_record="\x01\x00\x00\x00"
+kind_document="\x02\x00\x00\x00"
+bucket0="\x00\x40\x00\x00\x00\x00\x00\x00"

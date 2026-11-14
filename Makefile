@@ -8,10 +8,14 @@ TASK        ?= all
 RESULTS_DIR ?= results-raw
 BUILD_TYPE  ?= Release
 GPU         ?= a10
+FUZZ_SECONDS ?= 60
+JOBS        ?= $(shell nproc)
+FUZZ_CC     ?= $(shell command -v clang || echo clang-18)
+FUZZ_CXX    ?= $(shell command -v clang++ || echo clang++-18)
 CMD         ?= nvidia-smi
 
 .DEFAULT_GOAL := help
-.PHONY: help venv build build-cpu test test-gpu test-openfhe test-openfhe-local bench gpu-info results-pull fmt lint clean prebuild on-gpu
+.PHONY: help venv build build-cpu test test-asan fuzz fuzz-corpus test-gpu test-openfhe test-openfhe-local bench gpu-info results-pull fmt lint clean prebuild on-gpu
 
 help: ## List commands
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-14s %s\n", $$1, $$2}'
@@ -32,6 +36,25 @@ build-cpu: ## Build C++ code without CUDA (for CPU-only tests)
 test: build-cpu ## Run CPU tests locally (C++ and Python)
 	ctest --test-dir $(BUILD_DIR)-cpu --output-on-failure --no-tests=ignore
 	$(PYTHON) -m pytest -m "not gpu and not openfhe"; code=$$?; [ $$code -eq 0 ] || [ $$code -eq 5 ]
+
+test-asan: ## Run the CPU C++ tests under AddressSanitizer and UBSan (build-asan)
+	cmake -S . -B $(BUILD_DIR)-asan -DCMAKE_BUILD_TYPE=Debug -DOMBRA_ENABLE_CUDA=OFF -DOMBRA_ENABLE_SANITIZERS=ON
+	cmake --build $(BUILD_DIR)-asan -j$(JOBS)
+	ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
+		ctest --test-dir $(BUILD_DIR)-asan --output-on-failure --no-tests=ignore
+
+fuzz: ## Build the libFuzzer targets (clang) and run each FUZZ_SECONDS=60 on a copy of its corpus
+	cmake -S . -B $(BUILD_DIR)-fuzz -DCMAKE_BUILD_TYPE=RelWithDebInfo -DOMBRA_ENABLE_CUDA=OFF -DOMBRA_FUZZ=ON \
+		-DCMAKE_C_COMPILER=$(FUZZ_CC) -DCMAKE_CXX_COMPILER=$(FUZZ_CXX)
+	cmake --build $(BUILD_DIR)-fuzz -j$(JOBS) --target ombra_fuzzers
+	fuzz/run_fuzzers.sh $(BUILD_DIR)-fuzz $(FUZZ_SECONDS)
+
+fuzz-corpus: ## Regenerate the seed corpora in fuzz/corpus from the project's writers
+	cmake -S . -B $(BUILD_DIR)-fuzz -DCMAKE_BUILD_TYPE=RelWithDebInfo -DOMBRA_ENABLE_CUDA=OFF -DOMBRA_FUZZ=ON \
+		-DCMAKE_C_COMPILER=$(FUZZ_CC) -DCMAKE_CXX_COMPILER=$(FUZZ_CXX)
+	cmake --build $(BUILD_DIR)-fuzz -j$(JOBS) --target ombra_fuzz_seedgen
+	rm -rf fuzz/corpus
+	$(BUILD_DIR)-fuzz/fuzz/ombra_fuzz_seedgen fuzz/corpus
 
 test-gpu: ## Run GPU tests on Modal (A10)
 	modal run modal_app.py::test_gpu
@@ -74,4 +97,4 @@ lint: ## Lint Python (ruff) and check C++ formatting
 	@files=$$(git ls-files '*.cpp' '*.hpp' '*.h' '*.cu' '*.cuh'); [ -z "$$files" ] || clang-format --dry-run --Werror $$files
 
 clean: ## Remove local build directories
-	rm -rf $(BUILD_DIR) $(BUILD_DIR)-cpu $(BUILD_DIR)-openfhe $(BUILD_DIR)-native
+	rm -rf $(BUILD_DIR) $(BUILD_DIR)-cpu $(BUILD_DIR)-asan $(BUILD_DIR)-fuzz $(BUILD_DIR)-openfhe $(BUILD_DIR)-native

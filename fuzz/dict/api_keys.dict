@@ -1,0 +1,7 @@
+# API key file: header line, scopes, 32 hex digit salt and 64 hex digit hash.
+header="OMBRA-API-KEYS v1\x0a"
+scope_read=" read"
+scope_write=" write"
+scope_admin=" admin"
+salt="00112233445566778899aabbccddeeff"
+hash="00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"

@@ -1,0 +1,8 @@
+# Seeded payload: version 1, generator 1 (BLAKE2xb), small power-of-two ring dimensions.
+version_generator="\x01\x00\x01\x00"
+n8="\x08\x00\x00\x00"
+n1="\x01\x00\x00\x00"
+n_big="\x00\x00\x00\x80"
+towers2="\x02\x00"
+towers_big="\xff\xff"
+tag="tag-synthetic"

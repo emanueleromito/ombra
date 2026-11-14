@@ -1,0 +1,8 @@
+# Segment file (magic OSEG, container version 1) and the envelope magic of its columns.
+seg_magic="OSEG"
+seg_v1="\x01\x00"
+env_magic="OMBR"
+preset="m0_compact_n8192"
+ofhe="1.4.0-test"
+tag="tag-synthetic"
+big_count="\xff\xff\xff\xff"

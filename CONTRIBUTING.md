@@ -10,6 +10,12 @@ Run `make help` for the commands. Before you open a pull request, run `make fmt`
 
 Report security problems privately, as [SECURITY.md](SECURITY.md) explains, not in a public issue.
 
+## Sanitizers and fuzzing
+
+`make test-asan` builds all CPU C++ tests in `build-asan` with AddressSanitizer and UBSan and runs them. A UBSan finding stops the test, so it fails. Run it when you change a parser, a file format or memory handling.
+
+The parsers of untrusted bytes (file envelope, seeded payload, segment, blob, write-ahead log, recovery, API key file, HTTP request) have libFuzzer targets in `fuzz/`. `make fuzz FUZZ_SECONDS=60` needs clang, builds `build-fuzz` and runs each target for that long on a copy of its seed corpus. If you change one of these parsers, run it for a few minutes. A parser must reject bad input with its normal error, never crash, read out of bounds or allocate memory from a length field without checking it against the input size. Every fuzzing finding gets a regression test in the normal test suite. [fuzz/README.md](fuzz/README.md) has the details. CI runs both targets in the "Sanitizers and fuzzing" job.
+
 ## Security invariants
 
 These are project rules, not style preferences. A change that breaks one is a bug, and review will ask for it to be fixed before merge.

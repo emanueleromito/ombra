@@ -66,7 +66,9 @@ bool decode_body(const std::uint8_t* p, std::size_t n, WalRecord* r) {
   if (r->type != WalType::Delete && !str(&r->segment)) return false;
   if (r->type != WalType::InsertCommit) {
     std::uint32_t cnt;
-    if (!u32(&cnt) || cnt > n) return false;
+    // Every id costs at least its 4-byte length: bound the count by the bytes left before resizing,
+    // so a damaged count cannot make the log allocate far more than its own size.
+    if (!u32(&cnt) || cnt > (n - pos) / 4) return false;
     r->ids.resize(cnt);
     for (auto& id : r->ids)
       if (!str(&id)) return false;
