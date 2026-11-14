@@ -7,13 +7,18 @@
 #include <set>
 #include <stdexcept>
 
+#include "ombra/storage/failpoint.hpp"
+#include "ombra/storage/fsutil.hpp"
+
 namespace ombra::storage {
 
 namespace {
 
 [[noreturn]] void fail(sqlite3* db, const char* what) {
   // SQLite messages name tables and columns, never row values.
-  throw std::runtime_error(std::string("catalog: ") + what + ": " + sqlite3_errmsg(db));
+  const std::string m = std::string("catalog: ") + what + ": " + sqlite3_errmsg(db);
+  if ((sqlite3_errcode(db) & 0xff) == SQLITE_FULL) throw DiskFullError(m);
+  throw std::runtime_error(m);
 }
 
 class Stmt {
@@ -66,9 +71,11 @@ class Stmt {
 
 void exec(sqlite3* db, const char* sql) {
   char* msg = nullptr;
-  if (sqlite3_exec(db, sql, nullptr, nullptr, &msg) != SQLITE_OK) {
+  const int rc = sqlite3_exec(db, sql, nullptr, nullptr, &msg);
+  if (rc != SQLITE_OK) {
     std::string m = msg ? msg : "unknown";
     sqlite3_free(msg);
+    if ((rc & 0xff) == SQLITE_FULL) throw DiskFullError("catalog: " + m);
     throw std::runtime_error("catalog: " + m);
   }
 }
@@ -81,6 +88,9 @@ class Tx {
     if (open_) sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, nullptr);
   }
   void commit() {
+    // Test hook (off in production): behave as SQLite does on a full disk, the transaction stays
+    // open and the destructor rolls it back.
+    if (fs_fault_hit()) throw DiskFullError("catalog: database or disk is full");
     exec(db_, "COMMIT");
     open_ = false;
   }

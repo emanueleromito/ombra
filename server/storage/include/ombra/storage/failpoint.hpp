@@ -7,6 +7,7 @@
 #include <unistd.h>
 
 #include <atomic>
+#include <cerrno>
 
 namespace ombra::storage {
 
@@ -52,6 +53,33 @@ inline void set_crash_point(CrashPoint p) { crash_point_storage().store(static_c
 inline void maybe_crash(CrashPoint p) {
   if (crash_point_storage().load(std::memory_order_relaxed) == static_cast<int>(p))
     _exit(kCrashExitCode);
+}
+
+// Disk-full injection for the tests. set_fs_fault(n, ENOSPC) makes the n-th instrumented I/O call
+// after it fail once (write, fsync, rename, create in fsutil and the log, and the catalog
+// commit); n counts calls from 1. A write fails after writing half its bytes, like a full disk.
+// Off in production: the countdown is 0 and the check is one relaxed atomic load. To count the
+// calls of a scenario, arm a large n and subtract fs_fault_remaining() afterwards.
+inline std::atomic<long>& fs_fault_countdown() {
+  static std::atomic<long> c{0};
+  return c;
+}
+inline std::atomic<int>& fs_fault_errno() {
+  static std::atomic<int> e{0};
+  return e;
+}
+inline void set_fs_fault(long n, int err) {
+  fs_fault_errno().store(err);
+  fs_fault_countdown().store(n);
+}
+inline void clear_fs_fault() { fs_fault_countdown().store(0); }
+inline long fs_fault_remaining() { return fs_fault_countdown().load(); }
+// True when this call must fail (errno is set to the injected error).
+inline bool fs_fault_hit() {
+  if (fs_fault_countdown().load(std::memory_order_relaxed) <= 0) return false;
+  if (fs_fault_countdown().fetch_sub(1) != 1) return false;
+  errno = fs_fault_errno().load();
+  return true;
 }
 
 }  // namespace ombra::storage
