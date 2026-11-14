@@ -90,6 +90,7 @@ nav:
       - reference/python-api.md
       - reference/grpc-api.md
       - reference/configuration.md
+      - reference/cli.md
       - reference/presets.md
       - reference/file-formats.md
   - Operations:

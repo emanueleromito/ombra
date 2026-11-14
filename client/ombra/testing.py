@@ -18,6 +18,7 @@ from typing import Any
 import numpy as np
 
 from ombra._core import CollectionInfo, SearchHit
+from ombra.retry import RetryPolicy
 
 
 @dataclass
@@ -45,6 +46,8 @@ class FakeClient:
         insecure: bool = False,
         timeout: float | None = None,
         stream_timeout: float | None = None,
+        deadlines: Mapping[str, float] | None = None,
+        retry: RetryPolicy | None = None,
     ) -> None:
         self._colls: dict[str, _Coll] = {}
 

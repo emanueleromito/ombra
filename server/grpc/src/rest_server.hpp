@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
-// REST admin port: GET /healthz (no auth) and GET /metrics (admin key). HTTP/1.1 over
-// OpenSSL (TLS 1.2+) or, with --insecure, plain TCP. One request per connection, header cap 8 KiB,
-// a total deadline per connection that also covers the TLS handshake, a small worker pool so that
-// one slow client cannot block /healthz, and a cap on open connections (audit A-17). OpenSSL is
-// already a dependency of gRPC.
+// REST admin port: GET /healthz and GET /readyz (no auth) and GET /metrics (admin key). HTTP/1.1
+// over OpenSSL (TLS 1.2+) or, with --insecure, plain TCP. One request per connection, header cap 8
+// KiB, a total deadline per connection that also covers the TLS handshake, a small worker pool so
+// that one slow client cannot block /healthz, and a cap on open connections (audit A-17). OpenSSL
+// is already a dependency of gRPC.
 #pragma once
 
 #include <atomic>
@@ -34,6 +34,9 @@ class RestServer {
   RestServer& operator=(const RestServer&) = delete;
 
   int port() const { return port_; }
+  // Shutdown has begun: GET /readyz answers 503 from now on. /healthz stays 200 (the process is
+  // alive), so an orchestrator does not kill it while it drains.
+  void begin_drain() { draining_.store(true); }
   void stop();
 
  private:
@@ -49,6 +52,7 @@ class RestServer {
   int listen_fd_ = -1;
   int port_ = 0;
   std::atomic<bool> stop_{false};
+  std::atomic<bool> draining_{false};
   std::thread thread_;  // accept loop
   std::vector<std::thread> workers_;
   std::size_t max_connections_;

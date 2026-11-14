@@ -12,6 +12,14 @@ curl --cacert server.crt https://localhost:8080/healthz
 
 returns `{"status":"ok"}` and needs no API key. The HTTP port uses the same TLS certificate as gRPC, so drop `--cacert` only if the server runs with `--insecure`. It only tells you that the process is up. It does not check the GPU or the data.
 
+## Readiness check
+
+```bash
+curl --cacert server.crt https://localhost:8080/readyz
+```
+
+returns `{"status":"ready"}` while the server takes calls, and status 503 with `{"status":"draining"}` from the moment it gets SIGTERM until it exits. Use `/readyz` for a load balancer or a Kubernetes readiness probe, so traffic stops before the server does. Use `/healthz` for the liveness probe: it stays 200 while the server drains, so the server is not restarted in the middle of a shutdown.
+
 ## Metrics
 
 ```bash

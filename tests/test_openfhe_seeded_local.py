@@ -21,6 +21,7 @@ native = pytest.importorskip("ombra._native", reason="the compiled extension is 
 
 from ombra import _seeding  # noqa: E402
 from ombra._local import LocalTransport  # noqa: E402
+from ombra._proto import insert_requests  # noqa: E402
 from ombra.collection import Collection, KeyKit  # noqa: E402
 from ombra.file_format import Kind, read_column_envelope  # noqa: E402
 from ombra.seeded_format import read_payload  # noqa: E402
@@ -226,11 +227,11 @@ def test_query_stays_kind_2_and_truncated_seeded_column_is_refused(tmp_path, mon
             api_version=1, collection="c", cluster_id=1, ids=[b"center0"], columns=cols,
             is_center=True,
         )  # fmt: skip
-        assert not stub.Insert(iter([blk])).error.code
+        assert not stub.Insert(insert_requests(pb, [blk])).error.code
         truncated = [*cols[:-1], cols[-1][:-8]]
         blk2 = pb.InsertBlock(
             api_version=1, collection="c", cluster_id=0, ids=[b"x"], columns=truncated
         )
-        assert stub.Insert(iter([blk2])).error.code != 0
+        assert stub.Insert(insert_requests(pb, [blk2])).error.code != 0
     finally:
         transport.close()

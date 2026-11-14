@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 OR LicenseRef-Ombra-Commercial
 #include "ombra/storage/segment.hpp"
 
+#include <cctype>
 #include <cmath>
 #include <stdexcept>
 
@@ -73,8 +74,34 @@ SegmentInfo write_segment(const std::string& path, const SegmentData& s) {
   return info;
 }
 
-SegmentData read_segment(const std::string& path, const std::string& expected_preset,
-                         const std::string& expected_openfhe_version, SegmentInfo* info) {
+bool is_valid_segment_name(const std::string& n) {
+  if (n.size() != 22 || n[0] != 's' || n.compare(17, 5, ".oseg") != 0) return false;
+  for (std::size_t i = 1; i <= 16; ++i)
+    if (!std::isxdigit(static_cast<unsigned char>(n[i])) ||
+        std::isupper(static_cast<unsigned char>(n[i])))
+      return false;
+  return true;
+}
+
+std::string envelope_openfhe_version(const std::uint8_t* d, std::size_t size) {
+  if (size < 10 || d[0] != 'O' || d[1] != 'M' || d[2] != 'B' || d[3] != 'R')
+    throw std::runtime_error("envelope: bad magic, not an Ombra file");
+  std::size_t pos = 8;
+  const std::size_t plen = get_le(d + pos, 2);
+  pos += 2;
+  if (size < pos + plen + 2) throw std::runtime_error("envelope: truncated file");
+  pos += plen;
+  const std::size_t vlen = get_le(d + pos, 2);
+  pos += 2;
+  if (size < pos + vlen) throw std::runtime_error("envelope: truncated file");
+  return std::string(reinterpret_cast<const char*>(d + pos), vlen);
+}
+
+namespace {
+// expected_ofhe == nullptr: take the version of the first column.
+SegmentData read_segment_impl(const std::string& path, const std::string& expected_preset,
+                              const std::string* expected_ofhe, std::string* seen_version,
+                              SegmentInfo* info) {
   auto b = read_file(path);
   if (b.size() < kHeader) throw std::runtime_error("segment: truncated header");
   if (b[0] != 'O' || b[1] != 'S' || b[2] != 'E' || b[3] != 'G')
@@ -92,6 +119,7 @@ SegmentData read_segment(const std::string& path, const std::string& expected_pr
     if (n - pos < k) throw std::runtime_error("segment: truncated body");
   };
   SegmentData s;
+  std::string seen;
   need(12);
   s.cluster = static_cast<std::uint32_t>(get_le(p, 4));
   auto n_ids = get_le(p + 4, 4);
@@ -116,7 +144,11 @@ SegmentData read_segment(const std::string& path, const std::string& expected_pr
     need(len);
     // Throws on unknown envelope version, wrong kind, wrong preset or OpenFHE version, or a
     // malformed seeded payload.
-    check_column_envelope(p + pos, len, expected_preset, expected_openfhe_version);
+    if (!expected_ofhe) {
+      seen = envelope_openfhe_version(p + pos, len);
+      expected_ofhe = &seen;
+    }
+    check_column_envelope(p + pos, len, expected_preset, *expected_ofhe);
     s.column_envelopes.emplace_back(p + pos, p + pos + len);
     pos += len;
   }
@@ -126,7 +158,19 @@ SegmentData read_segment(const std::string& path, const std::string& expected_pr
     info->n_columns = static_cast<std::uint32_t>(n_cols);
     info->crc = crc;
   }
+  if (seen_version) *seen_version = seen;
   return s;
+}
+}  // namespace
+
+SegmentData read_segment(const std::string& path, const std::string& expected_preset,
+                         const std::string& expected_openfhe_version, SegmentInfo* info) {
+  return read_segment_impl(path, expected_preset, &expected_openfhe_version, nullptr, info);
+}
+
+SegmentData inspect_segment(const std::string& path, const std::string& expected_preset,
+                            std::string* seen_version, SegmentInfo* info) {
+  return read_segment_impl(path, expected_preset, nullptr, seen_version, info);
 }
 
 }  // namespace ombra::storage

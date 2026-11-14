@@ -41,7 +41,7 @@ COPY server /src/server
 COPY proto /src/proto
 RUN cmake -S /src -B /build -DCMAKE_BUILD_TYPE=Release -DOMBRA_ENABLE_CUDA=ON -DOMBRA_ENABLE_TEST_HOOKS=OFF \
         "-DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCHS}" \
-    && cmake --build /build -j --target ombra_server
+    && cmake --build /build -j --target ombra_server ombra_verify ombra_backup
 
 FROM nvidia/cuda:12.6.3-runtime-ubuntu22.04@sha256:63a18dd805367dacfb077aeced8384ab2fb569598ec5f5f5220c3f90a5c23650
 
@@ -60,6 +60,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=build /usr/local/lib/libOPENFHE*.so* /usr/local/lib/
 COPY --from=build /build/server/grpc/ombra_server /usr/local/bin/ombra_server
+COPY --from=build /build/server/storage/ombra_verify /usr/local/bin/ombra_verify
+COPY --from=build /build/server/storage/ombra_backup /usr/local/bin/ombra_backup
 COPY licenses /licenses
 COPY docker/entrypoint.sh /usr/local/bin/ombra-entrypoint
 RUN ldconfig && chmod +x /usr/local/bin/ombra-entrypoint

@@ -45,8 +45,9 @@ enum ErrorCode {
   ERROR_BAD_SEQUENCE = 10;          // stream messages out of order
   ERROR_INTERNAL = 11;
   ERROR_BLOCK_NOT_FOUND = 12;       // no such block (segment) in the collection
-  ERROR_BLOCK_MISMATCH = 13;
-  ERROR_BLOB_NOT_FOUND = 14;        // no blob with this (kind, id) in the collection        // ReplaceBlock ids are not exactly the live ids, or cluster/columns differ
+  ERROR_BLOCK_MISMATCH = 13;        // ReplaceBlock ids are not exactly the live ids, or cluster/columns differ
+  ERROR_BLOB_NOT_FOUND = 14;        // no blob with this (kind, id) in the collection
+  ERROR_STORAGE_FULL = 15;          // the server's disk or quota is full; nothing was stored; retry later
 }
 
 message Error {
@@ -121,10 +122,30 @@ message UploadKeysChunk {
 }
 message UploadKeysResponse { Error error = 1; }
 
-// Insert: a client stream of blocks. A block is up to batch_size vectors of one cluster:
-// d column ciphertexts + sum(cardinality) one-hot ciphertexts, each in a versioned envelope.
-message InsertBlock {
+// Insert: a client stream of blocks, sent in parts like ReplaceBlock so that no message is larger
+// than one column. A block is up to batch_size vectors of one cluster: d column ciphertexts +
+// sum(cardinality) one-hot ciphertexts, each in a versioned envelope. Per block: one header, then
+// its columns in column order, one per message. The next header (or the end of the stream) closes
+// the block; a block with fewer or more columns than the layout needs is ERROR_BAD_SEQUENCE.
+// A block is stored when it is closed; `inserted` counts the stored blocks' ids.
+//
+// Idempotent: a block whose ids ALL exist in one stored block of the same cluster, with
+// byte-identical column envelopes, is a success that stores nothing and counts its ids again, so a
+// client may repeat an Insert whose answer it never got. A block that shares only some ids with
+// stored ones, or reuses an id with other bytes, is refused as a duplicate.
+message InsertHeader {
+  string collection = 1;
+  uint32 cluster_id = 2;
+  repeated bytes ids = 3;       // one per occupied slot, in slot order; at most one block of slots
+  bool is_center = 4;           // cluster-center block (stage 1) instead of data
+}
+message InsertRequest {
   uint32 api_version = 1;       // must be 1 (the block is stored)
+  oneof part { InsertHeader header = 2; bytes column = 3; }
+}
+// One whole block: the form that the local mode stores. No call sends it.
+message InsertBlock {
+  uint32 api_version = 1;
   string collection = 2;
   uint32 cluster_id = 3;
   repeated bytes ids = 4;       // one per occupied slot, in slot order
@@ -163,6 +184,9 @@ message SearchScores {                // round 2 out: filtered scores and the id
   repeated bytes score_blocks = 2;    // each: slot i holds score + lambda * c
   repeated bytes ids = 3;             // slot order within the cluster, tombstoned slots included
   bool last = 4;                      // last message of the stream
+  repeated uint32 block_sizes = 5;    // occupied slots of each score block, in block order;
+                                      // they sum to the number of ids, so an answer
+                                      // describes itself (blocks may change between answers)
 }
 message SearchRequest {
   oneof step { SearchStart start = 1; SearchChosen chosen = 2; }
@@ -260,7 +284,7 @@ service Ombra {
   rpc ListCollections(ListCollectionsRequest) returns (ListCollectionsResponse);
   rpc DropCollection(DropCollectionRequest) returns (DropCollectionResponse);
   rpc UploadKeys(stream UploadKeysChunk) returns (UploadKeysResponse);
-  rpc Insert(stream InsertBlock) returns (InsertResponse);
+  rpc Insert(stream InsertRequest) returns (InsertResponse);
   rpc Delete(DeleteRequest) returns (DeleteResponse);
   rpc Search(stream SearchRequest) returns (stream SearchResponse);
   rpc ListBlocks(ListBlocksRequest) returns (ListBlocksResponse);

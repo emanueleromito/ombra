@@ -51,6 +51,19 @@ void check_column_for_insert(const std::uint8_t* data, std::size_t size,
                              const std::string& expected_openfhe_version,
                              const ColumnExpect& expect);
 
+// "s" + 16 lowercase hex digits + ".oseg", exactly what the store generates.
+bool is_valid_segment_name(const std::string& n);
+
+// The OpenFHE version string in an envelope's header (no other check beyond bounds); throws
+// std::runtime_error if the header is truncated or is not an Ombra envelope.
+std::string envelope_openfhe_version(const std::uint8_t* data, std::size_t size);
+
+// Like read_segment, but without a fixed OpenFHE version: the version of the first column is used
+// as the expected one for all columns (so the file must agree with itself). *seen_version
+// (optional) receives it ("" for a segment with no column). For ombra_verify.
+SegmentData inspect_segment(const std::string& path, const std::string& expected_preset,
+                            std::string* seen_version, SegmentInfo* info = nullptr);
+
 std::vector<std::uint8_t> encode_segment(const SegmentData& s);
 
 // Durable write (temp, fsync, rename, fsync dir). Crash points fire inside.
