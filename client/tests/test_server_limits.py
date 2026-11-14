@@ -67,9 +67,11 @@ def test_deadlines_are_set_and_can_be_overridden():
     )
     stub.Search(iter(()))
     stub.GetCollection(None)
-    assert seen == {"search": {"timeout": 50.0}, "get": {"timeout": 5.0}}
+    # every call also carries x-request-id metadata (tests/test_request_id.py covers that)
+    assert seen["search"]["timeout"] == 50.0 and seen["get"]["timeout"] == 5.0
+    assert {k for k in seen["get"]} == {"timeout", "metadata"}
     stub.GetCollection(None, timeout=1.0)
-    assert seen["get"] == {"timeout": 1.0}
+    assert seen["get"]["timeout"] == 1.0
 
 
 def test_receive_limit_is_far_below_a_gibibyte():
