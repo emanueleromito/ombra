@@ -155,7 +155,19 @@ def _tree_hash() -> str:
         ).stdout
 
     h = hashlib.sha256(git("rev-parse", "HEAD"))
-    h.update(git("diff", "HEAD", "--", "client", "server", "core", "proto", "CMakeLists.txt"))
+    h.update(
+        git(
+            "diff",
+            "HEAD",
+            "--",
+            "client",
+            "server",
+            "core",
+            "proto",
+            "CMakeLists.txt",
+            "tests/upgrade",
+        )
+    )
     return h.hexdigest()[:16]
 
 

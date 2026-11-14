@@ -100,13 +100,15 @@ def read(client, work: Path) -> dict:
     assert col.blobs.get(col.name, KIND_RECORD, b"rec2") == blob, "blob differs"
     _expect_no_gpu(client, x)
     # writes work on the opened data
-    client.insert(NAME, x[:1], ["z0"])
+    n = state.get("reads", 0)  # every read phase inserts a new id
+    new_id = f"z{n}"
+    client.insert(NAME, x[:1], [new_id])
     victim = state["live"][0]
     client.delete(NAME, [victim])
     live = _live(col)
-    assert live == sorted([*(set(state["live"]) - {victim}), "z0"]), "writes did not apply"
+    assert live == sorted([*(set(state["live"]) - {victim}), new_id]), "writes did not apply"
     # later reads (and the next phase of the test) start from what this phase left
-    state = {"live": live, "info": _info(client)}
+    state = {"live": live, "info": _info(client), "reads": n + 1}
     (work / "state.json").write_text(json.dumps(state))
     return {"info": state["info"]}
 
