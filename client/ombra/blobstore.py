@@ -116,11 +116,16 @@ class GrpcBlobStore:
         return data
 
     def delete(self, collection: str, kind: int, ids: Iterable[bytes]) -> int:
+        from ombra._transport import id_batches
+
         pb = self._pb
-        req = pb.DeleteBlobsRequest(
-            api_version=API_VERSION, collection=collection, kind=kind, ids=[bytes(i) for i in ids]
-        )
-        resp = self._stub.DeleteBlobs(req)
-        if resp.HasField("error"):
-            self._check(resp.error)
-        return int(resp.deleted)
+        deleted = 0
+        for batch in id_batches(ids):  # each request stays under the server's receive limit
+            req = pb.DeleteBlobsRequest(
+                api_version=API_VERSION, collection=collection, kind=kind, ids=batch
+            )
+            resp = self._stub.DeleteBlobs(req)
+            if resp.HasField("error"):
+                self._check(resp.error)
+            deleted += int(resp.deleted)
+        return deleted

@@ -589,3 +589,14 @@ def test_search_reconnect_survives_a_block_layout_change():
     s = search._Stream
     assert s._identity(_Msg(kind="centers")) == ("centers",)
     assert s._identity(_Msg(kind="scores", scores=_ns(cluster_id=4))) == ("scores", 4)
+
+
+def test_id_batches_stay_under_the_byte_cap():
+    from ombra._transport import id_batches
+
+    ids = [bytes([i % 256]) * 256 for i in range(100_000)]  # about 26 MB at the longest id
+    batches = list(id_batches(ids, max_bytes=8 << 20))
+    assert len(batches) > 1
+    assert [i for b in batches for i in b] == ids
+    assert all(sum(len(i) + 4 for i in b) <= 8 << 20 for b in batches)
+    assert list(id_batches([])) == []

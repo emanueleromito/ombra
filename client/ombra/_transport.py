@@ -17,6 +17,26 @@ from ombra.retry import Replayable, RetryPolicy, call_with_retry
 # of about 0.8 MB at the biggest preset; PutBlob and UploadKeys: chunks of at most 4 MiB; Insert
 # header: at most one block of ids, about 2 MB), so this equals the server's receive limit.
 MAX_SEND_MESSAGE = 16 << 20
+# Requests that carry an id list (Delete, DeleteBlobs) are split so each one stays well under the
+# server's receive limit: at most this many id bytes per request.
+ID_BYTES_PER_REQUEST = 8 << 20
+
+
+def id_batches(ids, max_bytes: int = ID_BYTES_PER_REQUEST):
+    """Split `ids` into lists whose total length is at most `max_bytes` (each list non-empty)."""
+    batch: list[bytes] = []
+    size = 0
+    for i in ids:
+        b = bytes(i)
+        if batch and size + len(b) + 4 > max_bytes:
+            yield batch
+            batch, size = [], 0
+        batch.append(b)
+        size += len(b) + 4  # field tag and length prefix
+    if batch:
+        yield batch
+
+
 # Largest message the client accepts from a server. Server answers are one ciphertext or blob chunk
 # (<= 4 MiB), one SearchScores (a few blocks and <= 100,000 ids of 256 bytes) or a ListBlocks
 # catalog (~50 bytes a block); 64 MiB covers all of them (audit A-23).

@@ -40,6 +40,7 @@ from ombra import _seeding, presets
 from ombra import query as oq
 from ombra._decrypt import ExpectedShapes, check_ciphertext, decrypt_values
 from ombra._proto import insert_requests
+from ombra._transport import id_batches
 from ombra.blobstore import KIND_DOCUMENT, KIND_RECORD, BlobStore, BlobStoreError, GrpcBlobStore
 from ombra.clustering import assign, cluster_vectors
 from ombra.documents import DocumentCodec
@@ -641,13 +642,16 @@ class Collection:
     def delete(self, ids: Sequence[bytes]) -> int:
         """Delete vectors (tombstones on the server) and their record and document blobs."""
         self._stats_for_delete(ids)
-        r = self.stub.Delete(
-            self.pb.DeleteRequest(api_version=API_VERSION, collection=self.name, ids=list(ids))
-        )
-        _check(r.error)
+        deleted = 0
+        for batch in id_batches(ids):  # each request stays under the server's receive limit
+            r = self.stub.Delete(
+                self.pb.DeleteRequest(api_version=API_VERSION, collection=self.name, ids=batch)
+            )
+            _check(r.error)
+            deleted += r.deleted
         for kind in (KIND_RECORD, KIND_DOCUMENT):
             self.blobs.delete(self.name, kind, ids)
-        return r.deleted
+        return deleted
 
     def _save_stats(self) -> None:
         """Store the cluster statistics as an encrypted blob under the reserved id (never plain)."""
