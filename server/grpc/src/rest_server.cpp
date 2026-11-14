@@ -19,6 +19,7 @@
 #include <stdexcept>
 
 #include "ombra/server/http.hpp"
+#include "ombra/server/log.hpp"
 
 namespace ombra::server {
 
@@ -134,9 +135,9 @@ void RestServer::worker() {
     try {
       serve(fd);
     } catch (const std::exception& e) {
-      std::fprintf(stderr, "[ombra.server] rest request failed: %s\n", e.what());
+      log::error("rest request failed", {{"error", e.what()}});
     } catch (...) {
-      std::fprintf(stderr, "[ombra.server] rest request failed: unknown error\n");
+      log::error("rest request failed", {{"error", "unknown error"}});
     }
     ::close(fd);
     std::lock_guard lk(qmu_);
@@ -244,7 +245,7 @@ void RestServer::serve(int fd) {
         return;
       case AuthResult::PermissionDenied:
         metrics_.count_permission_denied();
-        std::fprintf(stderr, "[ombra.server] rest denied path=/metrics key=%s\n", key_id.c_str());
+        log::warn("rest denied", {{"path", "/metrics"}, {"key_id", key_id}});
         write_all(http_response(403, "{\"error\":\"permission denied\"}"));
         return;
       case AuthResult::Ok:

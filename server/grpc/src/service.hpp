@@ -12,6 +12,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <string_view>
 
 #include "ombra/search/session.hpp"
 #include "ombra/server/auth.hpp"
@@ -115,6 +116,8 @@ class OmbraService final : public ombra::v1::Ombra::Service {
                            grpc::ServerWriter<v1::GetBlobResponse>*);
   grpc::Status run_DeleteBlobs(grpc::ServerContext*, const v1::DeleteBlobsRequest*,
                                v1::DeleteBlobsResponse*);
+  // OK, or PERMISSION_DENIED if the call's API key is scoped to another collection (auth.hpp).
+  grpc::Status check_collection(grpc::ServerContext* ctx, std::string_view name);
   template <class Resp, class Fn>
   grpc::Status guarded(grpc::ServerContext* ctx, Rpc rpc, Resp* resp, Fn&& fn);
 

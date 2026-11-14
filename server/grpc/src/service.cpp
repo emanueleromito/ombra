@@ -11,6 +11,7 @@
 #include <type_traits>
 #include <unordered_set>
 
+#include "ombra/server/log.hpp"
 #include "ombra/server/policy.hpp"
 #include "ombra/storage/fsutil.hpp"
 
@@ -62,8 +63,17 @@ double ms_since(Clock::time_point t0) {
 }
 
 // Logs: counts, sizes and timings only.
+// Inside an RPC the log helper adds request_id, rpc and key_id (log.hpp).
 void log_line(const char* what, std::size_t a, std::size_t b, double ms) {
-  std::fprintf(stderr, "[ombra.server] %s count=%zu bytes=%zu ms=%.2f\n", what, a, b, ms);
+  log::info(what, {{"count", static_cast<std::uint64_t>(a)},
+                   {"bytes", static_cast<std::uint64_t>(b)},
+                   {"ms", ms}});
+}
+
+std::string bearer_of(const grpc::ServerContext* ctx) {
+  const auto it = ctx->client_metadata().find("authorization");
+  if (it == ctx->client_metadata().end()) return {};
+  return std::string(it->second.data(), it->second.size());
 }
 
 void fill(v1::Error* e, const Status& s) {
@@ -104,7 +114,7 @@ Status classify_current() {
     // nothing), so ERROR_INTERNAL with the fixed, safe message that says why.
     return {Err::Internal, e.what()};
   } catch (const search::SearchError& e) {
-    std::fprintf(stderr, "[ombra.server] internal error: %s\n", e.what());
+    log::error("internal error", {{"error", e.what()}});
     return {Err::Internal, "internal error"};
   } catch (const std::exception& e) {
     const std::string w = e.what();
@@ -118,10 +128,10 @@ Status classify_current() {
     if (has("seeded column") || has("seeded:"))
       return {Err::InvalidArgument, "stored column does not match the collection"};
     if (has("unknown collection")) return {Err::CollectionNotFound, "unknown collection"};
-    std::fprintf(stderr, "[ombra.server] internal error: %s\n", e.what());
+    log::error("internal error", {{"error", e.what()}});
     return {Err::Internal, "internal error"};
   } catch (...) {
-    std::fprintf(stderr, "[ombra.server] internal error: unknown exception\n");
+    log::error("internal error", {{"error", "unknown exception"}});
     return {Err::Internal, "internal error"};
   }
 }
@@ -201,11 +211,30 @@ void OmbraService::forget(const std::string& c) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Collection scope of API keys
+//
+// guarded() has checked the key and its scope. A key scoped to one collection (api_keys.v2) may use
+// only that collection, so every handler calls this with the name from the request before it looks
+// the collection up, stores anything or parses a key. The answer is the same whether the collection
+// exists or not, so a scoped key cannot probe for other names. The key is verified again from the
+// call's metadata (a few hashes), which keeps the check stateless and closed: no key, no access.
+grpc::Status OmbraService::check_collection(grpc::ServerContext* ctx, std::string_view name) {
+  Verified who;
+  const AuthResult a = authorize_who(keys_, bearer_of(ctx), Scope::Read, &who);
+  if (a == AuthResult::Ok && who.allows_collection(name)) return grpc::Status::OK;
+  metrics_.count_permission_denied();
+  log::warn("refused", {{"reason", "collection"}});
+  return grpc::Status(grpc::StatusCode::PERMISSION_DENIED,
+                      "the API key is not allowed to use this collection");
+}
+
+// ---------------------------------------------------------------------------------------------
 // Collections
 
-grpc::Status OmbraService::run_CreateCollection(grpc::ServerContext*,
+grpc::Status OmbraService::run_CreateCollection(grpc::ServerContext* ctx,
                                                 const v1::CreateCollectionRequest* req,
                                                 v1::CreateCollectionResponse* resp) {
+  if (auto d = check_collection(ctx, req->spec().name()); !d.ok()) return d;
   const auto spec = to_storage(req->spec());
   Status st = validate_spec(spec);
   if (!st.ok()) {
@@ -253,9 +282,10 @@ static void fill_info(storage::Store& store, const storage::CollectionSpec& spec
   info->set_keys_uploaded(keys);
 }
 
-grpc::Status OmbraService::run_GetCollection(grpc::ServerContext*,
+grpc::Status OmbraService::run_GetCollection(grpc::ServerContext* ctx,
                                              const v1::GetCollectionRequest* req,
                                              v1::GetCollectionResponse* resp) {
+  if (auto d = check_collection(ctx, req->name()); !d.ok()) return d;
   try {
     storage::CollectionSpec spec;
     if (!store_.get_collection(req->name(), &spec))
@@ -268,11 +298,14 @@ grpc::Status OmbraService::run_GetCollection(grpc::ServerContext*,
   return grpc::Status::OK;
 }
 
-grpc::Status OmbraService::run_ListCollections(grpc::ServerContext*,
+grpc::Status OmbraService::run_ListCollections(grpc::ServerContext* ctx,
                                                const v1::ListCollectionsRequest*,
                                                v1::ListCollectionsResponse* resp) {
+  Verified who;
+  (void)authorize_who(keys_, bearer_of(ctx), Scope::Read, &who);
   try {
     for (const auto& n : store_.list_collections()) {
+      if (!who.allows_collection(n)) continue;  // a scoped key sees only its own collection
       storage::CollectionSpec spec;
       if (store_.get_collection(n, &spec)) fill_info(store_, spec, resp->add_collections());
     }
@@ -283,9 +316,10 @@ grpc::Status OmbraService::run_ListCollections(grpc::ServerContext*,
   return grpc::Status::OK;
 }
 
-grpc::Status OmbraService::run_DropCollection(grpc::ServerContext*,
+grpc::Status OmbraService::run_DropCollection(grpc::ServerContext* ctx,
                                               const v1::DropCollectionRequest* req,
                                               v1::DropCollectionResponse* resp) {
+  if (auto d = check_collection(ctx, req->name()); !d.ok()) return d;
   try {
     if (!store_.drop_collection(req->name()))
       fill(resp->mutable_error(), err(Err::CollectionNotFound, "collection not found"));
@@ -343,6 +377,8 @@ grpc::Status OmbraService::run_UploadKeys(grpc::ServerContext* ctx,
         if (c.collection().empty())
           return fail(Err::InvalidArgument, "collection is required on the first chunk");
         coll = c.collection();
+        // Before anything is staged or any key bytes are read.
+        if (auto d = check_collection(ctx, coll); !d.ok()) return d;
         if (!store_.get_collection(coll, nullptr))
           return fail(Err::CollectionNotFound, "collection not found");
       } else if (!c.collection().empty() && c.collection() != coll) {
@@ -455,6 +491,7 @@ grpc::Status OmbraService::run_Insert(grpc::ServerContext* ctx,
         const auto& h = m.header();
         if (headers++ == 0) {
           coll = h.collection();
+          if (auto d = check_collection(ctx, coll); !d.ok()) return d;  // before any block is stored
           if (!store_.get_collection(coll, &spec))
             return fail(Err::CollectionNotFound, "collection not found");
           preset = find_preset(spec.preset);
@@ -510,8 +547,9 @@ grpc::Status OmbraService::run_Insert(grpc::ServerContext* ctx,
   return grpc::Status::OK;
 }
 
-grpc::Status OmbraService::run_Delete(grpc::ServerContext*, const v1::DeleteRequest* req,
+grpc::Status OmbraService::run_Delete(grpc::ServerContext* ctx, const v1::DeleteRequest* req,
                                       v1::DeleteResponse* resp) {
+  if (auto d = check_collection(ctx, req->collection()); !d.ok()) return d;
   const auto t0 = Clock::now();
   const auto fail = [&](Err c, const char* m) {
     fill(resp->mutable_error(), err(c, m));
@@ -567,6 +605,9 @@ grpc::Status OmbraService::run_Search(
   guard->touch();
   if (req.step_case() != v1::SearchRequest::kStart)
     return send_error(err(Err::BadSequence, "the first message must be SearchStart"));
+
+  // The collection scope of the key, before a slot is taken or anything is looked up.
+  if (auto d = check_collection(ctx, req.start().collection()); !d.ok()) return d;
 
   // One slot per open stream, globally and per API key; released when the handler returns, which
   // also frees the session's device memory.
@@ -688,8 +729,9 @@ grpc::Status OmbraService::run_Search(
 // ---------------------------------------------------------------------------------------------
 // Blocks
 
-grpc::Status OmbraService::run_ListBlocks(grpc::ServerContext*, const v1::ListBlocksRequest* req,
+grpc::Status OmbraService::run_ListBlocks(grpc::ServerContext* ctx, const v1::ListBlocksRequest* req,
                                           v1::ListBlocksResponse* resp) {
+  if (auto d = check_collection(ctx, req->collection()); !d.ok()) return d;
   resp->set_api_version(kApiVersion);
   try {
     if (req->api_version() != kApiVersion) {
@@ -711,8 +753,9 @@ grpc::Status OmbraService::run_ListBlocks(grpc::ServerContext*, const v1::ListBl
   return grpc::Status::OK;
 }
 
-grpc::Status OmbraService::run_GetBlock(grpc::ServerContext*, const v1::GetBlockRequest* req,
+grpc::Status OmbraService::run_GetBlock(grpc::ServerContext* ctx, const v1::GetBlockRequest* req,
                                         grpc::ServerWriter<v1::GetBlockResponse>* out) {
+  if (auto d = check_collection(ctx, req->collection()); !d.ok()) return d;
   const auto t0 = Clock::now();
   const auto send_error = [&](const Status& s) {
     v1::GetBlockResponse r;
@@ -783,6 +826,8 @@ grpc::Status OmbraService::run_ReplaceBlock(grpc::ServerContext* ctx,
         if (have_header) return fail(Err::BadSequence, "second header");
         have_header = true;
         coll = m.header().collection();
+        // Before anything of the block is read into memory or stored.
+        if (auto d = check_collection(ctx, coll); !d.ok()) return d;
         for (const auto& s : m.header().segments()) segments.push_back(s);
         if (segments.empty() || segments.size() > kMaxClustersPerRound)
           return fail(Err::InvalidArgument, "between 1 and 4096 blocks must be listed");
@@ -863,6 +908,8 @@ grpc::Status OmbraService::run_PutBlob(grpc::ServerContext* ctx,
         have_header = true;
         const auto& h = m.header();
         coll = h.collection();
+        // Before the id, the size or any payload is looked at or kept.
+        if (auto d = check_collection(ctx, coll); !d.ok()) return d;
         id = h.id();
         kind = static_cast<std::uint32_t>(h.kind());
         size = h.size();
@@ -904,8 +951,9 @@ grpc::Status OmbraService::run_PutBlob(grpc::ServerContext* ctx,
   return grpc::Status::OK;
 }
 
-grpc::Status OmbraService::run_GetBlob(grpc::ServerContext*, const v1::GetBlobRequest* req,
+grpc::Status OmbraService::run_GetBlob(grpc::ServerContext* ctx, const v1::GetBlobRequest* req,
                                        grpc::ServerWriter<v1::GetBlobResponse>* out) {
+  if (auto d = check_collection(ctx, req->collection()); !d.ok()) return d;
   const auto t0 = Clock::now();
   const auto send_error = [&](const Status& s) {
     v1::GetBlobResponse r;
@@ -945,8 +993,9 @@ grpc::Status OmbraService::run_GetBlob(grpc::ServerContext*, const v1::GetBlobRe
   return grpc::Status::OK;
 }
 
-grpc::Status OmbraService::run_DeleteBlobs(grpc::ServerContext*, const v1::DeleteBlobsRequest* req,
+grpc::Status OmbraService::run_DeleteBlobs(grpc::ServerContext* ctx, const v1::DeleteBlobsRequest* req,
                                            v1::DeleteBlobsResponse* resp) {
+  if (auto d = check_collection(ctx, req->collection()); !d.ok()) return d;
   const auto t0 = Clock::now();
   const auto fail = [&](Err c, const char* m) {
     fill(resp->mutable_error(), err(c, m));
@@ -983,45 +1032,56 @@ grpc::Status ApiKeyAuthProcessor::Process(const InputMetadata& auth_metadata, gr
   if (authorize(keys_, token, Scope::Read) == AuthResult::Unauthenticated) {
     metrics_.count_unauthenticated();
     std::uint64_t suppressed = 0;
-    if (log_.allow(&suppressed))
-      std::fprintf(
-          stderr,
-          "[ombra.server] refused call before its body reason=unauthenticated (+%llu not logged)\n",
-          static_cast<unsigned long long>(suppressed));
+    if (log_.allow(&suppressed)) {
+      // The request id of the refused call, if the client sent a valid one (never trusted otherwise).
+      std::string rid;
+      const auto rit = auth_metadata.find("x-request-id");
+      if (rit != auth_metadata.end() &&
+          log::valid_request_id(std::string_view(rit->second.data(), rit->second.size())))
+        rid.assign(rit->second.data(), rit->second.size());
+      else
+        rid = log::new_request_id();
+      log::warn("refused call before its body",
+                {{"reason", "unauthenticated"},
+                 {"request_id", rid},
+                 {"not_logged", static_cast<std::uint64_t>(suppressed)}});
+    }
     return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "missing or invalid API key");
   }
   return grpc::Status::OK;  // the header stays visible to the handler, which checks the scope
 }
 
-namespace {
-
-std::string bearer_of(const grpc::ServerContext* ctx) {
-  const auto it = ctx->client_metadata().find("authorization");
-  if (it == ctx->client_metadata().end()) return {};
-  return std::string(it->second.data(), it->second.size());
-}
-
-}  // namespace
-
 template <class Resp, class Fn>
 grpc::Status OmbraService::guarded(grpc::ServerContext* ctx, Rpc rpc, Resp* resp, Fn&& fn) {
+  // Request id: the client's, if it is valid (bounded, [A-Za-z0-9._-]); else a random one. It is
+  // sent back in the initial metadata and put on every log line of this call.
+  std::string rid;
+  {
+    const auto it = ctx->client_metadata().find("x-request-id");
+    if (it != ctx->client_metadata().end() &&
+        log::valid_request_id(std::string_view(it->second.data(), it->second.size())))
+      rid.assign(it->second.data(), it->second.size());
+    else
+      rid = log::new_request_id();
+  }
+  ctx->AddInitialMetadata("x-request-id", rid);
+  log::CallScope scope(rid, rpc_name(rpc));
   if (draining_.load())
     return grpc::Status(grpc::StatusCode::UNAVAILABLE, "the server is shutting down");
   std::string key_id;
   const AuthResult a = authorize(keys_, bearer_of(ctx), required_scope(rpc), &key_id);
+  if (a != AuthResult::Unauthenticated) scope.set_key_id(key_id);
   if (a == AuthResult::Unauthenticated) {
     metrics_.count_unauthenticated();
     std::uint64_t suppressed = 0;
     if (refused_log_.allow(&suppressed))  // one line per interval, not one per attempt
-      std::fprintf(stderr,
-                   "[ombra.server] refused rpc=%s reason=unauthenticated (+%llu not logged)\n",
-                   rpc_name(rpc), static_cast<unsigned long long>(suppressed));
+      log::warn("refused", {{"reason", "unauthenticated"},
+                            {"not_logged", static_cast<std::uint64_t>(suppressed)}});
     return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "missing or invalid API key");
   }
   if (a == AuthResult::PermissionDenied) {
     metrics_.count_permission_denied();
-    std::fprintf(stderr, "[ombra.server] refused rpc=%s reason=scope key=%s\n", rpc_name(rpc),
-                 key_id.c_str());
+    log::warn("refused", {{"reason", "scope"}});
     return grpc::Status(grpc::StatusCode::PERMISSION_DENIED, "the API key's scope is too low");
   }
   const auto t0 = Clock::now();

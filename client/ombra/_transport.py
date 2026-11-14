@@ -3,14 +3,16 @@
 
 from __future__ import annotations
 
+import contextvars
 import random
+import secrets
 import time
 import warnings
 from collections.abc import Callable, Mapping
 from typing import Any
 
 from ombra._proto import load_stubs
-from ombra.errors import OmbraError, from_rpc_error
+from ombra.errors import OmbraError, from_rpc_error, set_last_request_id
 from ombra.retry import Replayable, RetryPolicy, call_with_retry
 
 # Largest message the client sends. Every stream is sent in parts (Insert, ReplaceBlock: one column
@@ -106,6 +108,19 @@ def default_deadlines(timeout: float, stream_timeout: float) -> dict[str, float]
 _LOOPBACK = frozenset({"localhost", "127.0.0.1", "::1"})
 
 
+class _Attempts:
+    """The request id of one logical call and how many attempts used it so far."""
+
+    def __init__(self) -> None:
+        self.request_id = secrets.token_hex(8)  # random; 16 hex characters
+        self.n = 0
+
+
+_ATTEMPTS: contextvars.ContextVar[_Attempts | None] = contextvars.ContextVar(
+    "ombra_attempts", default=None
+)
+
+
 def _host(address: str) -> str:
     """The host part of `host:port`, `[v6]:port` or a bare name."""
     if address.startswith("["):
@@ -146,15 +161,20 @@ class ResilientStub:
         self._clock, self._sleep, self._rand = clock, sleep, rand
 
     def retry_runner(self, rpc: str, fn: Callable[[], Any]) -> Any:
-        """Run `fn` under this stub's policy (used by callers that drive their own retries)."""
-        return call_with_retry(
-            fn,
-            rpc=rpc,
-            policy=self.retry_policy,
-            clock=self._clock,
-            sleep=self._sleep,
-            rand=self._rand,
-        )
+        """Run `fn` under this stub's policy (used by callers that drive their own retries). All
+        attempts send the same `x-request-id`, with `x-attempt` counting up from 1."""
+        token = _ATTEMPTS.set(_Attempts())
+        try:
+            return call_with_retry(
+                fn,
+                rpc=rpc,
+                policy=self.retry_policy,
+                clock=self._clock,
+                sleep=self._sleep,
+                rand=self._rand,
+            )
+        finally:
+            _ATTEMPTS.reset(token)
 
     def __getattr__(self, name: str) -> Any:
         if name.startswith("_"):
@@ -164,13 +184,22 @@ class ResilientStub:
 
         def once(args: tuple, kwargs: dict) -> Any:
             real = [iter(a) if isinstance(a, Replayable) else a for a in args]
+            # One id per call, kept across the retries of that call (see retry_runner).
+            state = _ATTEMPTS.get() or _Attempts()
+            state.n += 1
+            rid = state.request_id
+            set_last_request_id(rid)
+            kwargs = {
+                **kwargs,
+                "metadata": (("x-request-id", rid), ("x-attempt", str(state.n))),
+            }
             try:
                 res = method(*real, **kwargs)
                 return list(res) if name in _COLLECT else res
             except OmbraError:
                 raise
             except Exception as exc:
-                mapped = from_rpc_error(exc, name)
+                mapped = from_rpc_error(exc, name, rid)
                 if mapped is None:
                     raise
                 raise mapped from exc
@@ -178,7 +207,7 @@ class ResilientStub:
         def call(*args: Any, **kwargs: Any) -> Any:
             kwargs.setdefault("timeout", limit)
             if name in _CALLER_RETRIES or not may_retry(name):
-                return once(args, kwargs) if name != "Search" else method(*args, **kwargs)
+                return once(args, kwargs)
             streams_in = any(not isinstance(a, Replayable) and _is_iterator(a) for a in args)
             if streams_in:  # a one-shot request stream cannot be sent again
                 return once(args, kwargs)

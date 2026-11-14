@@ -9,12 +9,30 @@ Every error that comes from talking to a server derives from `OmbraError`:
 * `grpc_status`: the name of the gRPC status code ("UNAVAILABLE", ...), or None when the server
   answered with an ombra.v1 error inside a normal response.
 * `error_code`: the ombra.v1 `ErrorCode` number, or None when the failure was at transport level.
+* `request_id`: the id the client sent with the call (`x-request-id`). The server puts it on every
+  log line of that call, so quote it to the operator. None for errors that did not come from a call.
 
 Messages never contain ids, vectors, scores or ciphertext bytes: only the call name and codes.
 This module needs neither grpc nor the generated stubs.
 """
 
 from __future__ import annotations
+
+import contextvars
+
+# The request id of the call this thread made last. The transport sets it; `from_proto_error` reads
+# it, because an ombra.v1 error arrives inside a normal response and is raised by the caller.
+_LAST_REQUEST_ID: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "ombra_last_request_id", default=None
+)
+
+
+def set_last_request_id(request_id: str | None) -> None:
+    _LAST_REQUEST_ID.set(request_id)
+
+
+def last_request_id() -> str | None:
+    return _LAST_REQUEST_ID.get()
 
 
 class OmbraError(Exception):
@@ -23,6 +41,7 @@ class OmbraError(Exception):
     retryable: bool = False
     grpc_status: str | None = None
     error_code: int | None = None
+    request_id: str | None = None
 
     def __init__(
         self,
@@ -31,8 +50,11 @@ class OmbraError(Exception):
         retryable: bool | None = None,
         grpc_status: str | None = None,
         error_code: int | None = None,
+        request_id: str | None = None,
     ) -> None:
         super().__init__(message)
+        if request_id is not None:
+            self.request_id = request_id
         if retryable is not None:
             self.retryable = retryable
         if grpc_status is not None:
@@ -225,6 +247,7 @@ def from_proto_error(
         err,
         text if text is not None else f"error code {code}: {message}",
         error_code=code or None,
+        request_id=last_request_id(),
     )
     err.code = code  # type: ignore[attr-defined]
     err.message = message  # type: ignore[attr-defined]
@@ -250,11 +273,13 @@ def status_name(exc: BaseException) -> str | None:
     return name if isinstance(name, str) and name.isupper() else None
 
 
-def from_rpc_error(exc: BaseException, rpc: str) -> OmbraError | None:
+def from_rpc_error(
+    exc: BaseException, rpc: str, request_id: str | None = None
+) -> OmbraError | None:
     """Map a grpc.RpcError to an OmbraError, or None if `exc` is not one. Only the call name and
     the status code go into the message, never the server's detail text."""
     status = status_name(exc)
     if status is None:
         return None
     cls = _STATUS_CLASSES.get(status, OmbraError)
-    return cls(f"{rpc} failed with status {status}", grpc_status=status)
+    return cls(f"{rpc} failed with status {status}", grpc_status=status, request_id=request_id)

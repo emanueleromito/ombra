@@ -57,6 +57,7 @@
 #include "gpu_info.hpp"
 #include "ombra/search/session.hpp"
 #include "ombra/server/auth.hpp"
+#include "ombra/server/log.hpp"
 #include "ombra/server/limits.hpp"
 #include "ombra/server/metrics.hpp"
 #include "ombra/server/policy.hpp"
@@ -135,7 +136,7 @@ constexpr const char* kArgHandshakeTimeoutMs = "grpc.server_handshake_timeout_ms
 
 int main(int argc, char** argv) {
   std::string data_dir, listen, ofhe = OMBRA_OPENFHE_VERSION;
-  std::string tls_cert, tls_key, scope_arg, rest_host;
+  std::string tls_cert, tls_key, scope_arg, rest_host, key_collection, log_format_arg;
   std::uint64_t gpu_mb = 4096, host_mb = 2048;
   std::uint64_t compact_ms = 60000;
   // The C++ API has one receive limit for the whole server. No message is larger than a column or
@@ -233,6 +234,10 @@ int main(int argc, char** argv) {
       rest_host = next();
     else if (a == "--scope")
       scope_arg = next();
+    else if (a == "--collection")
+      key_collection = next();
+    else if (a == "--log-format")
+      log_format_arg = next();
     else if (a == "--create-api-key")
       create_key = true;
     else if (a == "--insecure")
@@ -245,21 +250,33 @@ int main(int argc, char** argv) {
     }
   }
 
+  if (!log_format_arg.empty()) {
+    ombra::server::log::Format lf;
+    if (!ombra::server::log::parse_format(log_format_arg, &lf)) {
+      std::fprintf(stderr, "invalid value for --log-format: expected text or json\n");
+      return 2;
+    }
+    ombra::server::log::set_format(lf);
+  }
+
   if (create_key) {
     ombra::server::Scope scope;
     if (data_dir.empty() || !ombra::server::parse_scope(scope_arg, &scope)) {
       std::fprintf(stderr,
-                   "usage: ombra_server --create-api-key --scope admin|read|write --data-dir D\n");
+                   "usage: ombra_server --create-api-key --scope admin|read|write --data-dir D "
+                   "[--collection NAME (read or write only)]\n");
       return 2;
     }
     try {
       std::string id;
-      const std::string token = ombra::server::create_api_key(data_dir, scope, &id);
+      const std::string token = ombra::server::create_api_key(data_dir, scope, &id, key_collection);
       // The only place a token is ever shown.
       std::printf("%s\n", token.c_str());
       std::fflush(stdout);
-      std::fprintf(stderr, "created %s API key %s (shown once; only its salted hash is stored)\n",
-                   scope_arg.c_str(), id.c_str());
+      std::fprintf(stderr,
+                   "created %s API key %s%s (shown once; only its salted hash is stored)\n",
+                   scope_arg.c_str(), id.c_str(),
+                   key_collection.empty() ? "" : " for one collection");
     } catch (const std::exception& e) {
       std::fprintf(stderr, "fatal: %s\n", e.what());
       return 1;
@@ -300,12 +317,12 @@ int main(int argc, char** argv) {
     }
   }
 #ifdef OMBRA_NO_GPU
-  std::fprintf(stderr,
-               "WARNING: this server was built without GPU support (for tests and development): "
-               "Search fails, every other call works\n");
+  ombra::server::log::warn(
+      "this server was built without GPU support (for tests and development): Search fails, "
+      "every other call works");
 #endif
-  if (!tls) std::fprintf(stderr, "WARNING: --insecure: connections are NOT encrypted\n");
-  if (no_auth) std::fprintf(stderr, "WARNING: --no-auth: anyone who can connect has full access\n");
+  if (!tls) ombra::server::log::warn("--insecure: connections are NOT encrypted");
+  if (no_auth) ombra::server::log::warn("--no-auth: anyone who can connect has full access");
   // The REST port is checked on the host it really binds (audit A-18), and defaults to loopback.
   const std::string rhost = rest_host.empty() ? "127.0.0.1" : rest_host;
   if ((!tls || no_auth) && !is_loopback_listen(listen)) {
@@ -438,9 +455,9 @@ int main(int argc, char** argv) {
             std::size_t dropped = 0;
             for (const auto& c : store.list_collections()) dropped += store.drop_dead_blocks(c);
             if (dropped > 0)
-              std::fprintf(stderr, "[ombra.server] compaction dropped=%zu\n", dropped);
+              ombra::server::log::info("compaction", {{"dropped", static_cast<std::uint64_t>(dropped)}});
           } catch (const std::exception& e) {
-            std::fprintf(stderr, "[ombra.server] compaction failed: %s\n", e.what());
+            ombra::server::log::error("compaction failed", {{"error", e.what()}});
           }
         }
       });
@@ -451,17 +468,17 @@ int main(int argc, char** argv) {
         // SIGHUP: pick up revoked or new API keys. A broken file keeps the loaded keys.
         try {
           keys->reload(ombra::server::ApiKeyStore::path_in(data_dir));
-          std::fprintf(stderr, "[ombra.server] reloaded API keys count=%zu\n", keys->size());
+          ombra::server::log::info("reloaded API keys",
+                                   {{"count", static_cast<std::uint64_t>(keys->size())}});
         } catch (const std::exception& e) {
-          std::fprintf(stderr,
-                       "[ombra.server] API key reload failed, keeping the loaded keys: %s\n",
-                       e.what());
+          ombra::server::log::error("API key reload failed, keeping the loaded keys",
+                                    {{"error", e.what()}});
         }
       }
     }
     // Shutdown (see the header comment). Not ready first, so a load balancer stops sending.
-    std::fprintf(stderr, "[ombra.server] shutdown requested: not ready, draining up to %llu s\n",
-                 static_cast<unsigned long long>(shutdown_grace_s));
+    ombra::server::log::info("shutdown requested: not ready, draining",
+                             {{"grace_s", static_cast<std::uint64_t>(shutdown_grace_s)}});
     if (rest) rest->begin_drain();
     service.begin_drain();
     if (compactor.joinable()) compactor.join();
@@ -475,13 +492,13 @@ int main(int argc, char** argv) {
     while (!drained.load() && g_signals.load() < 2)
       std::this_thread::sleep_for(std::chrono::milliseconds(20));
     if (!drained.load()) {
-      std::fprintf(stderr, "[ombra.server] second signal: exiting now, running calls are cut\n");
+      ombra::server::log::warn("second signal: exiting now, running calls are cut");
       std::_Exit(1);  // acknowledged writes are durable; recovery sweeps unfinished ones
     }
     drain.join();
     server->Wait();
     if (rest) rest->stop();
-    std::fprintf(stderr, "[ombra.server] shutdown complete\n");
+    ombra::server::log::info("shutdown complete");
   } catch (const std::exception& e) {
     std::fprintf(stderr, "fatal: %s\n", e.what());
     return 1;

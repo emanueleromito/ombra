@@ -29,7 +29,13 @@ from typing import Any
 import numpy as np
 
 from ombra.blobstore import KIND_RECORD
-from ombra.errors import CollectionError, OmbraError, collection_error, from_rpc_error
+from ombra.errors import (
+    CollectionError,
+    OmbraError,
+    collection_error,
+    from_rpc_error,
+    last_request_id,
+)
 from ombra.file_format import Kind, read_envelope
 from ombra.presets import FILTER_LAMBDA
 from ombra.probe import FIELDS_KEY, ProbePlanner, decoy_round_sizes, strict_halves
@@ -90,6 +96,7 @@ class _Stream:
         for request in self._sent:
             self._q.put(request)
         self._call = self._stub.Search(self._requests(self._q))
+        self._rid = last_request_id()  # the id the server logs this stream under
 
     @staticmethod
     def _requests(q: queue.Queue):
@@ -111,7 +118,7 @@ class _Stream:
         except OmbraError:
             raise
         except Exception as exc:
-            mapped = from_rpc_error(exc, "Search")
+            mapped = from_rpc_error(exc, "Search", getattr(self, "_rid", None))
             if mapped is None:
                 raise
             raise mapped from exc
